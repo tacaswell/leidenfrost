@@ -30,21 +30,24 @@ def gen_circle(x,y,r):
     theta = linspace(0,2*np.pi,1000)
     return vstack((r*sin(theta) + x,r*cos(theta) + y))
 
-def gen_ellipse(a,b,t,x,y):
-    theta = linspace(0,2*np.pi,1000)
+def gen_ellipse(a,b,t,x,y,theta):
+    
     if a > b:
-        tmp = b
-        b = a
-        a = tmp
-    r =  1/np.sqrt((np.sin(theta + t)**2 )/(a*a) +(np.cos(theta + t)**2 )/(b*b) )
-    return vstack((r*np.sin(theta) + x,r*np.cos(theta) + y))
+            tmp = b
+            b = a
+            a = tmp
+
+            
+    #t = mod(t,np.pi/2)
+    r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
+    return vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
 class ellipse_fitter:
     def __init__(self):
         self.pt_lst = []
         
         
-    def click_event(event):
+    def click_event(self,event):
         ''' Extracts locations from the user'''
         if event.key == 'shift':
             self.pt_list = []
@@ -76,14 +79,12 @@ def gen_to_parm(p):
     y0 = (a*f - b*d)/(b*b - a*c)
     ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
     bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (-np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
+
+    t0 =  (1/2) * arctan(2*b/(a-c))
     
-    if b == 0:
-        if a<c:
-            t0 = np.pi/2
-        else:
-            t0 = 0
-    elif a<c: 
+    if a<c: 
         t0 =  (1/2) * arctan(2*b/(a-c))
+        
     else:
         t0 = np.pi/2 + (1/2) * arctan(2*b/(c-a))
         
