@@ -31,8 +31,8 @@ def gen_circle(x,y,r):
     return vstack((r*sin(theta) + x,r*cos(theta) + y))
 
 def gen_ellipse(a,b,t,x,y,theta):
-    
-    if a > b:
+    # a is always the major axis, x is always the major axis, can be rotated away by t
+    if b > a:
             tmp = b
             b = a
             a = tmp
@@ -82,7 +82,7 @@ def gen_to_parm(p):
 
     t0 =  (1/2) * arctan(2*b/(a-c))
     
-    if a<c: 
+    if a>c: 
         t0 =  (1/2) * arctan(2*b/(a-c))
         
     else:
