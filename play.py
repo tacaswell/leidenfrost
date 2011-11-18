@@ -24,7 +24,7 @@ import numpy as np
 def extract_image(fname):
     im = PIL.Image.open(fname)
     img_sz = im.size[::-1]
-    return np.reshape(im.getdata(),img_sz).astype('uint16')
+    return np.reshape(im.getdata(),img_sz).astype('uint16').T
 
 def gen_circle(x,y,r):
     theta = linspace(0,2*np.pi,1000)
