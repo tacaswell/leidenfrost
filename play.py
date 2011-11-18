@@ -50,7 +50,7 @@ class ellipse_fitter:
     def click_event(self,event):
         ''' Extracts locations from the user'''
         if event.key == 'shift':
-            self.pt_list = []
+            self.pt_lst = []
             
         self.pt_lst.append((event.xdata,event.ydata))
 
