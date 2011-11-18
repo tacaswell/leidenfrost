@@ -14,8 +14,79 @@
 #
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
+from __future__ import division
+
+import PIL.Image
+import scipy.odr as sodr
+import numpy as np
+
+
+def extract_image(fname):
+    im = PIL.Image.open(fname)
+    img_sz = im.size[::-1]
+    return np.reshape(im.getdata(),img_sz).astype('uint16')
 
 def gen_circle(x,y,r):
     theta = linspace(0,2*np.pi,1000)
     return vstack((r*sin(theta) + x,r*cos(theta) + y))
 
+def gen_ellipse(a,b,t,x,y):
+    theta = linspace(0,2*np.pi,1000)
+    if a > b:
+        tmp = b
+        b = a
+        a = tmp
+    r =  1/np.sqrt((np.sin(theta + t)**2 )/(a*a) +(np.cos(theta + t)**2 )/(b*b) )
+    return vstack((r*np.sin(theta) + x,r*np.cos(theta) + y))
+
+class ellipse_fitter:
+    def __init__(self):
+        self.pt_lst = []
+        
+        
+    def click_event(event):
+        ''' Extracts locations from the user'''
+        if event.key == 'shift':
+            self.pt_list = []
+            
+        self.pt_lst.append((event.xdata,event.ydata))
+
+def e_funx(p,r):
+    x,y = r
+    a,b,c,d,f = p
+        
+    return a* x*x + 2*b*x*y + c * y*y + 2 *d *x + 2 * f *y -1
+
+def fit_ellipse(r):
+
+
+    p0 = (2,2,0,0,0)
+    data = sodr.Data(r,1)
+    model = sodr.Model(e_funx,implicit=1)
+    worker = sodr.ODR(data,model,p0)
+    out = worker.run()
+    out = worker.restart()
+    return out
+
+# http://mathworld.wolfram.com/Ellipse.html
+def gen_to_parm(p):
+    a,b,c,d,f = p
+    g = -1
+    x0 = (c*d-b*f)/(b*b - a*c)
+    y0 = (a*f - b*d)/(b*b - a*c)
+    ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
+    bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (-np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
+    
+    if b == 0:
+        if a<c:
+            t0 = np.pi/2
+        else:
+            t0 = 0
+    elif a<c: 
+        t0 =  (1/2) * arctan(2*b/(a-c))
+    else:
+        t0 = np.pi/2 + (1/2) * arctan(2*b/(c-a))
+        
+    
+
+    return (ap,bp,t0,x0,y0)
