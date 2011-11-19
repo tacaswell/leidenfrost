@@ -91,3 +91,13 @@ def gen_to_parm(p):
     
 
     return (ap,bp,t0,x0,y0)
+
+
+def l_smooth(values,window_len=2):
+    window_len = window_len*2+1
+    s=np.r_[values[window_len-1:0:-1],values,values[-1:-window_len:-1]]
+    #w = np.ones(window_len,'d')
+    w = np.exp(-((arange(-window_len//2,window_len//2,1)/(window_len//4))**2)/2)
+    print w
+    values = np.convolve(w/w.sum(),s,mode='valid')[(window_len//2):-(window_len//2)]
+    return values
