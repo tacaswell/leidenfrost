@@ -204,11 +204,11 @@ def link_points(levels,search_range = .02):
             cur_box = cur_hash.get_region(trk_pt)
             #print len(cur_box)
             if len(cur_box) ==0:
-                break
+                continue
 
             pmin = None
             # stupidly big number
-            dmin = 10000
+            dmin = search_range
             
             for p in cur_box:
                 if p.in_track():
@@ -218,7 +218,7 @@ def link_points(levels,search_range = .02):
                     dmin = d
                     pmin = p
                     
-            if pmin is not None and dmin < search_range:
+            if pmin is not None:
                 cur_track.add_point(pmin)
                 accepted_tracks.append(cur_track)
                 
