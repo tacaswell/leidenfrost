@@ -135,10 +135,13 @@ class track:
     count = 0
     def __init__(self,point=None):
         self.points = []
+        # will take initiator point
         if not point is None:
             self.add_point(point)
-        self.indx = track.count
+                                        
+        self.indx = track.count           #unique id
         track.count +=1
+        self.charge = 0
     def add_point(self,point):
         '''Adds a point to this track '''
         if point in self.points:
@@ -151,7 +154,58 @@ class track:
         return self.points[-1]
     def plot_trk(self,ax):
         ax.plot(*zip(*[(p.a,p.t) for p in self.points]),marker='x')
+    # classify tracks
+    def classify(self):
+        t,a = zip(*[(p.t,p.a) for p in self.points])
+        self.t = np.mean(t)
+        if len(t) < 15:
+            self.charge =  0
+            return
+        
+        i_min = min(t)
+        i_max = max(t)
+        match_count = 0
+        match_val = 0
+        fliped = False
+        while len(t) >=15:
+            t = t[4:-5]
+            t_min = min(t)
+            t_max = max(t)
+            if t_min == i_min:
+                if match_val != -1:
+                    if match_val == 1:
+                        fliped = True
+                        i_min = t_min
+                    match_val = -1
+                    match_count =0
+                match_count +=1
+            if t_max == i_max:
+                if match_val != 1:
+                    if match_val == -1:
+                        fliped = True
+                        i_max = t_max
+                    match_val = 1
+                    match_count =0
+                match_count +=1
+            if match_count == 2:
+                self.charge = match_val
+                if match_val == -1:
+                    self.t = i_min
+                elif match_val == 1:
+                    self.t = i_max
+                return
+        if not fliped:
+            self.charge =  match_val
+            if match_val == -1:
+                self.t = i_min
+            elif match_val == 1:
+                self.t = i_max
+            return
+        else:
+            self.charge = 0
+            return 
 
+        
 class hash_line:
     def __init__(self,bin_width):
         '''1D hash table for doing the ridge linking'''
@@ -192,11 +246,11 @@ def link_points(levels,search_range = .02):
     
     for cur_level in levels[1:]:
         accepted_tracks = []
-        print 'start level'
+        
         cur_hash = hash_line(search_range*2)
         for p in cur_level:
             cur_hash.add_point(p)
-        print 'started', len(candidate_tracks)
+        
         while len(candidate_tracks) > 0:
             # select the next track
             cur_track = candidate_tracks.pop()
@@ -205,6 +259,7 @@ def link_points(levels,search_range = .02):
             # get the region of candidate points
             cur_box = cur_hash.get_region(trk_pt)
             #print len(cur_box)
+            
             if len(cur_box) ==0:
                 continue
 
@@ -213,9 +268,12 @@ def link_points(levels,search_range = .02):
             dmin = search_range
             
             for p in cur_box:
+                # don't link previously linked particles
                 if p.in_track():
                     continue
+                # get distance between the current point and the candidate point
                 d  = trk_pt.distance(p)
+                
                 if  d < dmin:
                     dmin = d
                     pmin = p
@@ -226,7 +284,7 @@ def link_points(levels,search_range = .02):
                 
             
                 
-        print 'continued',len(accepted_tracks)
+                
         for p in cur_level:
             if not p.in_track():
                 new_trk = track(p)
