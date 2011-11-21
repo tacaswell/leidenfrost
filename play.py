@@ -206,9 +206,11 @@ class track:
             return 
 
         
-class hash_line:
+class hash_line_angular:
+    '''1D hash table with linked ends for doing the ridge linking
+    around a rim'''
     def __init__(self,bin_width):
-        '''1D hash table for doing the ridge linking'''
+        
         full_width = 2*np.pi
         self.boxes = [[] for j in range(0,int(np.ceil(full_width/bin_width)))]
         self.bin_width = bin_width
@@ -226,8 +228,42 @@ class hash_line:
             tmp_box.extend(self.boxes[mod(j,self.bin_count)])
         return tmp_box
 
+
+            
+class hash_line_linear:
+    '''1D hash table for doing ridge linking when sampling radially'''
+    def __init__(self,bin_width,max_r):
+        
+        full_width = max_r
+        self.boxes = [[] for j in range(0,int(np.ceil(full_width/bin_width)))]
+        self.bin_width = bin_width
+        self.bin_count = len(self.boxes)
+        
+    def add_point(self,point):
+        ''' Adds a point on the hash line'''
+        t = mod(point.t,2*np.pi)
+        self.boxes[int(np.floor(t/self.bin_width))].append(point)
+    def get_region(self,point,bbuffer = 1):
+        '''Gets the region around the point'''
+        box_indx = int(np.floor(t/self.bin_width))
+        min_b = box_indx - bbuffer
+        max_b = box_indx + bbuffer +1
+        if min_b < 0: 
+            min_b = 0
+        if max_b > self.bin_count:
+            max_b = self.bin_count 
+            
+        tmp_box = []
+        for j in range(min_b,max_b):
+            tmp_box.extend(self.boxes[mod(j,self.bin_count)])
+        return tmp_box
+
+def linear_factory(r):
+    def tmp(bin_width):
+        return hash_line_linear(bin_width,r)
     
-def link_points(levels,search_range = .02):
+    
+def link_points(levels,search_range = .02,hash_line=hash_line_angular):
     '''Stupid 1D linking routine.  The plan is to not worry about
     multiple connections at this stage and to instead write a way to
     merge tracks together.  Should be an issue with max points and saddles
