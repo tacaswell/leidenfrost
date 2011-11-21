@@ -198,9 +198,11 @@ def link_points(levels,search_range = .02):
             cur_hash.add_point(p)
         print 'started', len(candidate_tracks)
         while len(candidate_tracks) > 0:
+            # select the next track
             cur_track = candidate_tracks.pop()
-            
+            # get the last point in the current track
             trk_pt = cur_track.last_point()
+            # get the region of candidate points
             cur_box = cur_hash.get_region(trk_pt)
             #print len(cur_box)
             if len(cur_box) ==0:
