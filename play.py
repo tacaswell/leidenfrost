@@ -166,7 +166,7 @@ class hash_line:
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
     def get_region(self,point,bbuffer = 1):
         '''Gets the region around the point'''
-        box_indx = int(np.floor(mod(point.t,2*np.pi)/self.bin_count))
+        box_indx = int(np.floor(self.bin_count * mod(point.t,2*np.pi)/(2*np.pi)))
         tmp_box = []
         for j in range(box_indx - bbuffer,box_indx + bbuffer + 1):
             tmp_box.extend(self.boxes[mod(j,self.bin_count)])
