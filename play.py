@@ -20,7 +20,8 @@ import PIL.Image
 import scipy.odr as sodr
 import numpy as np
 
-
+import find_peaks as  fp
+    
 def extract_image(fname):
     im = PIL.Image.open(fname)
     img_sz = im.size[::-1]
@@ -98,7 +99,7 @@ def l_smooth(values,window_len=2):
     s=np.r_[values[window_len-1:0:-1],values,values[-1:-window_len:-1]]
     #w = np.ones(window_len,'d')
     w = np.exp(-((linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
-    print w
+    
     values = np.convolve(w/w.sum(),s,mode='valid')[(window_len//2):-(window_len//2)]
     return values
 
@@ -331,3 +332,56 @@ def link_points(levels,search_range = .02,hash_line=hash_line_angular):
         
 
     return track_set
+
+def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
+    # fit the ellipse to extract from
+    out = fit_ellipse(pts)
+    # set up points to sample at
+    theta = linspace(0,2*np.pi,floor(450*2*np.pi).astype('int'))
+
+    #dlfimg = scipy.ndimage.morphology.grey_closing(lfimg,(1,1))
+    dlfimg = lfimg
+    
+    # convert the parameters to parametric form
+    a,b,t0,x0,y0 = gen_to_parm(out.beta)
+    min_vec = []
+    max_vec = []
+    for ma_scale in linspace(1-s_width,1 +s_width,s_num):
+        # set up this steps ellipse
+        p = (a*ma_scale,b*ma_scale,t0,x0,y0)
+        # extract the points in the ellipse is x-y
+        zp = (gen_ellipse(*(p+(theta,))))
+        # extract the values at those locations from the image.  The
+        # extra flipud is to take a transpose of the points to deal
+        # with the fact that the definition of the first direction
+        # between plotting and the image libraries is inconsistent.
+        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,flipud(zp),order=4)
+        # smooth the curve
+        zv = l_smooth(zv)
+
+        # find the peaks, the parameters here are important
+        peaks = fp.peakdetect(zv,theta,5,10000)
+        # extract the maximums
+        max_pk = np.vstack(peaks[0]).T
+        # extract the minimums
+        min_pk = np.vstack(peaks[1]).T
+        
+        # append to the export vectors
+        min_vec.append((ma_scale,min_pk))
+        max_vec.append((ma_scale,max_pk))
+
+        
+        
+    return min_vec,max_vec
+
+def link_ridges(vec,search_range):
+    # generate point levels from the previous steps
+
+    levels = [[point(a,t,v) for t,v in zip(*pks)] for a,pks in vec]
+    print len(levels)
+    trks = link_points(levels,.02)        
+    for t in trks:
+        t.classify()
+
+    trks.sort(key = lambda x: x.t)
+    return trks
