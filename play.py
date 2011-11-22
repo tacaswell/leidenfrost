@@ -260,7 +260,7 @@ class hash_line_linear:
         
     def add_point(self,point):
         ''' Adds a point on the hash line'''
-        t = mod(point.t,2*np.pi)
+        t = point.phi
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
     def get_region(self,point,bbuffer = 1):
         '''Gets the region around the point'''
