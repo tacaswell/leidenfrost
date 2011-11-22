@@ -262,6 +262,7 @@ class hash_line_linear:
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
     def get_region(self,point,bbuffer = 1):
         '''Gets the region around the point'''
+        t = point.t
         box_indx = int(np.floor(t/self.bin_width))
         min_b = box_indx - bbuffer
         max_b = box_indx + bbuffer +1
