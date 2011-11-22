@@ -219,11 +219,15 @@ class track:
         '''Merges the track add_track into the current track.
         Progressively moves points from the other track to this one.
         '''
-        ot_pts = to_merge_track.points
-        while len(ot_pts) <0:
-            cur_pt = ot_pts.pop()
+        
+        while len(to_merge_track.points) >0:
+            cur_pt = to_merge_track.points.pop()
             cur_pt.remove_from_track(to_merge_track)
             self.add_point(cur_pt)
+        if self.phi is not None:
+            self.mean_phi()
+        if self.charge is not None:
+            self.classify()
         
 class hash_line_angular:
     '''1D hash table with linked ends for doing the ridge linking
