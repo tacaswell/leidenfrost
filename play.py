@@ -402,7 +402,7 @@ def link_ridges(vec,search_range):
     # generate point levels from the previous steps
 
     levels = [[point(q,t,v) for phi,v in zip(*pks)] for q,pks in vec]
-    print len(levels)
+    
     trks = link_points(levels,.02)        
     for t in trks:
         t.classify()
@@ -415,7 +415,7 @@ def link_rings(vec,search_range,r_max):
     # generate point levels from the previous steps
     hash_line = linear_factory(r_max)
     levels = [[point(a,t,v) for t,v in zip(*pks)] for a,pks in vec]
-    print len(levels)
+    
     trks = link_points(levels,search_range,hash_line = hash_line)        
     
     return trks
