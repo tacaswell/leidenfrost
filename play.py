@@ -228,7 +228,8 @@ class track:
             self.mean_phi()
         if self.charge is not None:
             self.classify()
-        
+    def sort(self):
+        self.points.sort(key = lambda x: x.q)
 class hash_line_angular:
     '''1D hash table with linked ends for doing the ridge linking
     around a rim'''
