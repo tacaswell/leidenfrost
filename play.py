@@ -21,7 +21,7 @@ import scipy.odr as sodr
 import numpy as np
 
 import find_peaks as  fp
-    
+
 def extract_image(fname):
     im = PIL.Image.open(fname)
     img_sz = im.size[::-1]
@@ -118,6 +118,10 @@ class point:
             pass
         else:
             self.tracks.append(track)
+    def remove_from_track(self,track):
+        '''Removes a point from the given track, error if not really
+        in that track'''
+        self.tracks.remove(track)
     def distance(self,point):
         '''Returns the absolute value of the angular distance between
         two points mod 2\pi'''
@@ -142,7 +146,9 @@ class track:
                                         
         self.indx = track.count           #unique id
         track.count +=1
-        self.charge = 0
+        self.charge = None
+        self.a_bar = None
+        self.t = None
     def add_point(self,point):
         '''Adds a point to this track '''
         if point in self.points:
@@ -205,7 +211,17 @@ class track:
         else:
             self.charge = 0
             return 
-
+    def average_t(self):
+        self.t = np.mean([p.t for p in self.points])
+    def merge_track(self,to_merge_track):
+        '''Merges the track add_track into the current track.
+        Progressively moves points from the other track to this one.
+        '''
+        ot_pts = to_merge_track.points
+        while len(ot_pts) <0:
+            cur_pt = ot_pts.pop()
+            cur_pt.remove_from_track(to_merge_track)
+            self.add_point(cur_pt)
         
 class hash_line_angular:
     '''1D hash table with linked ends for doing the ridge linking
