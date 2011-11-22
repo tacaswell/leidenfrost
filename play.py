@@ -401,9 +401,9 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
 def link_ridges(vec,search_range):
     # generate point levels from the previous steps
 
-    levels = [[point(q,t,v) for phi,v in zip(*pks)] for q,pks in vec]
+    levels = [[point(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
     
-    trks = link_points(levels,.02)        
+    trks = link_points(levels,search_range)        
     for t in trks:
         t.classify()
 
