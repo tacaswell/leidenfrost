@@ -213,7 +213,7 @@ class track:
         else:
             self.charge = 0
             return 
-    def average_t(self):
+    def mean_phi(self):
         self.phi = np.mean([p.phi for p in self.points])
     def merge_track(self,to_merge_track):
         '''Merges the track add_track into the current track.
