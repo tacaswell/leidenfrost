@@ -409,3 +409,36 @@ def link_ridges(vec,search_range):
 
     trks.sort(key = lambda x: x.phi)
     return trks
+
+
+def link_rings(vec,search_range,r_max):
+    # generate point levels from the previous steps
+    hash_line = linear_factory(r_max)
+    levels = [[point(a,t,v) for t,v in zip(*pks)] for a,pks in vec]
+    print len(levels)
+    trks = link_points(levels,search_range,hash_line = hash_line)        
+    
+    return trks
+
+
+    
+def radial_merge_tracks(trk_lst,merge_range):
+    hash_line = hash_line_linear(1,35)
+    for t in trk_lst:
+        t.mean_phi()
+        hash_line.add_point(t)
+    trk_lst.sort(key = lambda x: len(x.points))
+    new_trk_lst = []
+    while len(trk_lst)>0:
+        t = trk_lst.pop(0)
+        if len(t.points) > 0:
+            cur_region = hash_line.get_region(t)
+            for merge_cand in cur_region:
+                if merge_cand != t and len(merge_cand.points )> 0  and np.abs(t.phi-merge_cand.phi)<merge_range:
+                    t.merge_track(merge_cand)
+                    t.sort()
+                    
+                    
+            new_trk_lst.append(t)
+    new_trk_lst.sort(key = lambda x: x.phi)
+    return new_trk_lst
