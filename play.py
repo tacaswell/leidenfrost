@@ -105,10 +105,12 @@ def l_smooth(values,window_len=2):
 
 
 class point:
-    '''Class to encapsulate the min/max points found on a given curve '''
-    def __init__(self,a,t,v):
-        self.a = a                      # the scale of the curve
-        self.t = t                      # the angle of the extrema 
+    '''Class to encapsulate the min/max points found on a given curve 
+    points are on a line parametrized as phi(q)
+    '''
+    def __init__(self,q,phi,v):
+        self.q = q                      # paramterizing variable
+        self.phi = phi                  # function_value
         self.v = v                      # the value at the extrema (can probably drop this)
         self.tracks = []                # list of tracks that are trying to claim this point
 
@@ -125,7 +127,7 @@ class point:
     def distance(self,point):
         '''Returns the absolute value of the angular distance between
         two points mod 2\pi'''
-        d = np.mod(np.abs(self.t - point.t),2*np.pi)
+        d = np.mod(np.abs(self.phi - point.phi),2*np.pi)
         if d> np.pi:
             d = d-np.pi
         return d
@@ -147,8 +149,8 @@ class track:
         self.indx = track.count           #unique id
         track.count +=1
         self.charge = None
-        self.a_bar = None
-        self.t = None
+        self.q_bar = None
+        self.phi = None
     def add_point(self,point):
         '''Adds a point to this track '''
         if point in self.points:
@@ -160,11 +162,11 @@ class track:
         '''Returns the last point on the track'''
         return self.points[-1]
     def plot_trk(self,ax):
-        ax.plot(*zip(*[(p.a,p.t) for p in self.points]),marker='x')
+        ax.plot(*zip(*[(p.q,p.phi) for p in self.points]),marker='x')
     # classify tracks
     def classify(self):
-        t,a = zip(*[(p.t,p.a) for p in self.points])
-        self.t = np.mean(t)
+        t,a = zip(*[(p.phi,p.q) for p in self.points])
+        self.phi = np.mean(t)
         if len(t) < 15:
             self.charge =  0
             return
@@ -197,22 +199,22 @@ class track:
             if match_count == 2:
                 self.charge = match_val
                 if match_val == -1:
-                    self.t = i_min
+                    self.phi = i_min
                 elif match_val == 1:
-                    self.t = i_max
+                    self.phi = i_max
                 return
         if not fliped:
             self.charge =  match_val
             if match_val == -1:
-                self.t = i_min
+                self.phi = i_min
             elif match_val == 1:
-                self.t = i_max
+                self.phi = i_max
             return
         else:
             self.charge = 0
             return 
     def average_t(self):
-        self.t = np.mean([p.t for p in self.points])
+        self.phi = np.mean([p.phi for p in self.points])
     def merge_track(self,to_merge_track):
         '''Merges the track add_track into the current track.
         Progressively moves points from the other track to this one.
@@ -235,11 +237,11 @@ class hash_line_angular:
         
     def add_point(self,point):
         ''' Adds a point on the hash line'''
-        t = mod(point.t,2*np.pi)
+        t = mod(point.phi,2*np.pi)
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
     def get_region(self,point,bbuffer = 1):
         '''Gets the region around the point'''
-        box_indx = int(np.floor(self.bin_count * mod(point.t,2*np.pi)/(2*np.pi)))
+        box_indx = int(np.floor(self.bin_count * mod(point.phi,2*np.pi)/(2*np.pi)))
         tmp_box = []
         for j in range(box_indx - bbuffer,box_indx + bbuffer + 1):
             tmp_box.extend(self.boxes[mod(j,self.bin_count)])
@@ -262,7 +264,7 @@ class hash_line_linear:
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
     def get_region(self,point,bbuffer = 1):
         '''Gets the region around the point'''
-        t = point.t
+        t = point.phi
         box_indx = int(np.floor(t/self.bin_width))
         min_b = box_indx - bbuffer
         max_b = box_indx + bbuffer +1
@@ -279,7 +281,7 @@ class hash_line_linear:
 def linear_factory(r):
     def tmp(bin_width):
         return hash_line_linear(bin_width,r)
-    
+    return tmp
     
 def link_points(levels,search_range = .02,hash_line=hash_line_angular):
     '''Stupid 1D linking routine.  The plan is to not worry about
@@ -394,11 +396,11 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
 def link_ridges(vec,search_range):
     # generate point levels from the previous steps
 
-    levels = [[point(a,t,v) for t,v in zip(*pks)] for a,pks in vec]
+    levels = [[point(q,t,v) for phi,v in zip(*pks)] for q,pks in vec]
     print len(levels)
     trks = link_points(levels,.02)        
     for t in trks:
         t.classify()
 
-    trks.sort(key = lambda x: x.t)
+    trks.sort(key = lambda x: x.phi)
     return trks
