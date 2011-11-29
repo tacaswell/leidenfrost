@@ -423,6 +423,10 @@ def link_rings(vec,search_range,r_max):
 
     
 def radial_merge_tracks(trk_lst,merge_range):
+    '''This function is for merging radial tracks together.  This
+    assumes that the data is from concentric rings.  phi -> r, q ->
+    theta.  All tracks that have an average phi with in merge_range of
+    each other are merged into one track.'''
     hash_line = hash_line_linear(1,35)
     for t in trk_lst:
         t.mean_phi()
