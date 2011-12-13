@@ -149,7 +149,7 @@ class track:
         self.indx = track.count           #unique id
         track.count +=1
         self.charge = None
-        self.q_bar = None
+        self.q = None
         self.phi = None
     def add_point(self,point):
         '''Adds a point to this track '''
@@ -161,10 +161,11 @@ class track:
     def last_point(self):
         '''Returns the last point on the track'''
         return self.points[-1]
-    def plot_trk(self,ax):
-        ax.plot(*zip(*[(p.q,p.phi) for p in self.points]),marker='x')
+    def plot_trk(self,ax,**kwargs):
+        ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
     # classify tracks
     def classify(self):
+        '''This needs to be re-written to deal with non-properly Chevron tracks better '''
         t,a = zip(*[(p.phi,p.q) for p in self.points])
         self.phi = np.mean(t)
         if len(t) < 15:
@@ -173,45 +174,78 @@ class track:
         
         i_min = min(t)
         i_max = max(t)
+        q_val = None
         match_count = 0
         match_val = 0
         fliped = False
         while len(t) >=15:
+            # truncate the track
             t = t[4:-5]
-            t_min = min(t)
-            t_max = max(t)
+            # get the current min and max
+            t_min = np.min(t)
+            t_max = np.max(t)
+            # if the min hasn't changed, claim track has negative charge
             if t_min == i_min:
+                # if the track doesn't currently have negative charge
                 if match_val != -1:
+                    # if it currently has positive charge
                     if match_val == 1:
+                        # keep track of the fact that it has flipped
                         fliped = True
-                        i_min = t_min
-                    match_val = -1
-                    match_count =0
-                match_count +=1
-            if t_max == i_max:
+                                    
+                    match_val = -1        #change the proposed charge
+                    q_val = a[np.argmin(t)] #get the q val of the
+                                              #minimum
+                    match_count =0            #set the match count to 0
+                match_count +=1               #if this isn't a change, increase the match count
+            elif t_max == i_max:
                 if match_val != 1:
                     if match_val == -1:
                         fliped = True
-                        i_max = t_max
+                        
                     match_val = 1
+                    q_val = a[np.argmax(t)]
+                    
                     match_count =0
                 match_count +=1
-            if match_count == 2:
+            elif t_max < i_max and match_val == 1: #we have truncated
+                                                   #the maximum off at
+                                                   #it is positively
+                                                   #charged
+                match_val = 0                      #reset
+                mach_count = 0
+                q_val = None
+                i_max = t_max
+                i_min = t_min
+                
+            elif t_min > i_min  and match_val == -1: #we have truncated the minimum off at it is 
+                match_val = 0                      #reset
+                mach_count = 0
+                q_val = None
+                i_max = t_max
+                i_min = t_min
+                
+            if match_count == 2:          #if get two matches in a row
                 self.charge = match_val
                 if match_val == -1:
                     self.phi = i_min
+                    self.q = q_val
                 elif match_val == 1:
                     self.phi = i_max
+                    self.q = q_val
                 return
         if not fliped:
             self.charge =  match_val
             if match_val == -1:
                 self.phi = i_min
+                self.q = q_val
             elif match_val == 1:
                 self.phi = i_max
+                self.q = q_val
             return
         else:
             self.charge = 0
+            self.q = None
             return 
     def mean_phi(self):
         self.phi = np.mean([p.phi for p in self.points])
@@ -396,7 +430,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
 
         
         
-    return min_vec,max_vec
+    return min_vec,max_vec,(a,b,t0,x0,y0)
 
 def link_ridges(vec,search_range):
     # generate point levels from the previous steps
