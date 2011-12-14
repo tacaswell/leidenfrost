@@ -166,24 +166,25 @@ class track:
     # classify tracks
     def classify(self):
         '''This needs to be re-written to deal with non-properly Chevron tracks better '''
-        t,a = zip(*[(p.phi,p.q) for p in self.points])
-        self.phi = np.mean(t)
-        if len(t) < 15:
+        phi,a = zip(*[(p.phi,p.q) for p in self.points])
+        self.phi = np.mean(phi)
+        if len(phi) < 15:
             self.charge =  0
             return
         
-        i_min = min(t)
-        i_max = max(t)
+        i_min = np.min(phi)
+        i_max = np.max(phi)
         q_val = None
         match_count = 0
         match_val = 0
         fliped = False
-        while len(t) >=15:
+        while len(phi) >=15:
             # truncate the track
-            t = t[4:-5]
+            phi = phi[4:-5]
+            a = a[4:-5]
             # get the current min and max
-            t_min = np.min(t)
-            t_max = np.max(t)
+            t_min = np.min(phi)
+            t_max = np.max(phi)
             # if the min hasn't changed, claim track has negative charge
             if t_min == i_min:
                 # if the track doesn't currently have negative charge
@@ -194,7 +195,7 @@ class track:
                         fliped = True
                                     
                     match_val = -1        #change the proposed charge
-                    q_val = a[np.argmin(t)] #get the q val of the
+                    q_val = a[np.argmin(phi)] #get the q val of the
                                               #minimum
                     match_count =0            #set the match count to 0
                 match_count +=1               #if this isn't a change, increase the match count
@@ -204,7 +205,7 @@ class track:
                         fliped = True
                         
                     match_val = 1
-                    q_val = a[np.argmax(t)]
+                    q_val = a[np.argmax(phi)]
                     
                     match_count =0
                 match_count +=1
@@ -393,7 +394,8 @@ def link_points(levels,search_range = .02,hash_line=hash_line_angular):
 
 def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
     # fit the ellipse to extract from
-    out = fit_ellipse(pts)
+    
+    out = fit_ellipse(pt_lst)
     # set up points to sample at
     theta = linspace(0,2*np.pi,floor(450*2*np.pi).astype('int'))
 
@@ -427,8 +429,16 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
         # append to the export vectors
         min_vec.append((ma_scale,min_pk))
         max_vec.append((ma_scale,max_pk))
-
         
+    ## # debugging code
+    ## figure()
+    ## imshow(dlfimg)
+    ## axis('equal')
+    ## plot(pt_lst[0],pt_lst[1],'x')
+    ## curve2 = gen_ellipse(*(gen_to_parm(out.beta)+(theta,)))
+    ## plot(curve2[0],curve2[1],label='fit')
+    ## lfprof = scipy.ndimage.interpolation.map_coordinates(lfimg.T,curve2)
+    
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
 
