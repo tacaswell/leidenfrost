@@ -170,11 +170,12 @@ class track:
         self.phi = np.mean(phi)
         if len(phi) < 15:
             self.charge =  0
+            self.q = 0
             return
         
         i_min = np.min(phi)
         i_max = np.max(phi)
-        q_val = None
+        q_val = 0
         match_count = 0
         match_val = 0
         fliped = False
@@ -215,14 +216,14 @@ class track:
                                                    #charged
                 match_val = 0                      #reset
                 mach_count = 0
-                q_val = None
+                q_val = 0
                 i_max = t_max
                 i_min = t_min
                 
             elif t_min > i_min  and match_val == -1: #we have truncated the minimum off at it is 
                 match_val = 0                      #reset
                 mach_count = 0
-                q_val = None
+                q_val = 0
                 i_max = t_max
                 i_min = t_min
                 
@@ -234,6 +235,8 @@ class track:
                 elif match_val == 1:
                     self.phi = i_max
                     self.q = q_val
+                else:
+                    print 'should not have hit here 1'
                 return
         if not fliped:
             self.charge =  match_val
@@ -243,10 +246,13 @@ class track:
             elif match_val == 1:
                 self.phi = i_max
                 self.q = q_val
+            else:
+                self.q = 0
+#                print 'should not have hit here 2'
             return
         else:
             self.charge = 0
-            self.q = None
+            self.q = 0
             return 
     def mean_phi(self):
         self.phi = np.mean([p.phi for p in self.points])
