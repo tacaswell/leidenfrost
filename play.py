@@ -392,7 +392,7 @@ def link_points(levels,search_range = .02,hash_line=hash_line_angular):
 
     return track_set
 
-def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
+def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
     # fit the ellipse to extract from
     
     out = fit_ellipse(pt_lst)
@@ -420,7 +420,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num):
         zv = l_smooth(zv)
 
         # find the peaks, the parameters here are important
-        peaks = fp.peakdetect(zv,theta,5,10000)
+        peaks = fp.peakdetect(zv,theta,lookahead,delta)
         # extract the maximums
         max_pk = np.vstack(peaks[0]).T
         # extract the minimums
