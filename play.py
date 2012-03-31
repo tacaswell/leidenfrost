@@ -22,14 +22,30 @@ import numpy as np
 
 import find_peaks as  fp
 
+BPP_LOOKUP = dict({8:'uint8',16:'uint16'})
+
 def extract_image(fname):
     im = PIL.Image.open(fname)
     img_sz = im.size[::-1]
-    return np.reshape(im.getdata(),img_sz).astype('uint16').T
 
-def gen_circle(x,y,r):
-    theta = linspace(0,2*np.pi,1000)
-    return vstack((r*sin(theta) + x,r*cos(theta) + y))
+    if 277 in im.tag.keys():
+        chans = im.tag[277][0]
+    else:
+        chans = 1
+    if 258 in im.tag.keys():
+        bpp = im.tag[258]
+    else:
+        bpp = 16
+    print chans,bpp
+    if chans == 1:
+        return np.reshape(im.getdata(),img_sz).astype(BPP_LOOKUP(bpp[0])).T
+    else:
+        return np.reshape(map(lambda x: x[0],im.getdata()),img_sz).astype(BPP_LOOKUP[bpp[0]]).T
+
+def gen_circle(x,y,r,theta =None):
+    if theta is None:
+        theta = np.linspace(0,2*np.pi,1000)
+    return np.vstack((r*sin(theta) + x,r*cos(theta) + y))
 
 def gen_ellipse(a,b,t,x,y,theta):
     # a is always the major axis, x is always the major axis, can be rotated away by t
@@ -41,7 +57,7 @@ def gen_ellipse(a,b,t,x,y,theta):
             
     #t = mod(t,np.pi/2)
     r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
-    return vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
+    return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
 class ellipse_fitter:
     def __init__(self):
@@ -54,6 +70,26 @@ class ellipse_fitter:
             self.pt_lst = []
             
         self.pt_lst.append((event.xdata,event.ydata))
+
+    def get_params(self):
+        return gen_to_parm(fit_ellipse(self.pt_lst))
+
+class circ_finder:
+    def __init__(self):
+        self.pt_lst = []
+        
+    def click_event(self,event):
+        ''' Extracts locations from the user'''
+        if event.key == 'shift':
+            self.pt_lst = []
+            
+        self.pt_lst.append((event.xdata,event.ydata))
+
+    def get_params(self):
+        a,b,t,x,y = gen_to_parm(fit_ellipse(np.vstack(self.pt_lst).T).beta)
+        return (0,0,0,x,y)
+
+    
 
 def e_funx(p,r):
     x,y = r
@@ -81,13 +117,13 @@ def gen_to_parm(p):
     ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
     bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (-np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
 
-    t0 =  (1/2) * arctan(2*b/(a-c))
+    t0 =  (1/2) * np.arctan(2*b/(a-c))
     
     if a>c: 
-        t0 =  (1/2) * arctan(2*b/(a-c))
+        t0 =  (1/2) * np.arctan(2*b/(a-c))
         
     else:
-        t0 = np.pi/2 + (1/2) * arctan(2*b/(c-a))
+        t0 = np.pi/2 + (1/2) * np.arctan(2*b/(c-a))
         
     
 
@@ -447,6 +483,44 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
     
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
+
+def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 10000):
+
+    
+    
+    # set up points to sample at
+    theta = linspace(0,2*np.pi*1.05,floor(2*(rmin+rmax)*np.pi).astype('int'))
+
+    #dlfimg = scipy.ndimage.morphology.grey_closing(lfimg,(1,1))
+    dlfimg = lfimg
+    
+    # convert the parameters to parametric form
+
+    min_vec = []
+    max_vec = []
+    for r_step in np.linspace(rmin,rmax,s_num):
+        # extract the points in the ellipse is x-y
+        zp = (gen_circle(x,y,r_step,theta ) )
+        # extract the values at those locations from the image.  The
+        # extra flipud is to take a transpose of the points to deal
+        # with the fact that the definition of the first direction
+        # between plotting and the image libraries is inconsistent.
+        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,flipud(zp),order=4)
+        # smooth the curve
+        zv = l_smooth(zv)
+
+        # find the peaks, the parameters here are important
+        peaks = fp.peakdetect(zv,theta,lookahead,delta)
+        # extract the maximums
+        max_pk = np.vstack(peaks[0]).T
+        # extract the minimums
+        min_pk = np.vstack(peaks[1]).T
+        
+        # append to the export vectors
+        min_vec.append((r_step,min_pk))
+        max_vec.append((r_step,max_pk))
+                
+    return min_vec,max_vec
 
 def link_ridges(vec,search_range):
     # generate point levels from the previous steps
