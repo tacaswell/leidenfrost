@@ -419,8 +419,8 @@ def link_points(levels,search_range = .02,memory=0,hash_line=hash_line_angular):
                 
         candidate_tracks = accepted_tracks
         
-
-    return track_set
+    
+    return [t for t in track_set if len(t) >0]
 
 def _find_links(t_list,cur_hash,search_range):
     '''This is a helper function for  link points'''
@@ -446,10 +446,10 @@ def _find_links(t_list,cur_hash,search_range):
         dmin = search_range
 
         for p in cur_box:
-            # don't link previously linked particles
-            if p.in_track():
-                continue
-
+            # # don't link previously linked particles
+            # if p.in_track():
+            #     continue
+            
             # get distance between the current point and the candidate point
             d  = trk_pt.distance(p)
 
@@ -458,8 +458,13 @@ def _find_links(t_list,cur_hash,search_range):
                 pmin = p
 
         if pmin is not None:
-            cur_track.add_point(pmin)
-            accepted_tracks.append(cur_track)
+            if pmin.in_track():
+                other_track = pmin.tracks[0]
+                other_track.merge_track(cur_track)
+                other_track.sort()
+            else:
+                cur_track.add_point(pmin)
+                accepted_tracks.append(cur_track)
         else:
             new_mem_list.append(cur_track)            
 
@@ -562,6 +567,17 @@ def link_ridges(vec,search_range,memory=0):
     trks = link_points(levels,search_range,memory)        
     for t in trks:
         t.classify()
+
+    trks.sort(key = lambda x: x.phi)
+    return trks
+
+
+def link_fingers(vec,search_range,memory=0):
+    # generate point levels from the previous steps
+
+    levels = [[point(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
+    
+    trks = link_points(levels,search_range,memory)        
 
     trks.sort(key = lambda x: x.phi)
     return trks
