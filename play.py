@@ -295,6 +295,8 @@ class track:
             return 
     def mean_phi(self):
         self.phi = np.mean([p.phi for p in self.points])
+    def mean_q(self):
+        self.q = np.mean([p.q for p in self.points])
     def merge_track(self,to_merge_track):
         '''Merges the track add_track into the current track.
         Progressively moves points from the other track to this one.
