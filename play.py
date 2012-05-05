@@ -394,7 +394,7 @@ def link_points(levels,search_range = .02,memory=0,hash_line=hash_line_angular):
             cur_hash.add_point(p)
         accepted_tracks,new_mem_list = _find_links(candidate_tracks,cur_hash,search_range)
         if memory>0:
-            print '--'
+       
             re_mem_lists = []
             for m in mem_lists:
                 tmp_len = len(m)
