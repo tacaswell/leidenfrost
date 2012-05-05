@@ -45,7 +45,7 @@ def extract_image(fname):
 def gen_circle(x,y,r,theta =None):
     if theta is None:
         theta = np.linspace(0,2*np.pi,1000)
-    return np.vstack((r*sin(theta) + x,r*cos(theta) + y))
+    return np.vstack((r*np.sin(theta) + x,r*np.cos(theta) + y))
 
 def gen_ellipse(a,b,t,x,y,theta):
     # a is always the major axis, x is always the major axis, can be rotated away by t
