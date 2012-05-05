@@ -549,9 +549,16 @@ def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 15,s = 2,theta_
         # find the peaks, the parameters here are important
         peaks = fp.peakdetect(diff(zv),theta[:-1] + mean(diff(theta))/2,lookahead,delta)
         # extract the maximums
-        max_pk = np.vstack(peaks[0]).T
+
+        if len(peaks[0]) > 0:
+            max_pk = np.vstack(peaks[0]).T
+        else:
+            max_pk = []
         # extract the minimums
-        min_pk = np.vstack(peaks[1]).T
+        if len(peaks[1]) >0:
+            min_pk = np.vstack(peaks[1]).T
+        else:
+            min_pk = []
         
         # append to the export vectors
         min_vec.append((r_step,min_pk))
