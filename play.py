@@ -506,12 +506,13 @@ def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 15,s = 2,theta_
         # extra flipud is to take a transpose of the points to deal
         # with the fact that the definition of the first direction
         # between plotting and the image libraries is inconsistent.
-        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,flipud(zp),order=4)
+        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,flipud(zp),order=4).astype('float')
         # smooth the curve
         zv = l_smooth(zv,s)
 
+        
         # find the peaks, the parameters here are important
-        peaks = fp.peakdetect(zv,theta,lookahead,delta)
+        peaks = fp.peakdetect(diff(zv),theta[:-1] + mean(diff(theta))/2,lookahead,delta)
         # extract the maximums
         max_pk = np.vstack(peaks[0]).T
         # extract the minimums
