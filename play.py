@@ -365,7 +365,7 @@ def linear_factory(r):
         return hash_line_linear(bin_width,r)
     return tmp
     
-def link_points(levels,search_range = .02,hash_line=hash_line_angular):
+def link_points(levels,search_range = .02,memory=0,hash_line=hash_line_angular):
     '''Stupid 1D linking routine.  The plan is to not worry about
     multiple connections at this stage and to instead write a way to
     merge tracks together.  Should be an issue with max points and saddles
@@ -380,49 +380,34 @@ def link_points(levels,search_range = .02,hash_line=hash_line_angular):
     # 
     candidate_tracks = []
     candidate_tracks.extend(track_set)
-    
-    
+    mem_lists = []
+    for j in range(memory):
+        mem_lists.append([])
+        
+
     for cur_level in levels[1:]:
+        new_mem_list = []
         accepted_tracks = []
         
         cur_hash = hash_line(search_range*2)
         for p in cur_level:
             cur_hash.add_point(p)
-        
-        while len(candidate_tracks) > 0:
-            # select the next track
-            cur_track = candidate_tracks.pop()
-            # get the last point in the current track
-            trk_pt = cur_track.last_point()
-            # get the region of candidate points
-            cur_box = cur_hash.get_region(trk_pt)
-            #print len(cur_box)
-            
-            if len(cur_box) ==0:
-                continue
+        accepted_tracks,new_mem_list = _find_links(candidate_tracks,cur_hash,search_range)
+        if memory>0:
+            print '--'
+            re_mem_lists = []
+            for m in mem_lists:
+                tmp_len = len(m)
+                tmp_accpt,tmp_mem = _find_links(m,cur_hash,search_range)
+                accepted_tracks.extend(tmp_accpt)
+                re_mem_lists.append(tmp_mem)
 
-            pmin = None
-            # stupidly big number
-            dmin = search_range
+
+
+            mem_lists = re_mem_lists
+            mem_lists.pop(0)
+            mem_lists.append(new_mem_list)
             
-            for p in cur_box:
-                # don't link previously linked particles
-                if p.in_track():
-                    continue
-                # get distance between the current point and the candidate point
-                d  = trk_pt.distance(p)
-                
-                if  d < dmin:
-                    dmin = d
-                    pmin = p
-                    
-            if pmin is not None:
-                cur_track.add_point(pmin)
-                accepted_tracks.append(cur_track)
-                
-            
-                
-                
         for p in cur_level:
             if not p.in_track():
                 new_trk = track(p)
@@ -434,6 +419,48 @@ def link_points(levels,search_range = .02,hash_line=hash_line_angular):
 
     return track_set
 
+def _find_links(t_list,cur_hash,search_range):
+    '''This is a helper function for  link points'''
+
+    new_mem_list = []
+    accepted_tracks = []
+
+    while len(t_list) > 0:
+        # select the next track
+        cur_track = t_list.pop()
+        # get the last point in the current track
+        trk_pt = cur_track.last_point()
+        # get the region of candidate points
+        cur_box = cur_hash.get_region(trk_pt)
+        #print len(cur_box)
+
+        if len(cur_box) ==0:
+            new_mem_list.append(cur_track)            
+            continue
+
+        pmin = None
+        # stupidly big number
+        dmin = search_range
+
+        for p in cur_box:
+            # don't link previously linked particles
+            if p.in_track():
+                continue
+
+            # get distance between the current point and the candidate point
+            d  = trk_pt.distance(p)
+
+            if  d < dmin:
+                dmin = d
+                pmin = p
+
+        if pmin is not None:
+            cur_track.add_point(pmin)
+            accepted_tracks.append(cur_track)
+        else:
+            new_mem_list.append(cur_track)            
+
+    return accepted_tracks,new_mem_list
 def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
     # fit the ellipse to extract from
     
@@ -524,12 +551,12 @@ def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 15,s = 2,theta_
                 
     return min_vec,max_vec
 
-def link_ridges(vec,search_range):
+def link_ridges(vec,search_range,memory=0):
     # generate point levels from the previous steps
 
     levels = [[point(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
     
-    trks = link_points(levels,search_range)        
+    trks = link_points(levels,search_range,memory)        
     for t in trks:
         t.classify()
 
