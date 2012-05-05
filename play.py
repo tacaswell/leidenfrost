@@ -187,6 +187,9 @@ class track:
         self.charge = None
         self.q = None
         self.phi = None
+
+    def __len__(self):
+        return len(self.points)
     def add_point(self,point):
         '''Adds a point to this track '''
         if point in self.points:
