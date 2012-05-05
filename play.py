@@ -484,12 +484,12 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
 
-def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 10000):
+def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 15,s = 2,theta_rng =(0,2*np.pi)):
 
     
     
     # set up points to sample at
-    theta = linspace(0,2*np.pi*1.05,floor(2*(rmin+rmax)*np.pi).astype('int'))
+
 
     #dlfimg = scipy.ndimage.morphology.grey_closing(lfimg,(1,1))
     dlfimg = lfimg
@@ -499,6 +499,7 @@ def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 10000):
     min_vec = []
     max_vec = []
     for r_step in np.linspace(rmin,rmax,s_num):
+        theta = linspace(*(theta_rng + (int(ceil(2*2*r_step*np.pi)),)))
         # extract the points in the ellipse is x-y
         zp = (gen_circle(x,y,r_step,theta ) )
         # extract the values at those locations from the image.  The
@@ -507,7 +508,7 @@ def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 10000):
         # between plotting and the image libraries is inconsistent.
         zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,flipud(zp),order=4)
         # smooth the curve
-        zv = l_smooth(zv)
+        zv = l_smooth(zv,s)
 
         # find the peaks, the parameters here are important
         peaks = fp.peakdetect(zv,theta,lookahead,delta)
