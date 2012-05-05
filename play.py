@@ -134,7 +134,7 @@ def l_smooth(values,window_len=2):
     window_len = window_len*2+1
     s=np.r_[values[window_len-1:0:-1],values,values[-1:-window_len:-1]]
     #w = np.ones(window_len,'d')
-    w = np.exp(-((linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
+    w = np.exp(-((np.linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
     
     values = np.convolve(w/w.sum(),s,mode='valid')[(window_len//2):-(window_len//2)]
     return values
