@@ -204,10 +204,18 @@ class track:
         return self.points[-1]
     def plot_trk(self,ax,**kwargs):
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
-    def plot_trk_img(self,e_parm,ax,**kwarg):
-        a,b,t0,x0,y0 = e_pram
-        new_pts = np.hstack([gen_ellipse(*(a*p.q,b*p.q,t0,x0,y0,p.phi,)) for p in self.points])
-        ax.plot(new_pts[:,0],new_pts[:,1],**kwargs)
+    def plot_trk_img(self,pram,ax,**kwargs):
+        a,b,t0,x0,y0 = pram
+        X,Y = np.hstack([gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
+        if self.charge is None:
+            kwargs['marker'] = '*'
+        elif self.charge == 1:
+            kwargs['marker'] = '^'
+        elif self.charge == -1:
+            kwargs['marker'] = 'v'
+        else:
+            kwargs['marker'] = 'o'
+        ax.plot(X,Y,**kwargs)
          
     # classify tracks
     def classify(self):
