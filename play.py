@@ -21,6 +21,8 @@ import scipy.odr as sodr
 import numpy as np
 
 import find_peaks as  fp
+import scipy
+import scipy.ndimage
 
 BPP_LOOKUP = dict({8:'uint8',16:'uint16'})
 
@@ -55,7 +57,7 @@ def gen_ellipse(a,b,t,x,y,theta):
             a = tmp
 
             
-    #t = mod(t,np.pi/2)
+    #t = np.mod(t,np.pi/2)
     r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
     return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
@@ -324,14 +326,14 @@ class hash_line_angular:
         
     def add_point(self,point):
         ''' Adds a point on the hash line'''
-        t = mod(point.phi,2*np.pi)
+        t = np.mod(point.phi,2*np.pi)
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
     def get_region(self,point,bbuffer = 1):
         '''Gets the region around the point'''
-        box_indx = int(np.floor(self.bin_count * mod(point.phi,2*np.pi)/(2*np.pi)))
+        box_indx = int(np.floor(self.bin_count * np.mod(point.phi,2*np.pi)/(2*np.pi)))
         tmp_box = []
         for j in range(box_indx - bbuffer,box_indx + bbuffer + 1):
-            tmp_box.extend(self.boxes[mod(j,self.bin_count)])
+            tmp_box.extend(self.boxes[np.mod(j,self.bin_count)])
         return tmp_box
 
 
@@ -362,7 +364,7 @@ class hash_line_linear:
             
         tmp_box = []
         for j in range(min_b,max_b):
-            tmp_box.extend(self.boxes[mod(j,self.bin_count)])
+            tmp_box.extend(self.boxes[np.mod(j,self.bin_count)])
         return tmp_box
 
 def linear_factory(r):
@@ -485,7 +487,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
     a,b,t0,x0,y0 = gen_to_parm(out.beta)
     min_vec = []
     max_vec = []
-    for ma_scale in linspace(1-s_width,1 +s_width,s_num):
+    for ma_scale in np.linspace(1-s_width,1 +s_width,s_num):
         # set up this steps ellipse
         p = (a*ma_scale,b*ma_scale,t0,x0,y0)
         # extract the points in the ellipse is x-y
@@ -494,7 +496,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
         # extra flipud is to take a transpose of the points to deal
         # with the fact that the definition of the first direction
         # between plotting and the image libraries is inconsistent.
-        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,flipud(zp),order=4)
+        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,np.flipud(zp),order=4)
         # smooth the curve
         zv = l_smooth(zv)
 
@@ -536,7 +538,7 @@ def find_fingers(x,y,rmin,rmax,s_num,lfimg,lookahead = 5,delta = 15,s = 2,theta_
     min_vec = []
     max_vec = []
     for r_step in np.linspace(rmin,rmax,s_num):
-        theta = linspace(*(theta_rng + (int(ceil(2*2*r_step*np.pi)),)))
+        theta = np.linspace(*(theta_rng + (int(ceil(2*2*r_step*np.pi)),)))
         # extract the points in the ellipse is x-y
         zp = (gen_circle(x,y,r_step,theta ) )
         # extract the values at those locations from the image.  The
