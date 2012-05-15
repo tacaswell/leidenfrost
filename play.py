@@ -204,6 +204,11 @@ class track:
         return self.points[-1]
     def plot_trk(self,ax,**kwargs):
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
+    def plot_trk_img(self,e_parm,ax,**kwarg):
+        a,b,t0,x0,y0 = e_pram
+        new_pts = np.hstack([gen_ellipse(*(a*p.q,b*p.q,t0,x0,y0,p.phi,)) for p in self.points])
+        ax.plot(new_pts[:,0],new_pts[:,1],**kwargs)
+         
     # classify tracks
     def classify(self):
         '''This needs to be re-written to deal with non-properly Chevron tracks better '''
@@ -450,9 +455,9 @@ def _find_links(t_list,cur_hash,search_range):
         dmin = search_range
 
         for p in cur_box:
-            # # don't link previously linked particles
-            # if p.in_track():
-            #     continue
+            # don't link previously linked particles
+            if p.in_track():
+                continue
             
             # get distance between the current point and the candidate point
             d  = trk_pt.distance(p)
@@ -477,14 +482,21 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
     # fit the ellipse to extract from
     
     out = fit_ellipse(pt_lst)
-    # set up points to sample at
-    theta = linspace(0,2*np.pi,floor(450*2*np.pi).astype('int'))
 
     #dlfimg = scipy.ndimage.morphology.grey_closing(lfimg,(1,1))
     dlfimg = lfimg
     
     # convert the parameters to parametric form
     a,b,t0,x0,y0 = gen_to_parm(out.beta)
+
+    # set up points to sample at
+    C = np.pi * (a+b)*(1+ (3*((a-b)/(a+b))**2)/(10+np.sqrt(4+3*((a-b)/(a+b))**2)))
+    print C,np.pi*(a+b)
+    
+    theta = np.linspace(0,2*np.pi,np.floor(2*C*np.pi).astype('int'))
+    # this will approximately  double sample.
+    
+
     min_vec = []
     max_vec = []
     for ma_scale in np.linspace(1-s_width,1 +s_width,s_num):
