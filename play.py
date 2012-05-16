@@ -519,7 +519,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
         # extra flipud is to take a transpose of the points to deal
         # with the fact that the definition of the first direction
         # between plotting and the image libraries is inconsistent.
-        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,np.flipud(zp),order=4)
+        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,np.flipud(zp),order=2)
         # smooth the curve
         zv = l_smooth(zv,s,'blackman')
 
