@@ -502,9 +502,9 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
 
     # set up points to sample at
     C = np.pi * (a+b)*(1+ (3*((a-b)/(a+b))**2)/(10+np.sqrt(4+3*((a-b)/(a+b))**2)))
-    print C,np.pi*(a+b)
-    
-    theta = np.linspace(0,2*np.pi,np.floor(2*C*np.pi).astype('int'))
+
+
+    theta = np.linspace(0,2*np.pi,np.floor(2*C).astype('int'))
     # this will approximately  double sample.
     
 
