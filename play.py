@@ -23,8 +23,10 @@ import numpy as np
 import find_peaks as  fp
 import scipy
 import scipy.ndimage
-
+reload(fp)
 BPP_LOOKUP = dict({8:'uint8',16:'uint16'})
+
+WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
 
 def extract_image(fname):
     im = PIL.Image.open(fname)
@@ -132,11 +134,12 @@ def gen_to_parm(p):
     return (ap,bp,t0,x0,y0)
 
 
-def l_smooth(values,window_len=2):
+def l_smooth(values,window_len=2,window='flat'):
     window_len = window_len*2+1
     s=np.r_[values[window_len-1:0:-1],values,values[-1:-window_len:-1]]
-    #w = np.ones(window_len,'d')
-    w = np.exp(-((np.linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
+    w = WINDOW_DICT[window](window_len)
+    #    w = np.ones(window_len,'d')
+    #w = np.exp(-((np.linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
     
     values = np.convolve(w/w.sum(),s,mode='valid')[(window_len//2):-(window_len//2)]
     return values
@@ -486,7 +489,7 @@ def _find_links(t_list,cur_hash,search_range):
             new_mem_list.append(cur_track)            
 
     return accepted_tracks,new_mem_list
-def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
+def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2):
     # fit the ellipse to extract from
     
     out = fit_ellipse(pt_lst)
@@ -518,7 +521,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000):
         # between plotting and the image libraries is inconsistent.
         zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,np.flipud(zp),order=4)
         # smooth the curve
-        zv = l_smooth(zv)
+        zv = l_smooth(zv,s,'blackman')
 
         # find the peaks, the parameters here are important
         peaks = fp.peakdetect(zv,theta,lookahead,delta)
