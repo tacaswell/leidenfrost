@@ -149,22 +149,26 @@ class point:
     '''Class to encapsulate the min/max points found on a given curve 
     points are on a line parametrized as phi(q)
     '''
+    count = 0
+    
     def __init__(self,q,phi,v):
         self.q = q                      # paramterizing variable
         self.phi = phi                  # function_value
         self.v = v                      # the value at the extrema (can probably drop this)
-        self.tracks = []                # list of tracks that are trying to claim this point
+        self.uuid = point.count         # unique id for __hash__
+        self.track = None
 
+    def __hash__(self):
+        return self.uuid
+        
     def add_track(self,track):
         '''Adds a track to the point '''
-        if track in self.tracks:
-            pass
-        else:
-            self.tracks.append(track)
+        self.track = track
+        
     def remove_from_track(self,track):
         '''Removes a point from the given track, error if not really
         in that track'''
-        self.tracks.remove(track)
+        self.track = None
     def distance(self,point):
         '''Returns the absolute value of the angular distance between
         two points mod 2\pi'''
@@ -175,10 +179,8 @@ class point:
 
     def in_track(self):
         '''Returns if a point is in a track '''
-        if len(self.tracks)>0:
-            return True
-        else:
-            return False
+        return  self.track is not None
+    
 class track:
     count = 0
     def __init__(self,point=None):
@@ -412,7 +414,7 @@ def link_points(levels,search_range = .02,memory=0,hash_line=hash_line_angular):
         new_mem_list = []
         accepted_tracks = []
         
-        cur_hash = hash_line(search_range*2)
+        cur_hash = hash_line(search_range)
         for p in cur_level:
             cur_hash.add_point(p)
         accepted_tracks,new_mem_list = _find_links(candidate_tracks,cur_hash,search_range)
@@ -479,7 +481,7 @@ def _find_links(t_list,cur_hash,search_range):
 
         if pmin is not None:
             if pmin.in_track():
-                other_track = pmin.tracks[0]
+                other_track = pmin.track
                 other_track.merge_track(cur_track)
                 other_track.sort()
             else:
@@ -489,6 +491,79 @@ def _find_links(t_list,cur_hash,search_range):
             new_mem_list.append(cur_track)            
 
     return accepted_tracks,new_mem_list
+
+def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
+    '''Does proper linking, dealing with the forward and backward
+    networks.  This should work with any dimension, so long and the
+    hash object and the point objects behave as expected.
+
+    Expect hash_obj to have constructor that takes a single value and
+    support add_particle and get_region
+
+    expect particles to know what track they are in (p.track -> track)
+    and know how far apart they are from another particle (distance
+    returns absolute distance)'''
+
+    # assume everything in first level starts a track
+    cur_level = levels[0]
+    # initialize the master track list with the points in the first level
+    track_lst = [track(p) for p in cur_level]
+    mem_set = set()
+    # fill in first 'prev' hash
+    prev_hash =  hash_obj(search_range)
+    # fill in first prev set
+    prev_set = set(cur_level)
+    # fill in memory list of sets
+    mem_history = []
+    for j in range(memory):
+        mem_history.append(set())
+
+    for cur_level in levels[1:]:
+        # fill in first 'cur' hash
+        cur_hash = hash_obj(search_range)
+        for p in cur_level:
+            cur_hash.add_point(p)
+            # fill in first cur set
+        cur_set = set(cur_level)
+        tmp_set = set(cur_level) 
+
+        for p in cur_level:
+            
+        
+        if memory > 0:
+            # identify the new memory points
+            new_mem_set = prev_set - mem_set
+            mem_history.push_back(new_mem_set)
+            # remove points that are now too old
+            mem_set -= mem_history.pop(0)
+            mem_set |=new_mem_set
+            tmp_set |=mem_set
+            
+        prev_set = tmp_set
+        # set prev_hash to cur hash
+        prev_hash = cur_hash
+        # add in the memory points
+        if memory >0:
+            for p in mem_set:
+                prev_hash.add_point(p)
+
+        for p in prev_level
+        pass
+
+    
+    
+    return track_lst
+
+def _link_subnet(trk_lst,p_list):
+    '''This implements the sub-network logic for proper tracking'''
+    accp_track = []
+    mem_track = []
+
+    
+
+    return accp_track,mem_track
+
+    
 def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2):
     # fit the ellipse to extract from
     
