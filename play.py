@@ -524,7 +524,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
         zv = l_smooth(zv,s,'blackman')
 
         # find the peaks, the parameters here are important
-        peaks = fp.peakdetect(zv,theta,lookahead,delta)
+        peaks = fp.peakdetect(zv,theta,lookahead,delta,True)
         # extract the maximums
         max_pk = np.vstack(peaks[0]).T
         # extract the minimums

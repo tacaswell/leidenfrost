@@ -2,7 +2,7 @@
 
 import numpy as np
 
-def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0):
+def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
     """
     Converted from/based on a MATLAB script at http://billauer.co.il/peakdet.html
     
@@ -46,6 +46,7 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0):
         raise ValueError, "Lookahead must be above '1' in value"
     if not (np.isscalar(delta) and delta >= 0):
         raise ValueError, "delta must be a positive number"
+
     
     #needs to be a numpy array
     y_axis = np.asarray(y_axis)
@@ -53,7 +54,12 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0):
     #maxima and minima candidates are temporarily stored in
     #mx and mn respectively
     mn, mx = np.Inf, -np.Inf
-    
+    if isring:
+
+        y_axis = np.concatenate((y_axis,y_axis[:3*lookahead]))
+        x_axis = np.concatenate((x_axis,x_axis[:3*lookahead]))
+
+
     #Only detect peak if there is 'lookahead' amount of points after it
     for index, (x, y) in enumerate(zip(x_axis[:-lookahead], y_axis[:-lookahead])):
         if y > mx:
