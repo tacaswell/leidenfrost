@@ -225,7 +225,7 @@ class track:
         '''This needs to be re-written to deal with non-properly Chevron tracks better '''
         phi,a = zip(*[(p.phi,p.q) for p in self.points])
         self.phi = np.mean(phi)
-        if len(phi) < 15:
+        if len(phi) < 25:
             self.charge =  0
             self.q = 0
             return
