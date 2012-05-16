@@ -505,41 +505,129 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
     returns absolute distance)'''
 
     # assume everything in first level starts a track
-    cur_level = levels[0]
+    prev_level = levels[0]
     # initialize the master track list with the points in the first level
-    track_lst = [track(p) for p in cur_level]
+    track_lst = [track(p) for p in prev_level]
     mem_set = set()
     # fill in first 'prev' hash
     prev_hash =  hash_obj(search_range)
+    for p in prev_level:
+        prev_hash.add_point(p)
+        p.back_cands = []
     # fill in first prev set
-    prev_set = set(cur_level)
+    tmp_set = set(prev_level)
     # fill in memory list of sets
     mem_history = []
     for j in range(memory):
         mem_history.append(set())
-
+    
+    
     for cur_level in levels[1:]:
-        # fill in first 'cur' hash
+        # fill in first 'cur' hash and set up attributes for keeping
+        # track of possible connections
         cur_hash = hash_obj(search_range)
         for p in cur_level:
             cur_hash.add_point(p)
-            # fill in first cur set
-        cur_set = set(cur_level)
-        tmp_set = set(cur_level) 
+            p.back_cands = []
 
+        # set up the particles in the previous level for
+        # linking
+        for p in prev_level:
+            p.forward_cands = []
+
+        # set up the previous set from the stored set
+        prev_set = tmp_set
+        # create the set for the destination level
+        cur_set = set(cur_level)
+        # create a second copy that will be used as the destination in
+        # the next loop
+        tmp_set = set(cur_level) 
+        # memory set
+        new_mem_set = set()
+        # sort out what can go to what
         for p in cur_level:
-            
-        
+            # get 
+            work_box = prev_hash.get_region(p)
+            for wp in work_box:
+                # this should get changed to deal with squared values
+                # to save an eventually square root
+                d = p.distance(wp)
+                if d< search_range:
+                    p.back_cands.append((wp,d))
+                    wp.forward_cands.append((p,d))
+
+
+        # sort the candidate lists by distance
+        for p in cur_set: p.back_cands.sort(key=lambda x: x[1])
+        for p in prev_set: p.back_cands.sort(key=lambda x: x[1])
+        # while there are particles left to link, link
+        while len(prev_set) > 0 and len(cur_set) > 0:
+            p = cur_set.pop()
+            bc_c = len(p.back_cands)
+            # no backwards candidates
+            if bc_c ==  0:
+                # add a new track
+                track_lst.append(track(p))
+                # clean up tracking apparatus 
+                del p.back_cands
+                # short circuit loop
+                continue
+            if bc_c ==1:
+                # one backwards candidate
+                b_c_p = p.back_cands[0]
+                # and only one forward candidate
+                if len(b_c_p.forward_cands) ==1:
+                    # add to the track of the candidate
+                    b_c_p.track.add_point(p)
+                    # clean up tracking apparatus
+                    del p.back_cands
+                    del b_c_p.forward_cands
+                    # short circuit loop
+                    continue
+            # we need to generate the sub networks 
+            done_flg = False
+            s_sn = set()                  # source sub net
+            d_sn = set()                  # destination sub net
+            # add working particle to destination sub-net
+            d_sn.add(p)
+            while not done_flg:
+                d_sn_sz = len(d_sn)
+                s_sn_sz = len(s_sn)
+                for dp in d_sn:
+                    for c_sp in dp.back_cands:
+                        s_sn.add(c_sp[0])
+                        prev_set.discard(c_sp[0])
+                for sp in s_sn:
+                    for c_dp in sp.forward_cands:
+                        d_sn.add(c_dp[0])
+                        cur_set.discard(c_dp[0])
+                done_flg = (len(d_sn) == d_sn_sz) and (len(s_sn) == s_sn_sz)
+
+            best_pairs,s_remain,d_remain = link_recur(s_sn,d_sn,search_range)
+
+            for sp,dp in best_pairs:
+                sp.track.add_point(dp)
+                del dp.back_cands
+                del sp.forward_cands
+            for sp in s_remain:
+                del sp.forward_cands
+            for dp in d_remain:
+                del dp.back_cands
+            new_mem_set |= s_remain
+
         if memory > 0:
             # identify the new memory points
-            new_mem_set = prev_set - mem_set
+            new_mem_set -= mem_set
             mem_history.push_back(new_mem_set)
             # remove points that are now too old
             mem_set -= mem_history.pop(0)
+            # add the new points
             mem_set |=new_mem_set
+            # add the memory particles to what will be the next source
+            # set
             tmp_set |=mem_set
             
-        prev_set = tmp_set
+        prev_set = tmp_set + 
         # set prev_hash to cur hash
         prev_hash = cur_hash
         # add in the memory points
@@ -547,12 +635,9 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
             for p in mem_set:
                 prev_hash.add_point(p)
 
-        for p in prev_level
-        pass
-
-    
-    
     return track_lst
+
+
 
 def _link_subnet(trk_lst,p_list):
     '''This implements the sub-network logic for proper tracking'''
