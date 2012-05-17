@@ -603,16 +603,32 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
                         cur_set.discard(c_dp[0])
                 done_flg = (len(d_sn) == d_sn_sz) and (len(s_sn) == s_sn_sz)
 
-            best_pairs,s_remain,d_remain = link_recur(s_sn,d_sn,search_range)
+            snl = sub_net_linker(s_sn,d_sn,search_range)
+            
+
+            spl,dpl = zip(*snl.best_pairs)
+            # strip the distance information off the subnet sets and
+            # remove the linked particles
+            d_remain = set([d[0] for d in d_sn])
+            d_remain -= set(dpl)
+            s_remain = set([s[0] for s in s_sn])
+            s_remain -= set(spl)
 
             for sp,dp in best_pairs:
+                # do linking and clean up
                 sp.track.add_point(dp)
                 del dp.back_cands
                 del sp.forward_cands
             for sp in s_remain:
+                # clean up
                 del sp.forward_cands
             for dp in d_remain:
+                # if unclaimed destination particle, a track in born!
+                track_lst.append(track(dp))
+                # clean up
                 del dp.back_cands
+            # tack all of the unmatched source particles into the new
+            # memory set
             new_mem_set |= s_remain
 
         if memory > 0:
@@ -627,7 +643,7 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
             # set
             tmp_set |=mem_set
             
-        prev_set = tmp_set + 
+        prev_set = tmp_set
         # set prev_hash to cur hash
         prev_hash = cur_hash
         # add in the memory points
@@ -637,16 +653,68 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
 
     return track_lst
 
-
-
-def _link_subnet(trk_lst,p_list):
-    '''This implements the sub-network logic for proper tracking'''
-    accp_track = []
-    mem_track = []
-
+# need to write a class for this to wrap the recursion logic
+class sub_net_linker(object):
+    def __init__(self,s_sn,search_range):
+        self.s_sn = s_sn
+        self.s_lst = [s[0] for s in s_sn]
+        self.MAX = len(self.s_lst)
+        self.sr = search_range
+        self.best_pairs = []
+        self.cur_pairs = []
+        self.best_sum = np.Inf
+        self.d_taken = set()
+        self.cur_num = 0
+        # do the computation
+        self.do_recur(0)
+    def do_recur(j):
+        cur_s = self.s_lst[j]
+        for cur_d,dist in cur_s.forward_cands:
+            tmp_sum = self.cur_sum + dist
+            if tmp_sum > self.best_sum:
+                # if we are already greater than the best sum, bail
+                continue
+            if cur_d in self.d_taken:
+                # we have already used this destination point, bail
+                continue
+            # add this pair to the running list 
+            self.cur_pairs.append((cur_s,cur_d))
+            # add the destination point to the exclusion list 
+            self.d_taken.add(cur_d)
+            # update the current sum
+            self.cur_sum = tmp_sum
+            # buried base case
+            # if we have hit the end of s_lst and made it this far, it
+            # must be a better linking so save it.             
+            if j +1 == self.MAX:
+                self.best_sum = tmp_sum
+                self.best_pairs = copy(self.cur_pair)
+            else:
+                # recurse!
+                self.do_recur(j+1)
+            # remove this step from the working 
+            self.cur_sum -= dist
+            self.d_taken.remove(cur_d)
+            self.cur_pairs.pop()
+        # try null link
+        tmp_sum = self.cur_sum + search_range
+        if tmp_sum < self.best_sum:
+            # add displacement penalty
+            self.cur_sum = tmp_sum
+            # buried base case
+            if j +1 == self.MAX:
+                self.best_sum = tmp_sum
+                self.best_pairs = copy(self.cur_pair)
+            else:
+                # recurse!
+                self.do_recur(j+1)
+            # remove penalty 
+            self.cur_pair-=search_range
+        pass
     
 
-    return accp_track,mem_track
+
+    
 
     
 def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2):
