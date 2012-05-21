@@ -503,19 +503,19 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
     expect particles to know what track they are in (p.track -> track)
     and know how far apart they are from another particle (distance
     returns absolute distance)'''
-
+    # initial source set    
+    prev_set  = set(levels[0])
     # assume everything in first level starts a track
-    prev_level = levels[0]
     # initialize the master track list with the points in the first level
-    track_lst = [track(p) for p in prev_level]
+    track_lst = [track(p) for p in prev_set]
     mem_set = set()
     # fill in first 'prev' hash
     prev_hash =  hash_obj(search_range)
-    for p in prev_level:
+    for p in prev_set:
         prev_hash.add_point(p)
-        p.back_cands = []
-    # fill in first prev set
-    tmp_set = set(prev_level)
+
+
+
     # fill in memory list of sets
     mem_history = []
     for j in range(memory):
@@ -523,27 +523,30 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
     
     
     for cur_level in levels[1:]:
+        # make a new hash object
+        cur_hash = hash_obj(search_range)
+        # create the set for the destination level
+        cur_set = set(cur_level)
+        # create a second copy that will be used as the source in
+        # the next loop
+        tmp_set = set(cur_level) 
+        # memory set
+        new_mem_set = set()
+        
         # fill in first 'cur' hash and set up attributes for keeping
         # track of possible connections
-        cur_hash = hash_obj(search_range)
-        for p in cur_level:
+
+        for p in cur_set:
             cur_hash.add_point(p)
             p.back_cands = []
 
         # set up the particles in the previous level for
         # linking
-        for p in prev_level:
+        for p in prev_set:
             p.forward_cands = []
 
-        # set up the previous set from the stored set
-        prev_set = tmp_set
-        # create the set for the destination level
-        cur_set = set(cur_level)
-        # create a second copy that will be used as the destination in
-        # the next loop
-        tmp_set = set(cur_level) 
-        # memory set
-        new_mem_set = set()
+
+
         # sort out what can go to what
         for p in cur_level:
             # get 
@@ -559,7 +562,7 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
 
         # sort the candidate lists by distance
         for p in cur_set: p.back_cands.sort(key=lambda x: x[1])
-        for p in prev_set: p.back_cands.sort(key=lambda x: x[1])
+        for p in prev_set: p.forward_cands.sort(key=lambda x: x[1])
         # while there are particles left to link, link
         while len(prev_set) > 0 and len(cur_set) > 0:
             p = cur_set.pop()
@@ -576,12 +579,12 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
                 # one backwards candidate
                 b_c_p = p.back_cands[0]
                 # and only one forward candidate
-                if len(b_c_p.forward_cands) ==1:
+                if len(b_c_p[0].forward_cands) ==1:
                     # add to the track of the candidate
-                    b_c_p.track.add_point(p)
+                    b_c_p[0].track.add_point(p)
                     # clean up tracking apparatus
                     del p.back_cands
-                    del b_c_p.forward_cands
+                    del b_c_p[0].forward_cands
                     # short circuit loop
                     continue
             # we need to generate the sub networks 
@@ -603,18 +606,18 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
                         cur_set.discard(c_dp[0])
                 done_flg = (len(d_sn) == d_sn_sz) and (len(s_sn) == s_sn_sz)
 
-            snl = sub_net_linker(s_sn,d_sn,search_range)
+            snl = sub_net_linker(s_sn,search_range)
             
 
             spl,dpl = zip(*snl.best_pairs)
             # strip the distance information off the subnet sets and
             # remove the linked particles
-            d_remain = set([d[0] for d in d_sn])
+            d_remain = set([d for d in d_sn])
             d_remain -= set(dpl)
-            s_remain = set([s[0] for s in s_sn])
+            s_remain = set([s for s in s_sn])
             s_remain -= set(spl)
 
-            for sp,dp in best_pairs:
+            for sp,dp in snl.best_pairs:
                 # do linking and clean up
                 sp.track.add_point(dp)
                 del dp.back_cands
@@ -634,7 +637,7 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
         if memory > 0:
             # identify the new memory points
             new_mem_set -= mem_set
-            mem_history.push_back(new_mem_set)
+            mem_history.append(new_mem_set)
             # remove points that are now too old
             mem_set -= mem_history.pop(0)
             # add the new points
@@ -650,6 +653,7 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
         if memory >0:
             for p in mem_set:
                 prev_hash.add_point(p)
+        # store the current level for use in next loop
 
     return track_lst
 
@@ -657,23 +661,30 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
 class sub_net_linker(object):
     def __init__(self,s_sn,search_range):
         self.s_sn = s_sn
-        self.s_lst = [s[0] for s in s_sn]
+        self.s_lst = [s for s in s_sn]
         self.MAX = len(self.s_lst)
         self.sr = search_range
         self.best_pairs = []
         self.cur_pairs = []
         self.best_sum = np.Inf
         self.d_taken = set()
-        self.cur_num = 0
+        self.cur_sum = 0
+
+
         # do the computation
         self.do_recur(0)
-    def do_recur(j):
+    def do_recur(self,j):
         cur_s = self.s_lst[j]
         for cur_d,dist in cur_s.forward_cands:
             tmp_sum = self.cur_sum + dist
             if tmp_sum > self.best_sum:
-                # if we are already greater than the best sum, bail
-                continue
+                # if we are already greater than the best sum, bail we
+                # can bail all the way out of this branch because all
+                # the other possible connections (including the null
+                # connection) are more expensive than the current
+                # connection, thus we can discard with out testing all
+                # leaves down this branch
+                return
             if cur_d in self.d_taken:
                 # we have already used this destination point, bail
                 continue
@@ -688,7 +699,7 @@ class sub_net_linker(object):
             # must be a better linking so save it.             
             if j +1 == self.MAX:
                 self.best_sum = tmp_sum
-                self.best_pairs = copy(self.cur_pair)
+                self.best_pairs = list(self.cur_pairs)
             else:
                 # recurse!
                 self.do_recur(j+1)
@@ -697,19 +708,19 @@ class sub_net_linker(object):
             self.d_taken.remove(cur_d)
             self.cur_pairs.pop()
         # try null link
-        tmp_sum = self.cur_sum + search_range
+        tmp_sum = self.cur_sum + self.sr
         if tmp_sum < self.best_sum:
             # add displacement penalty
             self.cur_sum = tmp_sum
             # buried base case
             if j +1 == self.MAX:
                 self.best_sum = tmp_sum
-                self.best_pairs = copy(self.cur_pair)
+                self.best_pairs = list(self.cur_pairs)
             else:
                 # recurse!
                 self.do_recur(j+1)
             # remove penalty 
-            self.cur_pair-=search_range
+            self.cur_sum-=self.sr
         pass
     
 
@@ -826,7 +837,7 @@ def link_ridges(vec,search_range,memory=0):
 
     levels = [[point(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
     
-    trks = link_points(levels,search_range,memory)        
+    trks = link_full(levels,search_range,memory)        
     for t in trks:
         t.classify()
 
