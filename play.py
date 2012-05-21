@@ -63,7 +63,7 @@ def gen_ellipse(a,b,t,x,y,theta):
     r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
     return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
-class ellipse_fitter:
+class ellipse_fitter(object):
     def __init__(self):
         self.pt_lst = []
         
@@ -78,7 +78,7 @@ class ellipse_fitter:
     def get_params(self):
         return gen_to_parm(fit_ellipse(self.pt_lst))
 
-class circ_finder:
+class circ_finder(object):
     def __init__(self):
         self.pt_lst = []
         
@@ -332,7 +332,7 @@ class track(object):
             self.classify()
     def sort(self):
         self.points.sort(key = lambda x: x.q)
-class hash_line_angular:
+class hash_line_angular(object):
     '''1D hash table with linked ends for doing the ridge linking
     around a rim'''
     def __init__(self,bin_width):
