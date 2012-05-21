@@ -145,7 +145,7 @@ def l_smooth(values,window_len=2,window='flat'):
     return values
 
 
-class point:
+class point(object):
     '''Class to encapsulate the min/max points found on a given curve 
     points are on a line parametrized as phi(q)
     '''
@@ -181,7 +181,7 @@ class point:
         '''Returns if a point is in a track '''
         return  self.track is not None
     
-class track:
+class track(object):
     count = 0
     def __init__(self,point=None):
         self.points = []
@@ -356,7 +356,7 @@ class hash_line_angular:
 
 
             
-class hash_line_linear:
+class hash_line_linear(object):
     '''1D hash table for doing ridge linking when sampling radially'''
     def __init__(self,bin_width,max_r):
         
