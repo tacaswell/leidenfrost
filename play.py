@@ -19,10 +19,13 @@ from __future__ import division
 import PIL.Image
 import scipy.odr as sodr
 import numpy as np
+import numpy.linalg as nl
 
 import find_peaks as  fp
 import scipy
 import scipy.ndimage
+import scipy.stats as ss
+
 reload(fp)
 BPP_LOOKUP = dict({8:'uint8',16:'uint16'})
 
@@ -221,7 +224,38 @@ class track(object):
         else:
             kwargs['marker'] = 'o'
         ax.plot(X,Y,**kwargs)
-         
+    def classify2(self):
+        ''' second attempt at the classify function''' 
+        phi,q = zip(*[(p.phi,p.q) for p in self.points])
+        q = np.asarray(q)
+        # if the track is less than 25, don't try to classify
+        if len(phi) < 25:
+            self.charge =  0
+            self.q = None
+            self.phi = None
+            return
+
+        a = np.vstack([q**2,q,np.ones(np.size(q))]).T
+        X,res,rnk,s = nl.lstsq(a,phi)
+        phif = a.dot(X)
+        p = 1- ss.chi2.cdf(np.sum(((phif - phi)**2)/phif),len(q)-3)
+
+        prop_c = -np.sign(X[0])
+        prop_q = -X[1]/(2*X[0])
+        prop_phi = prop_q **2 * X[0] + prop_q * X[1] + X[2]
+
+
+        if prop_q < np.min(q) or prop_q > np.max(q):
+            # the 'center' in outside of the data we have -> screwy track don't classify
+            self.charge =  0
+            self.q = None
+            self.phi = None
+            return
+
+        self.charge = prop_c
+        self.q = prop_q
+        self.phi = prop_phi
+                        
     # classify tracks
     def classify(self):
         '''This needs to be re-written to deal with non-properly Chevron tracks better '''
@@ -839,7 +873,7 @@ def link_ridges(vec,search_range,memory=0):
     
     trks = link_full(levels,search_range,memory)        
     for t in trks:
-        t.classify()
+        t.classify2()
 
     trks.sort(key = lambda x: x.phi)
     return trks
