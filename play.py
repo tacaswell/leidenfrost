@@ -780,7 +780,15 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
     # set up points to sample at
     C = np.pi * (a+b)*(1+ (3*((a-b)/(a+b))**2)/(10+np.sqrt(4+3*((a-b)/(a+b))**2)))
 
+    r = int(np.max([a,b])*(1+s_width)*1.1)
+    x_shift = int(x0-r)
+    x_lim = int(x0+r)
+    y_shift = int(y0-r)
+    y_lim = int(y0+r)
 
+    dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
+    
+    #    print y_shift,y_lim,'\t',x_shift,x_lim
     theta = np.linspace(0,2*np.pi,np.floor(2*C).astype('int'))
     # this will approximately  double sample.
     
@@ -789,7 +797,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
     max_vec = []
     for ma_scale in np.linspace(1-s_width,1 +s_width,s_num):
         # set up this steps ellipse
-        p = (a*ma_scale,b*ma_scale,t0,x0,y0)
+        p = (a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift)
         # extract the points in the ellipse is x-y
         zp = (gen_ellipse(*(p+(theta,))))
         # extract the values at those locations from the image.  The
