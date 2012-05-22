@@ -75,7 +75,7 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
             #look ahead in signal to ensure that this is a peak and not jitter
             if y_axis[index:index+lookahead].max() < mx:
                 maxtab.append((mxpos, mx))
-                dump.append(True)
+                dump.append((index,True))
                 #set algorithm to only find minima now
                 mx = np.Inf
                 mn = np.Inf
@@ -86,7 +86,7 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
             #look ahead in signal to ensure that this is a peak and not jitter
             if y_axis[index:index+lookahead].min() > mn:
                 mintab.append((mnpos, mn))
-                dump.append(False)
+                dump.append((index,False))
                 #set algorithm to only find maxima now
                 mn = -np.Inf
                 mx = -np.Inf
@@ -94,12 +94,14 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
     
     #Remove the false hit on the first value of the y_axis
     try:
-        if dump[0]:
-            maxtab.pop(0)
-            #print "pop max"
-        else:
-            mintab.pop(0)
-            #print "pop min"
+        indx,dmp = dump[0]
+        if indx < lookahead:
+            if dmp:
+                maxtab.pop(0)
+                #print "pop max"
+            else:
+                mintab.pop(0)
+                #print "pop min"
         del dump
     except IndexError:
         #no peaks were found, should the function return empty lists?
