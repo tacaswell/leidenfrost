@@ -235,6 +235,10 @@ class track(object):
             self.phi = None
             return
 
+        p_shift = 0
+        if np.min(phi) < 0.1*np.pi or np.max(phi) > 2*np.pi*.9:
+            p_shift = np.pi
+            phi = np.mod(np.asarray(phi) + p_shift,2*np.pi)
         a = np.vstack([q**2,q,np.ones(np.size(q))]).T
         X,res,rnk,s = nl.lstsq(a,phi)
         phif = a.dot(X)
@@ -254,7 +258,7 @@ class track(object):
 
         self.charge = prop_c
         self.q = prop_q
-        self.phi = prop_phi
+        self.phi = prop_phi - p_shift
                         
     # classify tracks
     def classify(self):
