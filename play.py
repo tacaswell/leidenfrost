@@ -26,7 +26,7 @@ import scipy
 import scipy.ndimage
 import scipy.stats as ss
 
-reload(fp)
+
 BPP_LOOKUP = dict({8:'uint8',16:'uint16'})
 
 WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
@@ -767,6 +767,8 @@ class sub_net_linker(object):
 
     
 def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2):
+    smooth_rng = s
+    
     # fit the ellipse to extract from
     
     out = fit_ellipse(pt_lst)
@@ -777,9 +779,8 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
     # convert the parameters to parametric form
     a,b,t0,x0,y0 = gen_to_parm(out.beta)
 
-    # set up points to sample at
-    C = np.pi * (a+b)*(1+ (3*((a-b)/(a+b))**2)/(10+np.sqrt(4+3*((a-b)/(a+b))**2)))
 
+    # compute how to trim the image.  This saves computation time.
     r = int(np.max([a,b])*(1+s_width)*1.1)
     x_shift = int(x0-r)
     x_lim = int(x0+r)
@@ -787,26 +788,33 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
     y_lim = int(y0+r)
 
     dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
+
     
-    #    print y_shift,y_lim,'\t',x_shift,x_lim
-    theta = np.linspace(0,2*np.pi,np.floor(2*C).astype('int'))
+    # set up points to sample at
     # this will approximately  double sample.
-    
+    C = np.pi * (a+b)*(1+ (3*((a-b)/(a+b))**2)/(10+np.sqrt(4+3*((a-b)/(a+b))**2)))
+    sample_count = int(np.ceil(2*C))
+    theta = np.linspace(0,2*np.pi,sample_count)
+
+
+    # set up all of the points to sample at in all rings.  It is
+    # faster to do all the computation is one shot
+    zp_all = np.hstack([(gen_ellipse(*((a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift,theta,))))  
+                        for ma_scale in np.linspace(1-s_width,1 +s_width,s_num)])
+
+    # extract the values at those locations from the image.  The
+    # extra flipud is to take a transpose of the points to deal
+    # with the fact that the definition of the first direction
+    # between plotting and the image libraries is inconsistent.
+    zv_all = scipy.ndimage.interpolation.map_coordinates(dlfimg,np.flipud(zp_all),order=2)
 
     min_vec = []
     max_vec = []
-    for ma_scale in np.linspace(1-s_width,1 +s_width,s_num):
-        # set up this steps ellipse
-        p = (a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift)
-        # extract the points in the ellipse is x-y
-        zp = (gen_ellipse(*(p+(theta,))))
-        # extract the values at those locations from the image.  The
-        # extra flipud is to take a transpose of the points to deal
-        # with the fact that the definition of the first direction
-        # between plotting and the image libraries is inconsistent.
-        zv = scipy.ndimage.interpolation.map_coordinates(dlfimg,np.flipud(zp),order=2)
+    for j,ma_scale in enumerate(np.linspace(1-s_width,1 +s_width,s_num)):
+        # select out the right region
+        zv = zv_all[j*sample_count:(j+1)*sample_count] 
         # smooth the curve
-        zv = l_smooth(zv,s,'blackman')
+        zv = l_smooth(zv,smooth_rng,'blackman')
 
         # find the peaks, the parameters here are important
         peaks = fp.peakdetect(zv,theta,lookahead,delta,True)
@@ -818,15 +826,6 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
         # append to the export vectors
         min_vec.append((ma_scale,min_pk))
         max_vec.append((ma_scale,max_pk))
-        
-    ## # debugging code
-    ## figure()
-    ## imshow(dlfimg)
-    ## axis('equal')
-    ## plot(pt_lst[0],pt_lst[1],'x')
-    ## curve2 = gen_ellipse(*(gen_to_parm(out.beta)+(theta,)))
-    ## plot(curve2[0],curve2[1],label='fit')
-    ## lfprof = scipy.ndimage.interpolation.map_coordinates(lfimg.T,curve2)
     
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
