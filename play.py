@@ -672,6 +672,8 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
             # memory set
             new_mem_set |= s_remain
 
+        # set prev_hash to cur hash
+        prev_hash = cur_hash
         if memory > 0:
             # identify the new memory points
             new_mem_set -= mem_set
@@ -683,14 +685,14 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
             # add the memory particles to what will be the next source
             # set
             tmp_set |=mem_set
-            
-        prev_set = tmp_set
-        # set prev_hash to cur hash
-        prev_hash = cur_hash
-        # add in the memory points
-        if memory >0:
+            # add the extra points to the hash
             for p in mem_set:
                 prev_hash.add_point(p)
+
+            
+        prev_set = tmp_set
+
+        # add in the memory points
         # store the current level for use in next loop
 
     return track_lst
