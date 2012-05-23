@@ -548,9 +548,6 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
     track_lst = [track(p) for p in prev_set]
     mem_set = set()
     # fill in first 'prev' hash
-    prev_hash =  hash_obj(search_range)
-    for p in prev_set:
-        prev_hash.add_point(p)
 
 
 
@@ -563,6 +560,7 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
     for cur_level in levels[1:]:
         # make a new hash object
         cur_hash = hash_obj(search_range)
+        prev_hash = hash_obj(search_range)
         # create the set for the destination level
         cur_set = set(cur_level)
         # create a second copy that will be used as the source in
@@ -581,8 +579,8 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
         # set up the particles in the previous level for
         # linking
         for p in prev_set:
+            prev_hash.add_point(p)
             p.forward_cands = []
-
 
 
         # sort out what can go to what
@@ -685,10 +683,6 @@ def link_full(levels,search_range = .02,memory=0,hash_obj=hash_line_angular):
             # add the memory particles to what will be the next source
             # set
             tmp_set |=mem_set
-            # add the extra points to the hash
-            for p in mem_set:
-                prev_hash.add_point(p)
-
             
         prev_set = tmp_set
 
