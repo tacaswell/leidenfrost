@@ -230,7 +230,7 @@ class track(object):
         q = np.asarray(q)
         # if the track is less than 25, don't try to classify
         if len(phi) < 25:
-            self.charge =  0
+            self.charge =  None
             self.q = None
             self.phi = None
             return
@@ -251,7 +251,7 @@ class track(object):
 
         if prop_q < np.min(q) or prop_q > np.max(q):
             # the 'center' in outside of the data we have -> screwy track don't classify
-            self.charge =  0
+            self.charge =  None
             self.q = None
             self.phi = None
             return
