@@ -166,6 +166,8 @@ class point(object):
         
     def add_track(self,track):
         '''Adds a track to the point '''
+        if self.track is not None:
+            raise Exception("trying to add a particle already in a track")
         self.track = track
         
     def remove_from_track(self,track):
@@ -202,11 +204,8 @@ class track(object):
         return len(self.points)
     def add_point(self,point):
         '''Adds a point to this track '''
-        if point in self.points:
-            return
-        else:
-            self.points.append(point)
-            point.add_track(self)
+        self.points.append(point)
+        point.add_track(self)
     def last_point(self):
         '''Returns the last point on the track'''
         return self.points[-1]
