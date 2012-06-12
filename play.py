@@ -79,7 +79,7 @@ class ellipse_fitter(object):
         self.pt_lst.append((event.xdata,event.ydata))
 
     def get_params(self):
-        return gen_to_parm(fit_ellipse(self.pt_lst))
+        return gen_to_parm(fit_ellipse(np.vstack(self.pt_lst).T).beta)
 
 class circ_finder(object):
     def __init__(self):
