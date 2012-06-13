@@ -164,3 +164,75 @@ def play_movie(fname,bck_img=None):
     im.set_clim([.75,1.25])
     prof_ani = animation.FuncAnimation(fig,update_img,len(F),fargs=(F,bck_img,im,fr_num),interval=50)
     plt.show()
+
+
+def plot_plst_data(p_lst):
+    ''' makes a graph for the position, radius, angle, etc from the list of ellipse parameters'''
+
+    
+
+    print 'hi'
+    a,b,t0,x0,y0 = zip(*p_lst)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(a,label='a')
+    ax.plot(b,label='b')
+    ax.set_ylabel('axis [pix]')
+    ax.set_xlabel(r'frame \#')
+
+
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(x0,y0)
+    ax.set_xlabel('x [px]')
+    ax.set_ylabel('y [px]')
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(x0,label='x0')
+    ax.plot(y0,label='y0')
+    ax.legend(loc=0)
+    ax.set_ylabel('center location [px]')
+    ax.set_xlabel('frame \#')
+    
+    x0 = np.array(x0)
+    y0 = np.array(y0)
+    x0_0 = x0-np.mean(x0)
+    y0_0 = y0-np.mean(y0)
+    x0_0 = x0_0/np.sqrt(np.sum(x0_0**2))
+    y0_0 = y0_0/np.sqrt(np.sum(y0_0**2))
+    
+    print sum(x0_0 * y0_0)
+    
+
+
+
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.step(range(len(t0)),t0,label=r'$\theta_0$')
+    ax.axhline(-np.pi/2)
+    ax.axhline(np.pi/2)
+    ax.axhline(-np.pi)
+    ax.axhline(np.pi)
+    ax.legend(loc=0)
+    ax.set_ylabel(r'$\theta_0$ [rad]')
+    ax.set_xlabel('frame \#')
+    
+
+
+    
+        
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(10*(np.array(t0) - np.mean(t0)),label=r'$\theta_0$')
+    ax.plot(a-np.mean(a),label='a')
+    ax.plot(b-np.mean(b),label='b')
+    ax.set_ylabel('axis [pix]')
+    ax.set_xlabel('frame \#')
+    ax.legend(loc=0)
+    ax.set_ylabel(r'arb')
+    ax.set_xlabel('frame \#')
+    
+
