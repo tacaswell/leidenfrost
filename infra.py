@@ -187,6 +187,7 @@ def plot_plst_data(p_lst):
     ax.plot(x0,y0)
     ax.set_xlabel('x [px]')
     ax.set_ylabel('y [px]')
+    ax.set_aspect('equal')
     
     fig = plt.figure()
     ax = fig.add_subplot(111)
