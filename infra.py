@@ -15,16 +15,49 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
-import hashlib
 
-import scipy
-import scipy.ndimage
-import cine
-import lf_drop.play  as lfp
+import hashlib
 import time
-import h5py
+
+import cine
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.interpolate as sint
+import scipy.odr as sodr
+
+WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
+
+
+def gen_ellipse(a,b,t,x,y,theta):
+    # a is always the major axis, x is always the major axis, can be rotated away by t
+    if b > a:
+            tmp = b
+            b = a
+            a = tmp
+
+            
+    #t = np.mod(t,np.pi/2)
+    r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
+    return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
+
+class ellipse_fitter(object):
+    def __init__(self):
+        self.pt_lst = []
+        
+        
+    def click_event(self,event):
+        ''' Extracts locations from the user'''
+        if event.key == 'shift':
+            self.pt_lst = []
+            
+        self.pt_lst.append((event.xdata,event.ydata))
+
+    def get_params(self):
+        return gen_to_parm(fit_ellipse(np.vstack(self.pt_lst).T).beta)
+
+    def return_points(self):
+        '''Returns the clicked points in the format the rest of the code expects'''
+        return np.vstack(self.pt_lst).T
 
 def hash_file(fname):
     """for computing hash values of files.  This is to make it easy to
@@ -54,7 +87,7 @@ def set_up_efitter(fname,bck_img = None):
     ax = fig.add_axes([.1,.1,.8,.8])
     im = ax.imshow(lfimg/bck_img)
     im.set_clim([0,2])
-    ef = lfp.ellipse_fitter()
+    ef = ellipse_fitter()
     plt.connect('button_press_event',ef.click_event)
 
     
@@ -75,58 +108,6 @@ def gen_bck_img(fname):
     bck_img[bck_img==0] = .001
     return bck_img
 
-def proc_file(fname,new_pts,bck_img=None):
-    '''Extracts the profile for every frame in the input cine '''
-
-    #open the cine file
-
-
-    c_test = cine.Cine(fname)
-
-    #compute the background
-    if bck_img is None:
-        bck_img = gen_bck_img(fname)
-
-
-  
-
-    #  h5_fname = prefix + '/' + fn + '.h5'
-    #out_file = h5py.File(h5_fname,'w+')
-    tm_lst = []
-    trk_res_lst = []
-    p_lst = []
-  
-
-  
-    
-    for j,lf in enumerate(c_test):
-        _t0 = time.time()
-  
-
-        miv,mav,p = lfp.find_rim_fringes(new_pts,lf/bck_img,.045,110,5,.15)
-        a,b,t0,x0,y0 = p
-        tim = lfp.link_ridges(miv,.01)
-        tam = lfp.link_ridges(mav,.01)
-        
-        tim = [t for t in tim if len(t) > 30]
-        tam = [t for t in tam if len(t) > 30]
-        
-        trk_res_lst.append((zip(*[ (t.charge,t.phi) for t in tim if t.charge is not None ]),zip(*[ (t.charge,t.phi) for t in tam if t.charge is not None ])))
-        p_lst.append(p)
-        
-        _t1 = time.time()
-        print (_t1 - _t0) ,"seconds"
-        tm_lst.append(_t1-_t0)
-
-        if j > 500:
-            break
-        # seed the next round of points
-        new_pts = np.hstack([lfp.gen_ellipse(*(a*t.q,b*t.q,t0,x0,y0,t.phi,)) for t in tim+tam if len(t) > 50 and t.q is not None and t.phi is not None and t.charge !=0])
-
-        
-
-
-    return trk_res_lst,p_lst,tm_lst
 
 def disp_frame(fname,n,bck_img = None):
     '''Displays a given frame from the file'''
@@ -236,4 +217,98 @@ def plot_plst_data(p_lst):
     ax.set_ylabel(r'arb')
     ax.set_xlabel('frame \#')
     
+
+
+
+def resample_track(data,pt_num = 250,interp_type = 'linear'):
+    '''re-samples the curve on uniform points and averages out tilt
+    due to fringe ID error'''
+
+    # get data out
+    ch,th = data
+    th = np.array(th)
+    ch = np.array(ch)
+    
+    # make negative points positive
+    th = np.mod(th,2*np.pi)
+    indx = th.argsort()
+    # re-order to be monotonic
+    th = th[indx]
+    ch = ch[indx]
+    # sum the charges
+    ch = np.cumsum(ch)
+
+    # figure out the miss/match
+    miss_cnt = ch[-1]
+    corr_ln =th*(miss_cnt/(2*np.pi)) 
+    # add a linear line to make it come back to 0
+    ch -= corr_ln
+
+    # make sure that the full range is covered
+    if th[0] != 0:
+        ch = np.concatenate((ch[:1],ch))
+        th = np.concatenate(([0],th))
+    if th[-1] < 2*np.pi:
+        ch = np.concatenate((ch,ch[:1]))
+        th = np.concatenate((th,[2*np.pi]))
+
+    # set up interpolation 
+    f = sint.interp1d(th,ch,kind=interp_type)
+    # set up new points
+    th_new = np.linspace(0,2*np.pi,pt_num)
+    # get new interpolated values
+    ch_new = f(th_new)
+    # subtract off mean
+    ch_new -=np.mean(ch_new)
+    return ch_new,th_new
+
+
+def e_funx(p,r):
+    x,y = r
+    a,b,c,d,f = p
+        
+    return a* x*x + 2*b*x*y + c * y*y + 2 *d *x + 2 * f *y -1
+
+def fit_ellipse(r):
+
+
+    p0 = (2,2,0,0,0)
+    data = sodr.Data(r,1)
+    model = sodr.Model(e_funx,implicit=1)
+    worker = sodr.ODR(data,model,p0)
+    out = worker.run()
+    out = worker.restart()
+    return out
+
+# http://mathworld.wolfram.com/Ellipse.html
+def gen_to_parm(p):
+    a,b,c,d,f = p
+    g = -1
+    x0 = (c*d-b*f)/(b*b - a*c)
+    y0 = (a*f - b*d)/(b*b - a*c)
+    ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
+    bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (-np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
+
+    t0 =  (1/2) * np.arctan(2*b/(a-c))
+    
+    if a>c: 
+        t0 =  (1/2) * np.arctan(2*b/(a-c))
+        
+    else:
+        t0 = np.pi/2 + (1/2) * np.arctan(2*b/(c-a))
+        
+    
+
+    return (ap,bp,t0,x0,y0)
+
+
+def l_smooth(values,window_len=2,window='flat'):
+    window_len = window_len*2+1
+    s=np.r_[values[window_len-1:0:-1],values,values[-1:-window_len:-1]]
+    w = WINDOW_DICT[window](window_len)
+    #    w = np.ones(window_len,'d')
+    #w = np.exp(-((np.linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
+    
+    values = np.convolve(w/w.sum(),s,mode='valid')[(window_len//2):-(window_len//2)]
+    return values
 
