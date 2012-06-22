@@ -270,9 +270,15 @@ def e_funx(p,r):
     return a* x*x + 2*b*x*y + c * y*y + 2 *d *x + 2 * f *y -1
 
 def fit_ellipse(r):
+    x,y = r
+    R2 = np.max(x - np.mean(x))**2
 
-
-    p0 = (2,2,0,0,0)
+    a = c = 1/R2
+    b = 0
+    d = -np.mean(x)/R2
+    f = -np.mean(y)/R2
+    
+    p0 = (a,a,c,d,f)
     data = sodr.Data(r,1)
     model = sodr.Model(e_funx,implicit=1)
     worker = sodr.ODR(data,model,p0)

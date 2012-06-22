@@ -16,45 +16,47 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
 
+
 import numpy as np
 import trackpy.tracking as pt
 import scipy
-import infra as li
+import infra
 import find_peaks as fp
 import numpy.linalg as nl
 import scipy.stats as ss
+import time
 from trackpy.tracking import Point
 from trackpy.tracking import Track
+
 
 class hash_line_angular(object):
     '''1D hash table with linked ends for doing the ridge linking
     around a rim'''
-    def __init__(self,dims,bin_width):
+    def __init__(self, dims, bin_width):
         '''The argument dims needs to be there to homogenize hash interfaces  '''
         full_width = 2*np.pi
-        self.boxes = [[] for j in range(0,int(np.ceil(full_width/bin_width)))]
+        self.boxes = [[] for j in range(0, int(np.ceil(full_width/bin_width)))]
         self.bin_width = bin_width
         self.bin_count = len(self.boxes)
         
-    def add_point(self,point):
+    def add_point(self, point):
         ''' Adds a point on the hash line'''
-        t = np.mod(point.phi,2*np.pi)
+        t = np.mod(point.phi, 2*np.pi)
         self.boxes[int(np.floor(t/self.bin_width))].append(point)
-    def get_region(self,point,bbuffer = 1):
+
+    def get_region(self, point, bbuffer = 1):
         '''Gets the region around the point'''
         bbuffer = int(np.ceil(bbuffer/self.bin_width))
-        box_indx = int(np.floor(self.bin_count * np.mod(point.phi,2*np.pi)/(2*np.pi)))
+        box_indx = int(np.floor(self.bin_count * np.mod(point.phi, 2*np.pi)/(2*np.pi)))
         tmp_box = []
-        for j in range(box_indx - bbuffer,box_indx + bbuffer + 1):
-            tmp_box.extend(self.boxes[np.mod(j,self.bin_count)])
+        for j in range(box_indx - bbuffer, box_indx + bbuffer + 1):
+            tmp_box.extend(self.boxes[np.mod(j, self.bin_count)])
         return tmp_box
-
-
 
 
 class Point1D_circ(Point):
     '''
-    Version of :py:class:`Point` for finding fringes 
+    Version of :py:class:`Point` for finding fringes
 
     :py:attr:`Point1D_circ.q` is the parameter for the curve where the point is (maps to time in standard tracking)
     :py:attr:`Point1D_circ.phi` is the angle of the point along the parametric curve
@@ -62,34 +64,34 @@ class Point1D_circ(Point):
     '''
 
     
-    def __init__(self,q,phi,v):
+    def __init__(self, q, phi, v):
         Point.__init__(self)                  # initialize base class
         self.q = q                            # parametric variable
         self.phi = phi                        # 
         self.v = v                            # the value at the extrema (can probably drop this)
 
-    def distance(self,point):
+    def distance(self, point):
         '''Returns the absolute value of the angular distance between
         two points mod 2\pi'''
         d = np.abs(self.phi - point.phi)
         if d> np.pi:
-            d = np.abs(2*pi - d)  
+            d = np.abs(2*np.pi - d)  
         return d
 
 class lf_Track(Track):
-    def __init__(self,point=None):
-        Track.__init__(self,point)
+    def __init__(self, point=None):
+        Track.__init__(self, point)
         self.charge = None
         self.q = None
         self.phi = None
     def sort(self):
         self.points.sort(key = lambda x: x.q)
 
-    def plot_trk(self,ax,**kwargs):
+    def plot_trk(self, ax,**kwargs):
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
     def plot_trk_img(self,pram,ax,**kwargs):
         a,b,t0,x0,y0 = pram
-        X,Y = np.hstack([gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
+        X,Y = np.hstack([infra.gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
         if self.charge is None:
             kwargs['marker'] = '*'
         elif self.charge == 1:
@@ -241,11 +243,10 @@ class lf_Track(Track):
 
 
             
-def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2):
+def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
     smooth_rng = s
     
     # fit the ellipse to extract from
-    
     out = infra.fit_ellipse(pt_lst)
 
     #dlfimg = scipy.ndimage.morphology.grey_closing(lfimg,(1,1))
@@ -274,7 +275,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
 
     # set up all of the points to sample at in all rings.  It is
     # faster to do all the computation is one shot
-    zp_all = np.hstack([(gen_ellipse(*((a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift,theta,))))  
+    zp_all = np.hstack([(infra.gen_ellipse(*((a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift,theta,))))  
                         for ma_scale in np.linspace(1-s_width,1 +s_width,s_num)])
 
     # extract the values at those locations from the image.  The
@@ -289,7 +290,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
         # select out the right region
         zv = zv_all[j*sample_count:(j+1)*sample_count] 
         # smooth the curve
-        zv = li.l_smooth(zv,smooth_rng,'blackman')
+        zv = infra.l_smooth(zv,smooth_rng,'blackman')
 
         # find the peaks, the parameters here are important
         peaks = fp.peakdetect(zv,theta,lookahead,delta,True)
@@ -305,7 +306,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead = 5,delta = 10000,s=2)
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
 
-def proc_file(fname,new_pts,search_range,bck_img=None,memory=0):
+def proc_file(fname,new_pts,search_range,bck_img=None,memory=0,s_width = .045,s_num = 110,lookahead = 5,delta = 10000,s=2):
 
     c_test = cine.Cine(fname)
 
@@ -325,35 +326,44 @@ def proc_file(fname,new_pts,search_range,bck_img=None,memory=0):
 
 
 
-    for j,lf in enumerate(c_test):
-        _t0 = time.time()
-
-
-        miv,mav,p = find_rim_fringes(new_pts,lf/bck_img,.045,110,5,.15)
-        _t1 = time.time()
-        print (_t1 - _t0) ,"seconds"
-        a,b,t0,x0,y0 = p
-        tim = link_ridges(miv,search_range,memory=memory)
-        tam = link_ridges(mav,search_range,memory=memory)
-        
-        #    tim = [t for t in tim if len(t) > 30]
-        #    tam = [t for t in tam if len(t) > 30]
-
-        trk_res_lst.append((zip(*[ (t.charge,t.phi) for t in tim if t.charge is not None ]),zip(*[ (t.charge,t.phi) for t in tam if t.charge is not None ])))
+    for lf in c_test:
+        p,tm,trk_res,new_pts,tim,tam = proc_frame(new_pts,lf/bck_img,search_range,)
         p_lst.append(p)
-
-        _t1 = time.time()
-        print (_t1 - _t0) ,"seconds"
-        tm_lst.append(_t1-_t0)
-
-
-        # seed the next round of points
-        new_pts = np.hstack([gen_ellipse(*(a*t.q,b*t.q,t0,x0,y0,t.phi,)) for t in tim+tam if len(t) > 50 and t.q is not None and t.phi is not None and t.charge !=0])
+        tm_lst.append(tm)
+        trk_res_lst.append(trk_res)
+        print tm, 'seconds'
 
 
-        break
+def proc_frame(new_pts, img, search_range, s_width, s_num, memory=0, lookahead=5, delta=10000, s=2):
+    ''' function for inner logic of loop in proc_file'''
+    _t0 = time.time()
 
 
+    miv,mav,p = find_rim_fringes(new_pts,img,s_width=s_width,s_num=s_num,lookahead=lookahead,delta=delta,s=s)
+
+    tim = link_ridges(miv,search_range,memory=memory)
+    tam = link_ridges(mav,search_range,memory=memory)
+
+    tim = [t for t in tim if len(t) > 30]
+    tam = [t for t in tam if len(t) > 30]
+
+    trk_res = (zip(*[ (t.charge,t.phi) for t in tim if t.charge is not None ]),zip(*[ (t.charge,t.phi) for t in tam if t.charge is not None ]))
+
+
+    _t1 = time.time()
+
+
+
+    a,b,t0,x0,y0 = p
+    # seed the next round of points
+    new_pts = np.hstack([infra.gen_ellipse(*(a*t.q,b*t.q,t0,x0,y0,t.phi,)) for t in tim+tam 
+                            if len(t) > 30 and 
+                            t.q is not None 
+                            and t.phi is not None 
+                            and t.charge is not None
+                            and t.charge != 0])
+
+    return p,(_t1 - _t0),trk_res,new_pts,tim,tam
 
 
 def link_ridges(vec,search_range,memory=0):
@@ -361,9 +371,9 @@ def link_ridges(vec,search_range,memory=0):
 
     levels = [[Point1D_circ(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
     
-    trks = pt.link_full(levels,2*np.pi,search_range,hash_cls = hash_line_angular,memory = memory,track_cls = lf_Track)        
+    trks = pt.link_full(levels,2*np.pi,search_range,hash_cls = hash_line_angular,memory = memory, track_cls = lf_Track)        
     for t in trks:
         t.classify2()
 
-    trks.sort(key = lambda x: x.phi)
+    trks.sort(key=lambda x: x.phi)
     return trks
