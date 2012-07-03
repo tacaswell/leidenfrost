@@ -20,6 +20,7 @@ from __future__ import division
 import numpy as np
 import trackpy.tracking as pt
 import scipy
+import scipy.ndimage
 import infra
 import find_peaks as fp
 import numpy.linalg as nl
