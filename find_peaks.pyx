@@ -1,8 +1,13 @@
 #https://gist.github.com/1178136
+# converted to cython by Thomas A Caswell
 
 import numpy as np
+cimport numpy as np
+DTYPE = np.float
 
-def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
+ctypedef np.float DTYPE_t
+
+def peakdetect(np.ndarray y_axis_in, np.ndarray x_axis_in = None, int lookahead = 500, float delta = 0,isring=False):
     """
     Converted from/based on a MATLAB script at http://billauer.co.il/peakdet.html
     
@@ -34,11 +39,15 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
     maxtab = []
     mintab = []
     dump = []   #Used to pop the first hit which always if false
-       
-    length = len(y_axis)
-    if x_axis is None:
-        x_axis = range(length)
+
+    cdef np.ndarray x_axis
+    cdef np.ndarray y_axis
     
+    cdef int length = len(y_axis_in)
+    if x_axis_in is None:
+        x_axis = np.arange(length)
+    else:
+        x_axis = np.asarray(x_axis_in,dtype=DTYPE)
     #perform some checks
     if length != len(x_axis):
         raise ValueError, "Input vectors y_axis and x_axis must have same length"
@@ -49,10 +58,12 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
 
     
     #needs to be a numpy array
-    y_axis = np.asarray(y_axis)
+    y_axis = np.asarray(y_axis_in,dtype=DTYPE)
     
     #maxima and minima candidates are temporarily stored in
     #mx and mn respectively
+    cdef float x,y,mx,mn,mxpos,mnpos
+    cdef int index
     mn, mx = np.Inf, -np.Inf
     if isring:
 
@@ -61,7 +72,10 @@ def peakdetect(y_axis, x_axis = None, lookahead = 500, delta = 0,isring=False):
 
 
     #Only detect peak if there is 'lookahead' amount of points after it
-    for index, (x, y) in enumerate(zip(x_axis[:-lookahead], y_axis[:-lookahead])):
+    #    for index, (x, y) in enumerate(zip(x_axis[:-lookahead], y_axis[:-lookahead])):
+    for index in range(length - lookahead):
+        x = x_axis[index]
+        y = y_axis[index]
         if y > mx:
             mx = y
             mxpos = x
