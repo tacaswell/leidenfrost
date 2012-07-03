@@ -42,13 +42,12 @@ class hash_line_angular(object):
         
     def add_point(self, point):
         ''' Adds a point on the hash line'''
-        t = np.mod(point.phi, 2*np.pi)
-        self.boxes[int(np.floor(t/self.bin_width))].append(point)
+        self.boxes[int(np.floor(np.mod(point.phi, 2*np.pi)/self.bin_width))].append(point)
 
     def get_region(self, point, bbuffer = 1):
         '''Gets the region around the point'''
         bbuffer = int(np.ceil(bbuffer/self.bin_width))
-        box_indx = int(np.floor(self.bin_count * np.mod(point.phi, 2*np.pi)/(2*np.pi)))
+        box_indx = int(np.floor(np.mod(point.phi, 2*np.pi)/self.bin_width))
         tmp_box = []
         for j in range(box_indx - bbuffer, box_indx + bbuffer + 1):
             tmp_box.extend(self.boxes[np.mod(j, self.bin_count)])
