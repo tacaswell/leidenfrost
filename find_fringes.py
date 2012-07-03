@@ -84,6 +84,7 @@ class lf_Track(Track):
         self.charge = None
         self.q = None
         self.phi = None
+
     def sort(self):
         self.points.sort(key = lambda x: x.q)
 
@@ -272,11 +273,11 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
     sample_count = int(np.ceil(2*C))
     theta = np.linspace(0,2*np.pi,sample_count)
 
-
+    ma_scale_vec = np.linspace(1-s_width,1 +s_width,s_num)
     # set up all of the points to sample at in all rings.  It is
     # faster to do all the computation is one shot
-    zp_all = np.hstack([(infra.gen_ellipse(*((a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift,theta,))))  
-                        for ma_scale in np.linspace(1-s_width,1 +s_width,s_num)])
+    zp_all = np.hstack([(infra.gen_ellipse(*((a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift,theta,))))
+                        for ma_scale in ma_scale_vec])
 
     # extract the values at those locations from the image.  The
     # extra flipud is to take a transpose of the points to deal
@@ -286,7 +287,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
 
     min_vec = []
     max_vec = []
-    for j,ma_scale in enumerate(np.linspace(1-s_width,1 +s_width,s_num)):
+    for j,ma_scale in enumerate(ma_scale_vec):
         # select out the right region
         zv = zv_all[j*sample_count:(j+1)*sample_count] 
         # smooth the curve
@@ -302,7 +303,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
         # append to the export vectors
         min_vec.append((ma_scale,min_pk))
         max_vec.append((ma_scale,max_pk))
-    
+        
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
 
