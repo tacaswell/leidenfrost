@@ -67,7 +67,7 @@ class Point1D_circ(Point):
     def __init__(self, q, phi, v):
         Point.__init__(self)                  # initialize base class
         self.q = q                            # parametric variable
-        self.phi = phi                        # 
+        self.phi = np.mod(phi,2*np.pi)                        # 
         self.v = v                            # the value at the extrema (can probably drop this)
 
     def distance(self, point):
