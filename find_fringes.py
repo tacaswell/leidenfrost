@@ -22,7 +22,7 @@ import trackpy.tracking as pt
 import scipy
 import scipy.ndimage
 import infra
-import find_peaks as fp
+import find_peaks.peakdetect as pd
 import numpy.linalg as nl
 import scipy.stats as ss
 import time
@@ -294,7 +294,8 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
         zv = infra.l_smooth(zv,smooth_rng,'blackman')
 
         # find the peaks, the parameters here are important
-        peaks = fp.peakdetect(zv,theta,lookahead,delta,True)
+        #        peaks = fp.peakdetect(zv,theta,lookahead,delta,True)
+        peaks = pd.peakdetect_parabole(zv-np.mean(zv),theta)
         # extract the maximums
         max_pk = np.vstack(peaks[0]).T
         # extract the minimums
