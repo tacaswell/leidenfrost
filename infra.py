@@ -318,3 +318,103 @@ def l_smooth(values,window_len=2,window='flat'):
     values = np.convolve(w/w.sum(),s,mode='valid')[(window_len//2):-(window_len//2)]
     return values
 
+
+def do_comp():
+    pass
+
+def save_comp(fout_base,fout_path,fout_name,params):
+    # check status of h5 file
+
+    # either open or create h5 file
+
+    pass
+
+def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,md_args):
+    ''' 
+    Takes in an hdf object and creates the following data sets in `parent_group`
+
+
+    raw_data_{min,max}
+        a 2xN array with columns {ma,phi} which
+        is all of the tracked points for this frame
+
+    raw_track_md_{min,max}
+        a 2x(track_count) array with columns
+        {track_len,start_index} Start index refers to
+        raw_data_{}
+    
+    trk_res_{min,max}
+        a 2x(track_count) array with columns {charge,phi}
+
+    everything in md_args is shoved into the group level attributes
+
+    ======
+    INPUT
+    ======
+    `parent_group`
+        h5py group object.  Should not contain existing data sets with the same names
+
+    `t_min_lst`
+        an iterable of the tracks for the minimums in the frame.  
+
+    `t_max_lst`
+        an iterable of the tracks for the minimums in the frame
+
+    `md_args`
+        a dictionary of meta-data to be attached to the group
+    '''
+
+    # names
+    raw_data_name = 'raw_data_'
+    raw_track_md_name = 'raw_track_md_'
+    trk_res_name = 'trk_res_'
+    dset_names = ('min','max')
+    for t_lst,n_mod zip((t_min_lst,t_max_lst),name_mod):
+        # get total number of points
+        pt_count = np.prod([len(t) for t in t_lst])
+        # arrays to accumulate data into
+        tmp_raw_data = np.zeros(2,pt_count)
+        tmp_raw_track_data = np.zeros(2,len(t_lst))
+
+        tmp_indx = 0
+        for i,t in enumerate(t_lst):
+            t_len = len(t)
+            # shove in raw data
+            tmp_raw_data[tmp_indx:(tmp_indx + t_len), 0] = np.array([p.q for p in t])
+            tmp_raw_data[tmp_indx:(tmp_indx + t_len), 1] = np.array([p.phi for p in t])
+            # shove in raw track data
+            tmp_raw_track_data[i,:] = (t_len,tmp_indx)
+            # increment index
+            tmp_indx += t_len
+        good_t_lst  = [t for t in t_lst if t.charge is not None or t.charge != 0]
+        tmp_track_res = np.zeros(2,len(good_t_lst))
+        # shove in results data
+        for i,t in enumerate(good_t_lst):
+            tmp_track_res[i,:] = (t.charge,t.phi)
+
+        # create dataset and shove in data
+        g.create_dataset(raw_data_name + n_mod,tmp_raw_data.shape,np.float,compression='szip')
+        g[raw_data_name + n_mod] = tmp_raw_data
+
+        g.create_dataset(raw_track_md_name + n_mod,tmp_track_data.shape,np.float,compression='szip')
+        g[raw_data_name + n_mod] = tmp_raw_track_data
+
+        g.create_dataset(trk_res_name + n_mod,tmp_track_res.shape,np.float,compression='szip')
+        g[raw_data_name + n_mod] = tmp_track_res
+
+    for key,val in md_args.iteritems():
+        g.attrs[key] = val
+
+
+def _read_frame_tracks_from_file_all(parent_group):
+    '''
+    inverse operation to `_write_frame_tracks_to_file`
+
+    '''
+    
+    # names
+    raw_data_name = 'raw_data_'
+    raw_track_md_name = 'raw_track_md_'
+    trk_res_name = 'trk_res_'
+    dset_names = ('min','max')
+    
