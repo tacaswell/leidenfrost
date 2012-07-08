@@ -293,9 +293,8 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
         # smooth the curve
         zv = infra.l_smooth(zv,smooth_rng,'blackman')
 
-        # find the peaks, the parameters here are important
-        #        peaks = fp.peakdetect(zv,theta,lookahead,delta,True)
-        peaks = pd.peakdetect_parabole(zv-np.mean(zv),theta)
+        # find the peaks
+        peaks = pd.peakdetect_parabole(zv-np.mean(zv),theta,is_ring =True)
         # extract the maximums
         max_pk = np.vstack(peaks[0]).T
         # extract the minimums
@@ -308,7 +307,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,lookahead=5,delta=10000,s=2):
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
 
-def proc_file(fname,new_pts,search_range,bck_img=None,memory=0,s_width = .045,s_num = 110,lookahead = 5,delta = 10000,s=2):
+def proc_file(fname,new_pts,search_range,bck_img=None,*args,**kwargs):
 
     c_test = cine.Cine(fname)
 
@@ -329,25 +328,25 @@ def proc_file(fname,new_pts,search_range,bck_img=None,memory=0,s_width = .045,s_
 
 
     for lf in c_test:
-        p,tm,trk_res,new_pts,tim,tam = proc_frame(new_pts,lf/bck_img,search_range,)
+        p,tm,trk_res,new_pts,_,_,_,_ = proc_frame(new_pts,lf/bck_img,search_range,**kwargs)
         p_lst.append(p)
         tm_lst.append(tm)
         trk_res_lst.append(trk_res)
         print tm, 'seconds'
 
 
-def proc_frame(new_pts, img, search_range, s_width, s_num, memory=0, lookahead=5, delta=10000, s=2):
+def proc_frame(new_pts,img,s_width,s_num,search_range, **kwargs):
     ''' function for inner logic of loop in proc_file'''
     _t0 = time.time()
 
 
-    miv,mav,p = find_rim_fringes(new_pts,img,s_width=s_width,s_num=s_num,lookahead=lookahead,delta=delta,s=s)
+    miv,mav,p = find_rim_fringes(new_pts,img,s_width=s_width,s_num=s_num,**kwargs)
 
-    tim = link_ridges(miv,search_range,memory=memory)
-    tam = link_ridges(mav,search_range,memory=memory)
+    tim = link_ridges(miv,search_range,**kwargs)
+    tam = link_ridges(mav,search_range,**kwargs)
 
-    tim = [t for t in tim if len(t) > 30]
-    tam = [t for t in tam if len(t) > 30]
+    tim = [t for t in tim if len(t) > 15]
+    tam = [t for t in tam if len(t) > 15]
 
     trk_res = (zip(*[ (t.charge,t.phi) for t in tim if t.charge is not None ]),zip(*[ (t.charge,t.phi) for t in tam if t.charge is not None ]))
 
@@ -365,17 +364,17 @@ def proc_frame(new_pts, img, search_range, s_width, s_num, memory=0, lookahead=5
                             and t.charge is not None
                             and t.charge != 0])
 
-    return p,(_t1 - _t0),trk_res,new_pts,tim,tam
+    return p,(_t1 - _t0),trk_res,new_pts,tim,tam,miv,mav
 
 
-def link_ridges(vec,search_range,memory=0):
+def link_ridges(vec,search_range,memory=0,**kwargs):
     # generate point levels from the previous steps
 
-    levels = [[Point1D_circ(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
+    levels = [[infra.Point1D_circ(q,phi,v) for phi,v in zip(*pks)] for q,pks in vec]
     
-    trks = pt.link_full(levels,2*np.pi,search_range,hash_cls = hash_line_angular,memory = memory, track_cls = lf_Track)        
+    trks = pt.link_full(levels,2*np.pi,search_range,hash_cls = infra.hash_line_angular,memory = memory, track_cls = infra.lf_Track)        
     for t in trks:
-        t.classify2()
+        t.classify2(**kwargs)
 
     trks.sort(key=lambda x: x.phi)
     return trks

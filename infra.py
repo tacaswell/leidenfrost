@@ -25,7 +25,251 @@ import numpy as np
 import scipy.interpolate as sint
 import scipy.odr as sodr
 
+from trackpy.tracking import Point
+from trackpy.tracking import Track
+
+import h5py
+
 WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
+
+
+class hash_line_angular(object):
+    '''1D hash table with linked ends for doing the ridge linking
+    around a rim'''
+    def __init__(self, dims, bin_width):
+        '''The argument dims needs to be there to homogenize hash interfaces  '''
+        full_width = 2*np.pi
+        self.boxes = [[] for j in range(0, int(np.ceil(full_width/bin_width)))]
+        self.bin_width = bin_width
+        self.bin_count = len(self.boxes)
+        
+    def add_point(self, point):
+        ''' Adds a point on the hash line
+
+        Assumes that the point have been properly rationalized 0<phi<2pi
+        '''
+        self.boxes[int(np.floor(point.phi/self.bin_width))].append(point)
+
+    def get_region(self, point, bbuffer):
+        '''Gets the region around the point
+
+        Assumes that the point have been properly rationalized 0<phi<2pi
+        '''
+        bbuffer = int(np.ceil(bbuffer/self.bin_width))
+
+        box_indx = int(np.floor(point.phi/self.bin_width))
+        tmp_box = []
+        for j in range(box_indx - bbuffer, box_indx + bbuffer + 1):
+            tmp_box.extend(self.boxes[np.mod(j, self.bin_count)])
+        return tmp_box
+
+
+class Point1D_circ(Point):
+    '''
+    Version of :py:class:`Point` for finding fringes
+
+    :py:attr:`Point1D_circ.q` is the parameter for the curve where the point is (maps to time in standard tracking)
+    :py:attr:`Point1D_circ.phi` is the angle of the point along the parametric curve
+    :py:attr:`Point1D_circ.v` any extra values that the point should carry
+    '''
+
+    
+    def __init__(self, q, phi, v):
+        Point.__init__(self)                  # initialize base class
+        self.q = q                            # parametric variable
+        self.phi = np.mod(phi,2*np.pi)                        # 
+        self.v = v                            # the value at the extrema (can probably drop this)
+
+    def distance(self, point):
+        '''Returns the absolute value of the angular distance between
+        two points mod 2\pi'''
+        d = np.abs(self.phi - point.phi)
+        if d> np.pi:
+            d = np.abs(2*np.pi - d)  
+        return d
+
+class lf_Track(Track):
+    def __init__(self, point=None):
+        Track.__init__(self, point)
+        self.charge = None
+        self.q = None
+        self.phi = None
+
+    def sort(self):
+        self.points.sort(key = lambda x: x.q)
+
+    def plot_trk(self, ax,**kwargs):
+        if self.charge is None:
+            kwargs['color'] = 'm'
+        elif self.charge == 1:
+            kwargs['color'] = 'r'
+        elif self.charge == -1:
+            kwargs['color'] = 'b'
+        else:
+            kwargs['color'] = 'c'
+
+        ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
+    def plot_trk_img(self,pram,ax,**kwargs):
+        a,b,t0,x0,y0 = pram
+        X,Y = np.hstack([infra.gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
+        if self.charge is None:
+            kwargs['marker'] = '*'
+        elif self.charge == 1:
+            kwargs['marker'] = '^'
+        elif self.charge == -1:
+            kwargs['marker'] = 'v'
+        else:
+            kwargs['marker'] = 'o'
+        ax.plot(X,Y,**kwargs)
+    def classify2(self,min_len = None,min_extent = None,**kwargs):
+        ''' second attempt at the classify function''' 
+        phi,q = zip(*[(p.phi,p.q) for p in self.points])
+        q = np.asarray(q)
+        # if the track is less than 25, don't try to classify
+        
+        if if min_len is not None and len(phi) < min_len:
+            self.charge =  None
+            self.q = None
+            self.phi = None
+            return
+
+        p_shift = 0
+        if np.min(phi) < 0.1*np.pi or np.max(phi) > 2*np.pi*.9:
+            p_shift = np.pi
+            phi = np.mod(np.asarray(phi) + p_shift,2*np.pi)
+            
+        if if min_extent is not None and np.max(phi) - np.min_phi   < min_extent:
+            self.charge =  None
+            self.q = None
+            self.phi = None
+            return
+
+        a = np.vstack([q**2,q,np.ones(np.size(q))]).T
+        X,res,rnk,s = nl.lstsq(a,phi)
+        phif = a.dot(X)
+        p = 1- ss.chi2.cdf(np.sum(((phif - phi)**2)/phif),len(q)-3)
+
+        prop_c = -np.sign(X[0])
+        prop_q = -X[1]/(2*X[0])
+        prop_phi = prop_q **2 * X[0] + prop_q * X[1] + X[2]
+
+
+        if prop_q < np.min(q) or prop_q > np.max(q):
+            # the 'center' in outside of the data we have -> screwy track don't classify
+            self.charge =  None
+            self.q = None
+            self.phi = None
+            return
+
+        self.charge = prop_c
+        self.q = prop_q
+        self.phi = prop_phi - p_shift
+                        
+    # classify tracks
+    def classify(self):
+        '''This needs to be re-written to deal with non-properly Chevron tracks better '''
+        phi,a = zip(*[(p.phi,p.q) for p in self.points])
+        self.phi = np.mean(phi)
+        if len(phi) < 25:
+            self.charge =  0
+            self.q = 0
+            return
+        
+        i_min = np.min(phi)
+        i_max = np.max(phi)
+        q_val = 0
+        match_count = 0
+        match_val = 0
+        fliped = False
+        while len(phi) >=15:
+            # truncate the track
+            phi = phi[4:-5]
+            a = a[4:-5]
+            # get the current min and max
+            t_min = np.min(phi)
+            t_max = np.max(phi)
+            # if the min hasn't changed, claim track has negative charge
+            if t_min == i_min:
+                # if the track doesn't currently have negative charge
+                if match_val != -1:
+                    # if it currently has positive charge
+                    if match_val == 1:
+                        # keep track of the fact that it has flipped
+                        fliped = True
+                                    
+                    match_val = -1        #change the proposed charge
+                    q_val = a[np.argmin(phi)] #get the q val of the
+                                              #minimum
+                    match_count =0            #set the match count to 0
+                match_count +=1               #if this isn't a change, increase the match count
+            elif t_max == i_max:
+                if match_val != 1:
+                    if match_val == -1:
+                        fliped = True
+                        
+                    match_val = 1
+                    q_val = a[np.argmax(phi)]
+                    
+                    match_count =0
+                match_count +=1
+            elif t_max < i_max and match_val == 1: #we have truncated
+                                                   #the maximum off at
+                                                   #it is positively
+                                                   #charged
+                match_val = 0                      #reset
+                mach_count = 0
+                q_val = 0
+                i_max = t_max
+                i_min = t_min
+                
+            elif t_min > i_min  and match_val == -1: #we have truncated the minimum off at it is 
+                match_val = 0                      #reset
+                mach_count = 0
+                q_val = 0
+                i_max = t_max
+                i_min = t_min
+                
+            if match_count == 2:          #if get two matches in a row
+                self.charge = match_val
+                if match_val == -1:
+                    self.phi = i_min
+                    self.q = q_val
+                elif match_val == 1:
+                    self.phi = i_max
+                    self.q = q_val
+                else:
+                    print 'should not have hit here 1'
+                return
+        if not fliped:
+            self.charge =  match_val
+            if match_val == -1:
+                self.phi = i_min
+                self.q = q_val
+            elif match_val == 1:
+                self.phi = i_max
+                self.q = q_val
+            else:
+                self.q = 0
+#                print 'should not have hit here 2'
+            return
+        else:
+            self.charge = 0
+            self.q = 0
+            return 
+    def mean_phi(self):
+        self.phi = np.mean([p.phi for p in self.points])
+    def mean_q(self):
+        self.q = np.mean([p.q for p in self.points])
+
+    def merge_track(self,to_merge_track):
+        pt.Track.merge_track(self,to_merge_track)
+        if self.phi is not None:
+            self.mean_phi()
+        if self.charge is not None:
+            self.classify()
+
+
+
 
 
 def gen_ellipse(a,b,t,x,y,theta):
