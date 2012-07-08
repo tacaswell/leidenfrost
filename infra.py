@@ -74,7 +74,7 @@ class Point1D_circ(Point):
     '''
 
     
-    def __init__(self, q, phi, v):
+    def __init__(self, q, phi, v=0):
         Point.__init__(self)                  # initialize base class
         self.q = q                            # parametric variable
         self.phi = np.mod(phi,2*np.pi)                        # 
