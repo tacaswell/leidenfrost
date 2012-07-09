@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.interpolate as sint
 import scipy.odr as sodr
-
+import numpy.linalg as nl
 from trackpy.tracking import Point
 from trackpy.tracking import Track
 
@@ -111,7 +111,7 @@ class lf_Track(Track):
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
     def plot_trk_img(self,pram,ax,**kwargs):
         a,b,t0,x0,y0 = pram
-        X,Y = np.hstack([infra.gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
+        X,Y = np.hstack([gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
         if self.charge is None:
             kwargs['marker'] = '*'
         elif self.charge == 1:
@@ -147,7 +147,7 @@ class lf_Track(Track):
         a = np.vstack([q**2,q,np.ones(np.size(q))]).T
         X,res,rnk,s = nl.lstsq(a,phi)
         phif = a.dot(X)
-        p = 1- ss.chi2.cdf(np.sum(((phif - phi)**2)/phif),len(q)-3)
+        #        p = 1- ss.chi2.cdf(np.sum(((phif - phi)**2)/phif),len(q)-3)
 
         prop_c = -np.sign(X[0])
         prop_q = -X[1]/(2*X[0])
@@ -321,23 +321,22 @@ def hash_file(fname):
 
 def set_up_efitter(fname,bck_img = None):
     ''' gets the initial path '''
-    
+    clims = [.5,1.5]
     #open the first frame and find the initial circle
     c_test = cine.Cine(fname)    
     lfimg = c_test.get_frame(0)
     if bck_img is None:
         bck_img = np.ones(lfimg.shape)
+        clims = None
     fig = plt.figure()
     ax = fig.add_axes([.1,.1,.8,.8])
     im = ax.imshow(lfimg/bck_img)
-    im.set_clim([0,2])
+    if clims is not None:
+        im.set_clim(clims)
     ef = ellipse_fitter()
     plt.connect('button_press_event',ef.click_event)
 
-    
-    prefix = '/media/leidenfrost_a/leidenfrost/2012-05-10'
-    fn = '270C_1kh_150us_bigdrop_02.cine'
-    c_test = cine.Cine(prefix + '/' + fn)
+
     plt.draw()
 
     return ef
@@ -612,54 +611,95 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,md_args):
     raw_data_name = 'raw_data_'
     raw_track_md_name = 'raw_track_md_'
     trk_res_name = 'trk_res_'
-    dset_names = ('min','max')
-    for t_lst,n_mod zip((t_min_lst,t_max_lst),name_mod):
-        # get total number of points
-        pt_count = np.prod([len(t) for t in t_lst])
-        # arrays to accumulate data into
-        tmp_raw_data = np.zeros(2,pt_count)
-        tmp_raw_track_data = np.zeros(2,len(t_lst))
+    name_mod = ('min','max')
+    write_raw_data = True
+    write_res = True
+    for t_lst,n_mod in zip((t_min_lst,t_max_lst),name_mod):
+        if write_raw_data:
+            # get total number of points
+            pt_count = np.sum([len(t) for t in t_lst])
+            # arrays to accumulate data into
+            tmp_raw_data = np.zeros((pt_count,2))
+            tmp_raw_track_data = np.zeros((len(t_lst),2))
+            tmp_indx = 0
+            print pt_count
+            for i,t in enumerate(t_lst):
+                t_len = len(t)
+                # shove in raw data
+                tmp_raw_data[tmp_indx:(tmp_indx + t_len), 0] = np.array([p.q for p in t])
+                tmp_raw_data[tmp_indx:(tmp_indx + t_len), 1] = np.array([p.phi for p in t])
+                # shove in raw track data
+                tmp_raw_track_data[i,:] = (t_len,tmp_indx)
+                # increment index
+                tmp_indx += t_len
+          
+            # create dataset and shove in data
+            parent_group.create_dataset(raw_data_name + n_mod,tmp_raw_data.shape,np.float,compression='szip')
+            parent_group[raw_data_name + n_mod][:] = tmp_raw_data
 
-        tmp_indx = 0
-        for i,t in enumerate(t_lst):
-            t_len = len(t)
-            # shove in raw data
-            tmp_raw_data[tmp_indx:(tmp_indx + t_len), 0] = np.array([p.q for p in t])
-            tmp_raw_data[tmp_indx:(tmp_indx + t_len), 1] = np.array([p.phi for p in t])
-            # shove in raw track data
-            tmp_raw_track_data[i,:] = (t_len,tmp_indx)
-            # increment index
-            tmp_indx += t_len
-        good_t_lst  = [t for t in t_lst if t.charge is not None or t.charge != 0]
-        tmp_track_res = np.zeros(2,len(good_t_lst))
-        # shove in results data
-        for i,t in enumerate(good_t_lst):
-            tmp_track_res[i,:] = (t.charge,t.phi)
+            parent_group.create_dataset(raw_track_md_name + n_mod,tmp_raw_track_data.shape,np.float,compression='szip')
+            parent_group[raw_track_md_name + n_mod][:] = tmp_raw_track_data
+            
+        if write_res:
+            good_t_lst  = [t for t in t_lst if t.charge is not None or t.charge != 0]
+            tmp_track_res = np.zeros((len(good_t_lst),3))
 
-        # create dataset and shove in data
-        g.create_dataset(raw_data_name + n_mod,tmp_raw_data.shape,np.float,compression='szip')
-        g[raw_data_name + n_mod] = tmp_raw_data
-
-        g.create_dataset(raw_track_md_name + n_mod,tmp_track_data.shape,np.float,compression='szip')
-        g[raw_data_name + n_mod] = tmp_raw_track_data
-
-        g.create_dataset(trk_res_name + n_mod,tmp_track_res.shape,np.float,compression='szip')
-        g[raw_data_name + n_mod] = tmp_track_res
-
+            # shove in results data
+            for i,t in enumerate(good_t_lst):
+                tmp_track_res[i,:] = (t.charge,t.phi,t.q)
+                
+            parent_group.create_dataset(trk_res_name + n_mod,tmp_track_res.shape,np.float,compression='szip')
+            parent_group[trk_res_name + n_mod][:] = tmp_track_res
+            
     for key,val in md_args.iteritems():
         g.attrs[key] = val
 
 
-def _read_frame_tracks_from_file_all(parent_group):
+def _read_frame_tracks_from_file_raw(parent_group):
     '''
     inverse operation to `_write_frame_tracks_to_file`
+
+    Reads out all of the raw data
 
     '''
     
     # names
     raw_data_name = 'raw_data_'
     raw_track_md_name = 'raw_track_md_'
+    name_mod = ('min','max')
+    
+    trk_lsts_tmp = []
+    for n_mod in name_mod:
+        tmp_raw_data = parent_group[raw_data_name + n_mod][:]
+        tmp_track_data = parent_group[raw_track_md_name + n_mod][:]
+        t_lst = []
+        for t_len,strt_indx in tmp_track_data:
+            tmp_trk = lf_Track()
+            for ma,phi in tmp_raw_data[strt_indx:(strt_indx + t_len),:]:
+                tmp_trk.add_point(Point1D_circ(ma,phi)) 
+            tmp_trk.classify2()
+            t_lst.append(tmp_trk)
+        trk_lsts_tmp.append(t_lst)
+
+    return trk_lsts_tmp
+
+
+
+def _read_frame_tracks_from_file_res(parent_group):
+    '''
+    Only reads out the charge and location of the tracks, not all of their points
+    '''
+    
+    
+    # names
     trk_res_name = 'trk_res_'
-    dset_names = ('min','max')
-    
-    
+    name_mod = ('min','max')
+    res_lst = []
+    for n_mod in name_mod:
+        tmp_trk_res = parent_group[trk_res_name + n_mod][:]
+        tmp_charge = tmp_trk_res[:,0]
+        tmp_phi = tmp_trk_res[:,1]
+        tmp_q = tmp_trk_res[:,2]
+        res_lst.appendf((tmp_charge,tmp_phi,tmp_q))
+
+    return res_lst
