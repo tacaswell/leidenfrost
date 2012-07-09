@@ -23,7 +23,7 @@ import scipy
 import scipy.ndimage
 import infra
 import find_peaks.peakdetect as pd
-import numpy.linalg as nl
+import cine
 import scipy.stats as ss
 import time
 
@@ -59,6 +59,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,smooth_rng=2):
     theta = np.linspace(0,2*np.pi,sample_count)
 
     ma_scale_vec = np.linspace(1-s_width,1 +s_width,s_num)
+
     # set up all of the points to sample at in all rings.  It is
     # faster to do all the computation is one shot
     zp_all = np.hstack([(infra.gen_ellipse(*((a*ma_scale,b*ma_scale,t0,x0-x_shift,y0-y_shift,theta,))))
@@ -92,7 +93,7 @@ def find_rim_fringes(pt_lst,lfimg,s_width,s_num,smooth_rng=2):
         
     return min_vec,max_vec,(a,b,t0,x0,y0)
 
-def proc_file(fname,new_pts,search_range,bck_img=None,*args,**kwargs):
+def proc_file(fname,new_pts,bck_img=None,file_out = None,*args,**kwargs):
 
     c_test = cine.Cine(fname)
 
@@ -112,12 +113,18 @@ def proc_file(fname,new_pts,search_range,bck_img=None,*args,**kwargs):
 
 
 
-    for lf in c_test:
-        p,tm,trk_res,new_pts,_,_,_,_ = proc_frame(new_pts,lf/bck_img,search_range,**kwargs)
+    for frame_num,lf in enumerate(c_test):
+        print frame_num
+        p,tm,trk_res,new_pts,tim,tam,_,_ = proc_frame(new_pts,lf/bck_img,**kwargs)
         p_lst.append(p)
         tm_lst.append(tm)
         trk_res_lst.append(trk_res)
         print tm, 'seconds'
+        if file_out is not None:
+            g = file_out.create_group('frame_%05d'%frame_num)
+            infra._write_frame_tracks_to_file(g,tim,tam,{})
+
+    return tm_lst,trk_res_lst,p_lst
 
 
 def proc_frame(new_pts,img,s_width,s_num,search_range, **kwargs):
