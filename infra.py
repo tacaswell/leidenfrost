@@ -127,7 +127,7 @@ class lf_Track(Track):
         q = np.asarray(q)
         # if the track is less than 25, don't try to classify
         
-        if if min_len is not None and len(phi) < min_len:
+        if min_len is not None and len(phi) < min_len:
             self.charge =  None
             self.q = None
             self.phi = None
@@ -138,7 +138,7 @@ class lf_Track(Track):
             p_shift = np.pi
             phi = np.mod(np.asarray(phi) + p_shift,2*np.pi)
             
-        if if min_extent is not None and np.max(phi) - np.min_phi   < min_extent:
+        if min_extent is not None and np.max(phi) - np.min_phi   < min_extent:
             self.charge =  None
             self.q = None
             self.phi = None
