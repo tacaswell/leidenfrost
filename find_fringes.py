@@ -31,65 +31,53 @@ import scipy.interpolate as si
 
             
 def find_rim_fringes(pt_lst,lfimg,s_width,s_num,s_pix_err = 1.5,smooth_rng=2,*args,**kwargs):
-    fig = plt.figure()
-    ax = fig.gca()
     # make sure pt_lst is a well formed array
     pt_lst = np.asarray(pt_lst)
 
     # a really rough estimate of the circumference 
     C = np.sum(np.sqrt(np.sum(np.diff(pt_lst,axis=1)**2,axis=0)))
-    # sample points at ~ 1.5/pix
-    sample_count = int(np.ceil(C*1.5))
-    theta = np.linspace(0,2*np.pi,sample_count)
-    
-    tck,u = si.splprep(pt_lst,s=pt_lst.shape[1]*s_pix_err*s_pix_err,per=True)
-    new_pts = si.splev(np.linspace(0,1,sample_count),tck)
-    ax.plot(*new_pts)
-    center = np.mean(new_pts,axis=1).reshape(2,1)
-    print center
+    # sample points at ~ 2/pix
+    sample_count = int(np.ceil(C*2))
+
+    new_pts,tck,center = infra.get_spline(pt_lst,point_count = sample_count,pix_err = s_pix_err)
+
     x0,y0 = center[:,0]
     new_pts -= center
-    ax.plot(*new_pts)
+
     # compute theta values
     th_new = np.arctan2(*(new_pts[::-1]))
     # compute radius
     r_new = np.sqrt(np.sum(new_pts**2,axis=0)).reshape(1,-1)
-    ax.plot(r_new.reshape(-1)*np.cos(th_new),r_new.reshape(-1)*np.sin(th_new),marker= 'x',linestyle='none')
-    ax.plot(.9*r_new.reshape(-1)*np.cos(th_new),.9*r_new.reshape(-1)*np.sin(th_new),marker= 'x',linestyle='none')
     R = np.max(r_new)*(1+s_width)*1.1
     x_shift = int(x0-R)
     x_lim = int(x0+R)
     y_shift = int(y0-R)
     y_lim = int(y0+R)
     dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
-    
+
     # this will approximately  double sample.
-    #ma_scale_vec = np.linspace(1-s_width,1 +s_width,s_num).reshape(-1,1)
-    s_num = 5
-    ma_scale_vec = np.linspace(1,1.5,s_num).reshape(-1,1)
+    ma_scale_vec = np.linspace(1-s_width,1 +s_width,s_num).reshape(-1,1)
+
+    
     r_scaled = ma_scale_vec.dot(r_new)
-    print r_scaled.shape,len(theta),np.cos(theta).shape
+
     X = np.cos(th_new)*r_scaled
     Y = np.sin(th_new)*r_scaled
     zp_all = np.vstack(((Y).reshape(-1),(X).reshape(-1))) + np.flipud(center) - np.array((y_shift,x_shift)).reshape(2,1)
-    print zp_all.shape
-    for j in range(s_num):
-        TY,TX = zp_all[:,j*sample_count:(j+1)*sample_count] 
-        ax.plot(TX,TY)
+
     # extract the values at those locations from the image.  The
     # extra flipud is to take a transpose of the points to deal
     # with the fact that the definition of the first direction
     # between plotting and the image libraries is inconsistent.
     zv_all = scipy.ndimage.interpolation.map_coordinates(dlfimg,zp_all,order=2)
-    fig = plt.figure()
-    ax = fig.gca()
     min_vec = []
     max_vec = []
+    theta = np.linspace(0,2*np.pi,sample_count)
     for j,ma_scale in enumerate(ma_scale_vec.reshape(-1)):
-        print j
+
         # select out the right region
         zv = zv_all[j*sample_count:(j+1)*sample_count] 
-        ax.plot(zv)
+
         # smooth the curve
         zv = infra.l_smooth(zv,smooth_rng,'blackman')
 
@@ -130,7 +118,7 @@ def proc_file(fname,new_pts,bck_img=None,file_out = None,*args,**kwargs):
     for frame_num,lf in enumerate(c_test):
         print frame_num
         tm,trk_res,new_pts,tim,tam,_,_,tck,center = proc_frame(new_pts,lf/bck_img,**kwargs)
-        p_lst.append(p)
+
         tm_lst.append(tm)
         trk_res_lst.append(trk_res)
         print tm, 'seconds'
@@ -138,14 +126,14 @@ def proc_file(fname,new_pts,bck_img=None,file_out = None,*args,**kwargs):
             g = file_out.create_group('frame_%05d'%frame_num)
             infra._write_frame_tracks_to_file(g,tim,tam,{})
 
-    return tm_lst,trk_res_lst,p_lst
+    return tm_lst,trk_res_lst
 
 
 def proc_frame(new_pts,img,s_width,s_num,search_range, **kwargs):
     ''' function for inner logic of loop in proc_file'''
     _t0 = time.time()
 
-    print kwargs
+
     miv,mav,tck,center = find_rim_fringes(new_pts,img,s_width=s_width,s_num=s_num,**kwargs)
 
     tim = link_ridges(miv,search_range,**kwargs)
@@ -174,7 +162,15 @@ def proc_frame(new_pts,img,s_width,s_num,search_range, **kwargs):
                     and t.charge != 0])
     
     # seed the next round of points
-    new_pts = np.vstack((np.sin(t_phi)*t_q,np.cos(t_phi)*t_q)) + center
+    tmp_pts = si.splev(np.mod(t_phi,2*np.pi)/(2*np.pi),tck)
+    tmp_pts -= center
+    th = np.arctan2(*(tmp_pts[::-1]))
+    r = np.sqrt(np.sum(tmp_pts**2,axis=0))
+    r *= t_q
+    indx =th.argsort()
+    r = r[indx]
+    th = th[indx]
+    new_pts = np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + center
 
     return (_t1 - _t0),trk_res,new_pts,tim,tam,miv,mav,tck,center
 

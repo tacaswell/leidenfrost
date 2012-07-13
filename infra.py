@@ -110,7 +110,8 @@ class lf_Track(Track):
 
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
     def plot_trk_img(self,tck,center,ax,**kwargs):
-
+        if len(self.points) <2:
+            return
         new_pts = si.splev(np.array([np.mod(p.phi,2*np.pi)/(2*np.pi) for p in self.points]),tck)
         
 
@@ -297,6 +298,55 @@ def gen_ellipse(a,b,t,x,y,theta):
     r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
     return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
+def get_spline(points,point_count=None,pix_err = 2):
+    '''
+    Returns a closed spline for the points handed in.  Input is assumed to be a (2xN) array
+
+    =====
+    input
+    =====
+
+    points
+        a 2xN array 
+
+    point_count (optional)
+        the number of new places to sample
+        
+    center
+        The center of the point for converting to a shifted radial coordinate system
+    =====
+    output
+    =====
+    new_points
+        a 2x{N,point_count} array with evenly sampled points
+    tck
+       The return data from the spline fitting
+    '''
+    # make into a list
+    pt_lst = zip(*points)
+    # get the center
+    center = np.mean(points,axis=1).reshape(2,1)
+
+    # sort the list by angle around center
+    pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
+    # add first point to end because it is periodic (makes the interpolation code happy)
+    pt_lst.append(pt_lst[0])
+
+    # make array for handing in to spline fitting
+    pt_array = np.vstack(pt_lst).T
+    # do spline fitting
+
+    tck,u = si.splprep(pt_array,s=len(pt_lst)*(pix_err**2),per=True)
+    if point_count is None:
+        point_count = len(pt_lst) -1
+    new_pts = si.splev(np.linspace(0,1,point_count),tck)
+
+    return new_pts,tck,center
+
+
+
+    
+
 class ellipse_fitter(object):
     def __init__(self,ax,pix_err = 1):
         fig = ax.get_figure()
@@ -314,7 +364,7 @@ class ellipse_fitter(object):
             return
         self.pt_lst.append((event.xdata,event.ydata))
 
-
+        
         pt_array = np.vstack(self.pt_lst).T
         center = np.mean(pt_array,axis=1).reshape(2,1)
         self.pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
@@ -589,7 +639,7 @@ def gen_to_parm(p):
 
 def l_smooth(values,window_len=2,window='flat'):
     window_len = window_len*2+1
-    s=np.r_[values[window_len-1:0:-1],values,values[-1:-window_len:-1]]
+    s=np.r_[values[-(window_len-1):],values,values[0:(window_len-1)]]
     w = WINDOW_DICT[window](window_len)
     #    w = np.ones(window_len,'d')
     #w = np.exp(-((np.linspace(-(window_len//2),window_len//2,window_len)/(window_len//4))**2)/2)
@@ -658,7 +708,7 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,md_args):
             tmp_raw_data = np.zeros((pt_count,2))
             tmp_raw_track_data = np.zeros((len(t_lst),2))
             tmp_indx = 0
-            print pt_count
+            #            print pt_count
             for i,t in enumerate(t_lst):
                 t_len = len(t)
                 # shove in raw data
