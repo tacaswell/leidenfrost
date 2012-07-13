@@ -27,7 +27,7 @@ import scipy.odr as sodr
 import numpy.linalg as nl
 from trackpy.tracking import Point
 from trackpy.tracking import Track
-
+import scipy.interpolate as si
 import h5py
 
 WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
@@ -109,9 +109,22 @@ class lf_Track(Track):
             kwargs['color'] = 'c'
 
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
-    def plot_trk_img(self,pram,ax,**kwargs):
-        a,b,t0,x0,y0 = pram
-        X,Y = np.hstack([gen_ellipse(a*p.q,b*p.q,t0,x0,y0,p.phi) for p in self.points])
+    def plot_trk_img(self,tck,center,ax,**kwargs):
+
+        new_pts = si.splev(np.array([np.mod(p.phi,2*np.pi)/(2*np.pi) for p in self.points]),tck)
+        
+
+        new_pts -= center
+
+        th = np.arctan2(*(new_pts[::-1]))
+
+        # compute radius
+        r = np.sqrt(np.sum(new_pts**2,axis=0))
+
+        r *= np.array([p.q for p in self.points])
+
+        zp_all = np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + center
+        
         if self.charge is None:
             kwargs['marker'] = '*'
         elif self.charge == 1:
@@ -120,7 +133,7 @@ class lf_Track(Track):
             kwargs['marker'] = 'v'
         else:
             kwargs['marker'] = 'o'
-        ax.plot(X,Y,**kwargs)
+        ax.plot(*zp_all,**kwargs)
     def classify2(self,min_len = None,min_extent = None,**kwargs):
         ''' second attempt at the classify function''' 
         phi,q = zip(*[(p.phi,p.q) for p in self.points])
@@ -285,16 +298,39 @@ def gen_ellipse(a,b,t,x,y,theta):
     return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
 class ellipse_fitter(object):
-    def __init__(self):
+    def __init__(self,ax,pix_err = 1):
+        fig = ax.get_figure()
+        fig.canvas.mpl_connect('button_press_event',self.click_event)
         self.pt_lst = []
-        
+        self.pt_plot = ax.plot([],[],marker='x',linestyle ='-')[0]
+        self.sp_plot = ax.plot([],[],lw=3,color='k')[0]
+        self.pix_err = pix_err
         
     def click_event(self,event):
         ''' Extracts locations from the user'''
         if event.key == 'shift':
             self.pt_lst = []
-            
+        if event.xdata is None or event.ydata is None:
+            return
         self.pt_lst.append((event.xdata,event.ydata))
+
+
+        pt_array = np.vstack(self.pt_lst).T
+        center = np.mean(pt_array,axis=1).reshape(2,1)
+        self.pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
+        self.pt_lst.append(self.pt_lst[0])
+
+        pt_array = np.vstack(self.pt_lst).T
+        self.pt_plot.set_xdata(pt_array[0])
+        self.pt_plot.set_ydata(pt_array[1])
+        if len(self.pt_lst) > 5:
+            tck,u = si.splprep(pt_array,s=len(self.pt_lst)*(self.pix_err**2),per=True)
+            new_pts = si.splev(np.linspace(0,1,1000),tck)
+            self.sp_plot.set_xdata(new_pts[0])
+            self.sp_plot.set_ydata(new_pts[1])
+        plt.draw()
+
+        self.pt_lst.pop(-1)
 
     def get_params(self):
         return gen_to_parm(fit_ellipse(np.vstack(self.pt_lst).T).beta)
@@ -333,8 +369,8 @@ def set_up_efitter(fname,bck_img = None):
     im = ax.imshow(lfimg/bck_img)
     if clims is not None:
         im.set_clim(clims)
-    ef = ellipse_fitter()
-    plt.connect('button_press_event',ef.click_event)
+    ef = ellipse_fitter(ax)
+
 
 
     plt.draw()
