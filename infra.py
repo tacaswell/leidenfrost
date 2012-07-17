@@ -322,10 +322,20 @@ def get_spline(points,point_count=None,pix_err = 2):
     tck
        The return data from the spline fitting
     '''
-    # make into a list
-    pt_lst = zip(*points)
-    # get the center
-    center = np.mean(points,axis=1).reshape(2,1)
+    if type(points) is np.ndarray:
+        # make into a list
+        pt_lst = zip(*points)
+        # get center
+        center = np.mean(points,axis=1).reshape(2,1)
+    else:
+        # make a copy of the list
+        pt_lst = list(points)
+        # compute center
+        center = np.array(reduce(lambda x,y: (x[0] + y[0],x[1] + y[1]),pt_lst)).reshape(2,1)/len(pt_lst)
+
+    if len(pt_lst)<5:
+        raise Exception("not enough points")
+
 
     # sort the list by angle around center
     pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
@@ -340,7 +350,7 @@ def get_spline(points,point_count=None,pix_err = 2):
     if point_count is None:
         point_count = len(pt_lst) -1
     new_pts = si.splev(np.linspace(0,1,point_count),tck)
-
+    pt_lst.pop(-1)
     return new_pts,tck,center
 
 
@@ -360,27 +370,33 @@ class spline_fitter(object):
         ''' Extracts locations from the user'''
         if event.key == 'shift':
             self.pt_lst = []
+            return
         if event.xdata is None or event.ydata is None:
             return
-        self.pt_lst.append((event.xdata,event.ydata))
-
+        if event.button == 1:
+            self.pt_lst.append((event.xdata,event.ydata))
+        elif event.button == 3:
+            self.remove_pt((event.xdata,event.ydata))
         
-        pt_array = np.vstack(self.pt_lst).T
-        center = np.mean(pt_array,axis=1).reshape(2,1)
-        self.pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
-        self.pt_lst.append(self.pt_lst[0])
+        self.redraw()
 
-        pt_array = np.vstack(self.pt_lst).T
-        self.pt_plot.set_xdata(pt_array[0])
-        self.pt_plot.set_ydata(pt_array[1])
+    def remove_pt(self,loc):
+        self.pt_lst.pop(np.argmin(map(lambda x:np.sqrt( (x[0] - loc[0])**2 + (x[1] - loc[1])**2),self.pt_lst)))
+    def redraw(self):
         if len(self.pt_lst) > 5:
-            tck,u = si.splprep(pt_array,s=len(self.pt_lst)*(self.pix_err**2),per=True)
-            new_pts = si.splev(np.linspace(0,1,1000),tck)
+            new_pts,tck,center = get_spline(self.pt_lst,point_count=1000,pix_err = self.pix_err)
             self.sp_plot.set_xdata(new_pts[0])
             self.sp_plot.set_ydata(new_pts[1])
+            self.pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
+        else:
+            self.sp_plot.set_xdata([])
+            self.sp_plot.set_ydata([])
+        x,y = zip(*self.pt_lst)
+        self.pt_plot.set_xdata(x)
+        self.pt_plot.set_ydata(y)
+
         plt.draw()
 
-        self.pt_lst.pop(-1)
 
     def get_params(self):
         return gen_to_parm(fit_ellipse(np.vstack(self.pt_lst).T).beta)
