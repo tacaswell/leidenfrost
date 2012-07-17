@@ -347,7 +347,7 @@ def get_spline(points,point_count=None,pix_err = 2):
 
     
 
-class ellipse_fitter(object):
+class spline_fitter(object):
     def __init__(self,ax,pix_err = 1):
         fig = ax.get_figure()
         fig.canvas.mpl_connect('button_press_event',self.click_event)
@@ -419,7 +419,7 @@ def set_up_efitter(fname,bck_img = None):
     im = ax.imshow(lfimg/bck_img)
     if clims is not None:
         im.set_clim(clims)
-    ef = ellipse_fitter(ax)
+    ef = spline_fitter(ax)
 
 
 
