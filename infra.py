@@ -789,3 +789,14 @@ def _read_frame_tracks_from_file_res(parent_group):
         res_lst.appendf((tmp_charge,tmp_phi,tmp_q))
 
     return res_lst
+
+def plot_tracks(img,tim,tam,tck,center,min_len = 0):
+    fig = plt.figure();
+    ax = fig.gca()
+    c_img = ax.imshow(img,cmap=plt.get_cmap('jet'),interpolation='nearest');
+    c_img.set_clim([.5,1.5])
+    [t.plot_trk_img(tck,center,ax,color='b',linestyle='-') for t in tam if len(t) > min_len ];
+    [t.plot_trk_img(tck,center,ax,color='m',linestyle='-') for t in tim if len(t) > min_len ];
+    plt.draw();
+
+
