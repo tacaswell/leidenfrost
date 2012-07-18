@@ -815,15 +815,32 @@ class ProcessStack(object):
         self.params = {}
         pass
 
-    def from_hdf_file(self,fname):
+    @classmethod
+    def from_hdf_file(cls,fname):
         ''' Sets up object to process data based on MD in an hdf file.
         '''
+        
         pass
 
-    def from_args(self,*args,**kwangs):
+    @classmethod
+    def from_args(cls,*args,**kwangs):
+        this = cls()
         '''Sets up the object based on arguments
         '''
-        pass
+        req_args_lst = ['search_range','fname','s_width','s_num','new_pts']
+        for s in req_args_lst:
+            if s not in kwargs:
+                raise Exception("missing required argument %s"%s)
+        self.next_pts = kwargs['new_pts']
+        del kwargs['new_pts']
+        if 'fname_out' in kwargs:
+            self.fname_out = kwargs['fname_out']
+            del kwargs['fname_out']
+        else: 
+            self.fname_out = None
+        self.params = kwargs
+        return this
+    
 
     def process_next_frame(self):
         '''process the next frame'''
@@ -834,15 +851,17 @@ class StackStorage(object):
     results of given movie.  This class also keeps track of doing mid-level
     processing and visualization.  
     """
-    def __init__(self):
-        self.back_img = None
-        self.cine_fname = None
-        self.back_end = None
+    def __init__(self,cine_fname=None,bck_img=None):
+        self.back_img = bck_img
+        self.cine_fname = cine_fname
+        self.cine = Cine.cine(cine_fname)
+        self.frames = {}
         pass
 
-    def add_frame(self,frame_num,*args,**kwargs):
+    def add_frame(self,frame_num,data):
         """ Adds a frame to the storage 
         """
+        self.frames[frame_num] = data
 
 class MemBackendFrame(object):
     """A class for keeping all of the relevant results about a frame in memory
@@ -852,9 +871,38 @@ class MemBackendFrame(object):
      - add logic to generate res from raw
      - add visualization code to this object
     """
-    def __init__(self,*args,**kwarg):
+    def __init__(self,tck,center,res=None,trk_lst=None,*args,**kwarg):
+        self.tck = tck
+        self.center = center
+        self.res = res
+        self.trk_lst =trk_lst
         pass
+    def get_next_spline(self):
+        tim,tam = self.trk_lst
+           
+        t_q = np.array([t.q for t in tim+tam if len(t) > 30 and 
+                        t.q is not None  
+                        and t.phi is not None 
+                        and t.charge is not None
+                        and t.charge != 0])
 
+        t_phi = np.array([t.phi for t in tim+tam if len(t) > 30 and 
+                        t.q is not None  
+                        and t.phi is not None 
+                        and t.charge is not None
+                        and t.charge != 0])
+
+        # seed the next round of points
+        tmp_pts = si.splev(np.mod(t_phi,2*np.pi)/(2*np.pi),self.tck)
+        tmp_pts -= self.center
+        th = np.arctan2(*(tmp_pts[::-1]))
+        r = np.sqrt(np.sum(tmp_pts**2,axis=0))
+        r *= t_q
+        indx =th.argsort()
+        r = r[indx]
+        th = th[indx]
+        return get_spline(np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + center)
+        
     def __getitem__(self,val):
         pass
 
@@ -862,22 +910,28 @@ class HdfBackend(object):
     """A class that wraps around an HDF results file"""
     def __init__(self,fname,*args,**kwargs):
         self.file = h5py.File(fname,'r')
-        self.raw = False
+        self.raw = True
         self.res = True
+        self.frames = []
         pass
 
     def __del__(self):
         self.file.close()
     def get_frame(self,frame_num,*args,**kwargs):
-        res = MemBackendFrame()
+        res = MemBackendFrame(kwargs['tck'],kwargs['center'])
         g = self.file['frame_%05d'%frame_num]
         if self.raw:
-            res.res = _read_frame_tracks_from_file_raw(g)
+            res.trk_lst = _read_frame_tracks_from_file_raw(g)
         if self.res:
-            res.trk_lst = _read_frame_tracks_from_file_res(g)
+            res.res = _read_frame_tracks_from_file_res(g)
 
         return res
-            
+    def fill_frames(self,start_num,count,new_pts):
+        smp_pts,tck,center = get_spline(new_pts)
+        self.frames.append(self.get_frame(start_num,tck=tck,center=center))
+        for j in range(start_num +1,start_num+count):
+            smp_pts,tck,center = self.frames[-1].get_next_spline()
+            self.frames.append(self.get_frame(j,tck=tck,center=center))
             
 def plot_tracks(img,tim,tam,tck,center,min_len = 0):
     fig = plt.figure();
