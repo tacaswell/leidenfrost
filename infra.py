@@ -674,7 +674,7 @@ def save_comp(fout_base,fout_path,fout_name,params):
 
     pass
 
-def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,md_args):
+def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,tck,center,md_args):
     ''' 
     Takes in an hdf object and creates the following data sets in `parent_group`
 
@@ -716,6 +716,16 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,md_args):
     name_mod = ('min','max')
     write_raw_data = True
     write_res = True
+    parent_group.attrs['tck0'] = tck[0]
+    parent_group.attrs['tck1'] = np.vstack(tck[1])
+    parent_group.attrs['tck2'] = tck[2]
+    parent_group.attrs['center'] = center
+    for key,val in md_args.items:
+        try:
+            parent_group.attrs[key] = val
+        except TypeError:
+            print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
+            print 'please reconsider your life choices'
     for t_lst,n_mod in zip((t_min_lst,t_max_lst),name_mod):
         if write_raw_data:
             # get total number of points
@@ -769,7 +779,8 @@ def _read_frame_tracks_from_file_raw(parent_group):
     raw_data_name = 'raw_data_'
     raw_track_md_name = 'raw_track_md_'
     name_mod = ('min','max')
-    
+    center = parent_group.attrs['center']
+    tck = [parent_group.attrs['tck0'],parent_group.attrs['tck1'],parent_group.attrs['tck2']]
     trk_lsts_tmp = []
     for n_mod in name_mod:
         tmp_raw_data = parent_group[raw_data_name + n_mod][:]
@@ -783,7 +794,7 @@ def _read_frame_tracks_from_file_raw(parent_group):
             t_lst.append(tmp_trk)
         trk_lsts_tmp.append(t_lst)
 
-    return trk_lsts_tmp
+    return trk_lsts_tmp,tck,center
 
 
 
@@ -791,7 +802,8 @@ def _read_frame_tracks_from_file_res(parent_group):
     '''
     Only reads out the charge and location of the tracks, not all of their points
     '''
-    
+    center = parent_group.attrs['center']
+    tck = [parent_group.attrs['tck0'],parent_group.attrs['tck1'],parent_group.attrs['tck2']]
     
     # names
     trk_res_name = 'trk_res_'
@@ -804,15 +816,19 @@ def _read_frame_tracks_from_file_res(parent_group):
         tmp_q = tmp_trk_res[:,2]
         res_lst.append((tmp_charge,tmp_phi,tmp_q))
 
-    return res_lst
+    return res_lst,tck,center
 
 
     
 
 class ProcessStack(object):
     def __init__(self):
-        self.cur_frame = None
         self.params = {}
+        self.frames = []
+        self.cine_ = None
+        self.cine_name = None
+        self.h5_name = None
+        self.back_img = None
         pass
 
     @classmethod
@@ -831,20 +847,37 @@ class ProcessStack(object):
         for s in req_args_lst:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
-        self.next_pts = kwargs['new_pts']
+        this.next_pts = kwargs['new_pts']
         del kwargs['new_pts']
         if 'fname_out' in kwargs:
-            self.fname_out = kwargs['fname_out']
+            this.fname_out = kwargs['fname_out']
             del kwargs['fname_out']
         else: 
-            self.fname_out = None
-        self.params = kwargs
+            this.fname_out = None
+        this.params = kwargs
         return this
     
-
+    def process_first_frame(self,new_pts):
+        '''Processes the first frame which requires feeding in the seed points'''
+        _,tck,center = get_spline(new_pts)
+        mbe = MemBackendFrame(tck,center)
+        self.frames.append((0,mbe))
+        self._process_frame(self,mbe,0)
+        
     def process_next_frame(self):
         '''process the next frame'''
+        _,tck,center = self.frames[-1][1].get_next_spline()
+        mbe = MemBackendFrame(tck,center)
+        frame_num = self.frames[-1][0]+1
+        self.frames.append((frame_num,mbe))
+        self._process_frame(self,mbe,frame_num)
 
+    def _process_frame(self,mbe,frame_num):
+        tmp_img = self.cine_
+        if bck_img is not None:
+            tmp_img /= bck_img
+        tck
+        
 class StackStorage(object):
     """
     A class to deal with keeping track of and spitting back out the
@@ -877,7 +910,7 @@ class MemBackendFrame(object):
         self.res = res
         self.trk_lst =trk_lst
         pass
-    def get_next_spline(self):
+    def get_next_spline(self,pt_count=100):
         tim,tam = self.trk_lst
            
         t_q = np.array([t.q for t in tim+tam if len(t) > 30 and 
@@ -901,7 +934,7 @@ class MemBackendFrame(object):
         indx =th.argsort()
         r = r[indx]
         th = th[indx]
-        return get_spline(np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + center)
+        return get_spline(np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + self.center,point_count = pt_count)
         
     def __getitem__(self,val):
         pass
