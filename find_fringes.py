@@ -16,21 +16,23 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
 
-import matplotlib.pyplot as plt
-
+import time
 import numpy as np
-import trackpy.tracking as pt
 import scipy
 import scipy.ndimage
-import infra
+import scipy.interpolate as si
+import trackpy.tracking as pt
+
 import find_peaks.peakdetect as pd
 import cine
-import scipy.stats as ss
-import time
-import scipy.interpolate as si
 
-            
-def find_rim_fringes(pt_lst,lfimg,s_width,s_num,s_pix_err = 1.5,smooth_rng=2,*args,**kwargs):
+import lf_drop.infra as infra
+
+        
+def find_rim_fringes(pt_lst, lfimg, s_width, s_num, s_pix_err=1.5, smooth_rng=2, *args, **kwargs):
+    """
+    Does the actual work of finding the fringes on the image
+    """
     # make sure pt_lst is a well formed array
     pt_lst = np.asarray(pt_lst)
 
@@ -101,7 +103,7 @@ def proc_file(fname,new_pts,bck_img=None,file_out = None,*args,**kwargs):
 
     #compute the background
     if bck_img is None:
-        bck_img = gen_bck_img(fname)
+        bck_img = infra.gen_bck_img(fname)
 
 
 
@@ -110,7 +112,7 @@ def proc_file(fname,new_pts,bck_img=None,file_out = None,*args,**kwargs):
     #out_file = h5py.File(h5_fname,'w+')
     tm_lst = []
     trk_res_lst = []
-    p_lst = []
+
 
 
 
