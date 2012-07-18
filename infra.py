@@ -802,10 +802,83 @@ def _read_frame_tracks_from_file_res(parent_group):
         tmp_charge = tmp_trk_res[:,0]
         tmp_phi = tmp_trk_res[:,1]
         tmp_q = tmp_trk_res[:,2]
-        res_lst.appendf((tmp_charge,tmp_phi,tmp_q))
+        res_lst.append((tmp_charge,tmp_phi,tmp_q))
 
     return res_lst
 
+
+    
+
+class ProcessStack(object):
+    def __init__(self):
+        self.cur_frame = None
+        self.params = {}
+        pass
+
+    def from_hdf_file(self,fname):
+        ''' Sets up object to process data based on MD in an hdf file.
+        '''
+        pass
+
+    def from_args(self,*args,**kwangs):
+        '''Sets up the object based on arguments
+        '''
+        pass
+
+    def process_next_frame(self):
+        '''process the next frame'''
+
+class StackStorage(object):
+    """
+    A class to deal with keeping track of and spitting back out the
+    results of given movie.  This class also keeps track of doing mid-level
+    processing and visualization.  
+    """
+    def __init__(self):
+        self.back_img = None
+        self.cine_fname = None
+        self.back_end = None
+        pass
+
+    def add_frame(self,frame_num,*args,**kwargs):
+        """ Adds a frame to the storage 
+        """
+
+class MemBackendFrame(object):
+    """A class for keeping all of the relevant results about a frame in memory
+
+    This class will get smarter over time.  
+
+     - add logic to generate res from raw
+     - add visualization code to this object
+    """
+    def __init__(self,*args,**kwarg):
+        pass
+
+    def __getitem__(self,val):
+        pass
+
+class HdfBackend(object):
+    """A class that wraps around an HDF results file"""
+    def __init__(self,fname,*args,**kwargs):
+        self.file = h5py.File(fname,'r')
+        self.raw = False
+        self.res = True
+        pass
+
+    def __del__(self):
+        self.file.close()
+    def get_frame(self,frame_num,*args,**kwargs):
+        res = MemBackendFrame()
+        g = self.file['frame_%05d'%frame_num]
+        if self.raw:
+            res.res = _read_frame_tracks_from_file_raw(g)
+        if self.res:
+            res.trk_lst = _read_frame_tracks_from_file_res(g)
+
+        return res
+            
+            
 def plot_tracks(img,tim,tam,tck,center,min_len = 0):
     fig = plt.figure();
     ax = fig.gca()
