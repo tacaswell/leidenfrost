@@ -19,16 +19,25 @@ from __future__ import division
 import hashlib
 import time
 
-import cine
+
+
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.interpolate as sint
-import scipy.odr as sodr
 import numpy.linalg as nl
+import scipy
+import scipy.ndimage
+import scipy.interpolate as sint
+import scipy.interpolate as si
+import scipy.odr as sodr
+import h5py
+
+import cine
 from trackpy.tracking import Point
 from trackpy.tracking import Track
-import scipy.interpolate as si
-import h5py
+import find_peaks.peakdetect as pd
+import trackpy.tracking as pt
+
+
 
 WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
 
@@ -321,6 +330,8 @@ def get_spline(points,point_count=None,pix_err = 2):
         a 2x{N,point_count} array with evenly sampled points
     tck
        The return data from the spline fitting
+    center
+       The center of mass the initial points
     '''
     if type(points) is np.ndarray:
         # make into a list
@@ -674,7 +685,7 @@ def save_comp(fout_base,fout_path,fout_name,params):
 
     pass
 
-def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,tck,center,md_args):
+def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,curve,md_args):
     ''' 
     Takes in an hdf object and creates the following data sets in `parent_group`
 
@@ -716,10 +727,7 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,tck,center,md_a
     name_mod = ('min','max')
     write_raw_data = True
     write_res = True
-    parent_group.attrs['tck0'] = tck[0]
-    parent_group.attrs['tck1'] = np.vstack(tck[1])
-    parent_group.attrs['tck2'] = tck[2]
-    parent_group.attrs['center'] = center
+    curve.write_to_hdf(parent_group)
     for key,val in md_args.items:
         try:
             parent_group.attrs[key] = val
@@ -746,10 +754,16 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,tck,center,md_a
                 tmp_indx += t_len
           
             # create dataset and shove in data
-            parent_group.create_dataset(raw_data_name + n_mod,tmp_raw_data.shape,np.float,compression='szip')
+            parent_group.create_dataset(raw_data_name + n_mod,
+                                        tmp_raw_data.shape,
+                                        np.float,
+                                        compression='szip')
             parent_group[raw_data_name + n_mod][:] = tmp_raw_data
 
-            parent_group.create_dataset(raw_track_md_name + n_mod,tmp_raw_track_data.shape,np.float,compression='szip')
+            parent_group.create_dataset(raw_track_md_name + n_mod,
+                                        tmp_raw_track_data.shape,
+                                        np.float,
+                                        compression='szip')
             parent_group[raw_track_md_name + n_mod][:] = tmp_raw_track_data
             
         if write_res:
@@ -760,12 +774,12 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,tck,center,md_a
             for i,t in enumerate(good_t_lst):
                 tmp_track_res[i,:] = (t.charge,t.phi,t.q)
                 
-            parent_group.create_dataset(trk_res_name + n_mod,tmp_track_res.shape,np.float,compression='szip')
+            parent_group.create_dataset(trk_res_name + n_mod,
+                                        tmp_track_res.shape,
+                                        np.float,
+                                        compression='szip')
             parent_group[trk_res_name + n_mod][:] = tmp_track_res
             
-    for key,val in md_args.iteritems():
-        g.attrs[key] = val
-
 
 def _read_frame_tracks_from_file_raw(parent_group):
     '''
@@ -839,44 +853,55 @@ class ProcessStack(object):
         pass
 
     @classmethod
-    def from_args(cls,*args,**kwangs):
+    def from_args(cls,*args,**kwargs):
         this = cls()
         '''Sets up the object based on arguments
         '''
-        req_args_lst = ['search_range','fname','s_width','s_num','new_pts']
+        req_args_lst = ['search_range','fname','s_width','s_num']
         for s in req_args_lst:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
-        this.next_pts = kwargs['new_pts']
-        del kwargs['new_pts']
+
+
         if 'fname_out' in kwargs:
             this.fname_out = kwargs['fname_out']
             del kwargs['fname_out']
         else: 
             this.fname_out = None
+
+        if 'bck_img' in kwargs:
+            this.bck_img = kwargs['bck_img']
+            del kwargs['bck_img']
+        else: 
+            this.bck_img = None
+                
         this.params = kwargs
+        this.cine_ = cine.Cine(kwargs['fname'])
         return this
     
     def process_first_frame(self,new_pts):
         '''Processes the first frame which requires feeding in the seed points'''
-        _,tck,center = get_spline(new_pts)
-        mbe = MemBackendFrame(tck,center)
-        self.frames.append((0,mbe))
-        self._process_frame(self,mbe,0)
+        curve = SplineCurve.from_pts(new_pts)
+
+        self._process_frame(curve,0)
         
     def process_next_frame(self):
         '''process the next frame'''
-        _,tck,center = self.frames[-1][1].get_next_spline()
-        mbe = MemBackendFrame(tck,center)
+        # get the curve from the previous 
+        curve = self.frames[-1][1].get_next_spline(pix_err=.03)
         frame_num = self.frames[-1][0]+1
-        self.frames.append((frame_num,mbe))
-        self._process_frame(self,mbe,frame_num)
-
-    def _process_frame(self,mbe,frame_num):
-        tmp_img = self.cine_
-        if bck_img is not None:
-            tmp_img /= bck_img
-        tck
+        self._process_frame(curve,0)
+        
+    def _process_frame(self,curve,frame_num):
+        # get the raw data, and convert to float
+        tmp_img = np.array(self.cine_.get_frame(frame_num),dtype='float')
+        # if 
+        if self.bck_img is not None:
+            tmp_img /= self.bck_img
+        tm,trk_res,tim,tam,miv,mav = proc_frame(curve,tmp_img,**self.params)
+        
+        mbe = MemBackendFrame(curve,frame_num,res = trk_res,trk_lst = [tim,tam])
+        self.frames.append((frame_num,mbe))        
         
 class StackStorage(object):
     """
@@ -904,13 +929,16 @@ class MemBackendFrame(object):
      - add logic to generate res from raw
      - add visualization code to this object
     """
-    def __init__(self,tck,center,res=None,trk_lst=None,*args,**kwarg):
-        self.tck = tck
-        self.center = center
+    def __init__(self,curve,frame_number,res=None,trk_lst=None,*args,**kwarg):
+        self.curve = curve
         self.res = res
         self.trk_lst =trk_lst
+        self.frame_number = frame_number
         pass
-    def get_next_spline(self,pt_count=100):
+    def get_next_spline(self,pt_count=100,**kwargs):
+        if self.trk_lst is None:
+            self.compute_res_fram_raw()
+            
         tim,tam = self.trk_lst
            
         t_q = np.array([t.q for t in tim+tam if len(t) > 30 and 
@@ -926,19 +954,37 @@ class MemBackendFrame(object):
                         and t.charge != 0])
 
         # seed the next round of points
-        tmp_pts = si.splev(np.mod(t_phi,2*np.pi)/(2*np.pi),self.tck)
-        tmp_pts -= self.center
-        th = np.arctan2(*(tmp_pts[::-1]))
-        r = np.sqrt(np.sum(tmp_pts**2,axis=0))
+
+        # get the (r,t) of _this_ frames spline
+        r,th = self.curve.sample_rt(np.mod(t_phi,2*np.pi)/(2*np.pi))
+        # scale the radius
         r *= t_q
+        # sort by theta
         indx =th.argsort()
         r = r[indx]
         th = th[indx]
-        return get_spline(np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + self.center,point_count = pt_count)
-        
-    def __getitem__(self,val):
-        pass
+        # generate the new curve
+        new_curve = SplineCurve.from_pts(self.curve.rt_to_xy(r,th),**kwargs)
 
+        
+        return new_curve
+
+    def plot_tracks(self,img,min_len = 0):
+        fig = plt.figure();
+        ax = fig.gca()
+        c_img = ax.imshow(img,cmap=plt.get_cmap('jet'),interpolation='nearest');
+        c_img.set_clim([.5,1.5])
+        color_cycle = ['r','b']
+        for tk_l,c in zip(self.trk_lst,color_cycle):
+            [t.plot_trk_img(self.curve.tck,self.curve.center,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len ];
+        ax.plot(*self.curve.get_xy_samples(1000))
+        plt.draw();
+
+    def write_to_hdf(self,parent_group):
+        group = parent_group.create_group(
+        _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],curve,md_args):
+        pass
+    
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
     def __init__(self,fname,*args,**kwargs):
@@ -965,6 +1011,7 @@ class HdfBackend(object):
         for j in range(start_num +1,start_num+count):
             smp_pts,tck,center = self.frames[-1].get_next_spline()
             self.frames.append(self.get_frame(j,tck=tck,center=center))
+
             
 def plot_tracks(img,tim,tam,tck,center,min_len = 0):
     fig = plt.figure();
@@ -976,3 +1023,162 @@ def plot_tracks(img,tim,tam,tck,center,min_len = 0):
     plt.draw();
 
 
+class SplineCurve(object):
+    '''
+    A class that wraps the scipy.interpolation objects
+    '''
+    @classmethod
+    def from_pts(cls,new_pts,**kwargs):
+        _,tck,center = get_spline(new_pts,**kwargs)
+        return cls(tck,center)
+
+    @classmethod
+    def from_hdf(cls,parent_group):
+        center = parent_group.attrs['center']
+        tck = [parent_group.attrs['tck0'],parent_group.attrs['tck1'],parent_group.attrs['tck2']]
+        return cls(tck,center)
+    
+    def __init__(self,tck,center):
+        '''A really hacky way of doing different 
+        '''
+        self.tck = tck
+        self.center = center
+    def get_xy_samples(self,sample_count):
+        '''
+        Returns the x-y coordinates of uniformly sampled points on the
+        spline.  
+        '''
+        return si.splev(np.linspace(0,1,sample_count),self.tck)
+    def get_rt_samples(self,sample_count):
+        '''
+
+        '''
+        new_pts = self.get_xy_samples(sample_count)
+        new_pts -= self.center
+        return np.sqrt(np.sum(new_pts**2,axis=0)).reshape(1,-1),np.arctan2(*(new_pts[::-1]))
+
+    def write_to_hdf(self,parent_group):
+        parent_group.attrs['tck0'] = self.tck[0]
+        parent_group.attrs['tck1'] = np.vstack(self.tck[1])
+        parent_group.attrs['tck2'] = self.tck[2]
+        parent_group.attrs['center'] = self.center
+
+    def circumference(self):
+        '''returns a rough estimate of the circumference'''
+        new_pts = self.get_xy_samples(100)
+        return np.sum(np.sqrt(np.sum(np.diff(new_pts,axis=1)**2,axis=0)))
+
+    def sample_rt(self,points):
+        '''Samples at the given points and returns the locations in (r,t)'''
+        tmp_pts = si.splev(points,self.tck)
+        tmp_pts -= self.center
+        th = np.arctan2(*(tmp_pts[::-1]))
+        r = np.sqrt(np.sum(tmp_pts**2,axis=0))
+
+        return r,th
+
+    def rt_to_xy(self,r,th):
+        '''converts (r,t) coords to (x,y)'''
+        return np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + self.center
+        
+
+        
+
+        
+def find_rim_fringes(curve, lfimg, s_width, s_num, s_pix_err=1.5, smooth_rng=2, *args, **kwargs):
+    """
+    Does the actual work of finding the fringes on the image
+    """
+
+    # a really rough estimate of the circumference 
+    C = curve.circumference()
+
+    # sample points at ~ 2/pix
+    sample_count = int(np.ceil(C*2))
+
+    r_new,th_new = curve.get_rt_samples(sample_count)
+
+
+    # get center of curve
+    x0,y0 = curve.center[:,0]
+
+    
+    R = np.max(r_new)*(1+s_width)*1.1
+    x_shift = int(x0-R)
+    x_lim = int(x0+R)
+    y_shift = int(y0-R)
+    y_lim = int(y0+R)
+    dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
+
+    # this will approximately  double sample.
+    ma_scale_vec = np.linspace(1-s_width,1 +s_width,s_num).reshape(-1,1)
+
+    
+    r_scaled = ma_scale_vec.dot(r_new)
+
+    X = np.cos(th_new)*r_scaled
+    Y = np.sin(th_new)*r_scaled
+    zp_all = np.vstack(((Y).reshape(-1),(X).reshape(-1))) + np.flipud(curve.center) - np.array((y_shift,x_shift)).reshape(2,1)
+
+    # extract the values at those locations from the image.  The
+    # extra flipud is to take a transpose of the points to deal
+    # with the fact that the definition of the first direction
+    # between plotting and the image libraries is inconsistent.
+    zv_all = scipy.ndimage.interpolation.map_coordinates(dlfimg,zp_all,order=2)
+    min_vec = []
+    max_vec = []
+    theta = np.linspace(0,2*np.pi,sample_count)
+    for j,ma_scale in enumerate(ma_scale_vec.reshape(-1)):
+
+        # select out the right region
+        zv = zv_all[j*sample_count:(j+1)*sample_count] 
+
+        # smooth the curve
+        zv = l_smooth(zv,smooth_rng,'blackman')
+
+        # find the peaks
+        peaks = pd.peakdetect_parabole(zv-np.mean(zv),theta,is_ring =True)
+        # extract the maximums
+        max_pk = np.vstack(peaks[0])
+        # extract the minimums
+        min_pk = np.vstack(peaks[1])
+        
+        # append to the export vectors
+        min_vec.append((ma_scale,min_pk))
+        max_vec.append((ma_scale,max_pk))
+        
+        
+    return min_vec,max_vec
+
+
+def proc_frame(curve,img,s_width,s_num,search_range,min_tlen = 5, **kwargs):
+    '''new version with different returns'''
+    _t0 = time.time()
+
+
+    miv,mav = find_rim_fringes(curve,img,s_width=s_width,s_num=s_num,**kwargs)
+
+    tim = link_ridges(miv,search_range,**kwargs)
+    tam = link_ridges(mav,search_range,**kwargs)
+
+    tim = [t for t in tim if len(t) > min_tlen]
+    tam = [t for t in tam if len(t) > min_tlen]
+
+    trk_res = (zip(*[ (t.charge,t.phi) for t in tim if t.charge is not None ]),zip(*[ (t.charge,t.phi) for t in tam if t.charge is not None ]))
+
+
+    _t1 = time.time()
+
+    return (_t1 - _t0),trk_res,tim,tam,miv,mav
+    
+def link_ridges(vec,search_range,memory=0,**kwargs):
+    # generate point levels from the previous steps
+
+    levels = [[Point1D_circ(q,phi,v) for phi,v in pks] for q,pks in vec]
+    
+    trks = pt.link_full(levels,2*np.pi,search_range,hash_cls = hash_line_angular,memory = memory, track_cls = lf_Track)        
+    for t in trks:
+        t.classify2(**kwargs)
+
+    trks.sort(key=lambda x: x.phi)
+    return trks
