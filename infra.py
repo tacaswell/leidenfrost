@@ -750,26 +750,20 @@ class HdfBackend(object):
         self.file = h5py.File(fname,'r')
         self.raw = True
         self.res = True
-        self.frames = []
         pass
 
     def __del__(self):
         self.file.close()
     def get_frame(self,frame_num,*args,**kwargs):
-        res = MemBackendFrame(kwargs['tck'],kwargs['center'])
+        trk_lst = None
+        res = None
         g = self.file['frame_%05d'%frame_num]
         if self.raw:
-            res.trk_lst = _read_frame_tracks_from_file_raw(g)
+            trk_lst = _read_frame_tracks_from_file_raw(g)
         if self.res:
-            res.res = _read_frame_tracks_from_file_res(g)
-
-        return res
-    def fill_frames(self,start_num,count,new_pts):
-        smp_pts,tck,center = get_spline(new_pts)
-        self.frames.append(self.get_frame(start_num,tck=tck,center=center))
-        for j in range(start_num +1,start_num+count):
-            smp_pts,tck,center = self.frames[-1].get_next_spline()
-            self.frames.append(self.get_frame(j,tck=tck,center=center))
+            res = _read_frame_tracks_from_file_res(g)
+        curve = SplineCurve.from_hdf(g)
+        return MemBackendFrame(curve,frame_num,res,trk_lst)
 
             
 
