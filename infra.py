@@ -39,7 +39,7 @@ import trackpy.tracking as pt
 
 
 
-WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
+
 
 
 class hash_line_angular(object):
@@ -143,6 +143,11 @@ class lf_Track(Track):
             kwargs['marker'] = 'v'
         else:
             kwargs['marker'] = 'o'
+        if 'markevery' not in kwargs:
+            kwargs['markevery'] = 10
+        if 'markersize' not in kwargs:
+            kwargs['markersize'] = 7.5
+            
         ax.plot(*zp_all,**kwargs)
     def classify2(self,min_len = None,min_extent = None,**kwargs):
         ''' second attempt at the classify function''' 
@@ -295,17 +300,6 @@ class lf_Track(Track):
 
 
 
-def gen_ellipse(a,b,t,x,y,theta):
-    # a is always the major axis, x is always the major axis, can be rotated away by t
-    if b > a:
-            tmp = b
-            b = a
-            a = tmp
-
-            
-    #t = np.mod(t,np.pi/2)
-    r =  1/np.sqrt((np.cos(theta - t)**2 )/(a*a) +(np.sin(theta - t)**2 )/(b*b) )
-    return np.vstack((r*np.cos(theta) + x,r*np.sin(theta) + y))
 
 def get_spline(points,point_count=None,pix_err = 2):
     '''
@@ -416,43 +410,8 @@ class spline_fitter(object):
         '''Returns the clicked points in the format the rest of the code expects'''
         return np.vstack(self.pt_lst).T
 
-def hash_file(fname):
-    """for computing hash values of files.  This is to make it easy to
-   run my data base scheme with files that are on external hard drives.
-
-   code lifted from:
-   http://stackoverflow.com/a/4213255/380231
-   """
-
-    
-    md5 = hashlib.md5()
-    with open(fname,'rb') as f: 
-        for chunk in iter(lambda: f.read(128*md5.block_size), b''): 
-            md5.update(chunk)
-    return md5.hexdigest()
 
 
-def set_up_efitter(fname,bck_img = None):
-    ''' gets the initial path '''
-    clims = [.5,1.5]
-    #open the first frame and find the initial circle
-    c_test = cine.Cine(fname)    
-    lfimg = c_test.get_frame(0)
-    if bck_img is None:
-        bck_img = np.ones(lfimg.shape)
-        clims = None
-    fig = plt.figure()
-    ax = fig.add_axes([.1,.1,.8,.8])
-    im = ax.imshow(lfimg/bck_img)
-    if clims is not None:
-        im.set_clim(clims)
-    ef = spline_fitter(ax)
-
-
-
-    plt.draw()
-
-    return ef
 
 def gen_bck_img(fname):
     '''Computes the background image'''
@@ -465,205 +424,7 @@ def gen_bck_img(fname):
     return bck_img
 
 
-def disp_frame(fname,n,bck_img = None):
-    '''Displays a given frame from the file'''
-
-    c_test = cine.Cine(fname)    
-
-    lfimg = c_test.get_frame(n)
-
-    if bck_img is None:
-        bck_img = np.ones(lfimg.shape)
-    fig = plt.figure()
-    ax = fig.add_axes([.1,.1,.8,.8])
-    im = ax.imshow(lfimg/bck_img)
-    im.set_clim([.5,1.5])
-    ax.set_title(n)
-    plt.draw()
-
-
-def play_movie(fname,bck_img=None):
-    '''plays the movie with correction'''
-    
-
-    def update_img(num,F,bck_img,im,txt):
-        im.set_data(F.get_frame(num)/bck_img)
-        txt.set_text(str(num))
-    F = cine.Cine(fname)    
-    
-    if bck_img is None:
-        bck_img = np.ones(F.get_frame(0).shape)
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    im = ax.imshow(F.get_frame(0)/bck_img)
-    fr_num = ax.text(0.05,0.05,0,transform = ax.transAxes )
-    im.set_clim([.75,1.25])
-    prof_ani = animation.FuncAnimation(fig,update_img,len(F),fargs=(F,bck_img,im,fr_num),interval=50)
-    plt.show()
-
-
-def plot_plst_data(p_lst):
-    ''' makes a graph for the position, radius, angle, etc from the list of ellipse parameters'''
-
-    
-
-    print 'hi'
-    a,b,t0,x0,y0 = zip(*p_lst)
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(a,label='a')
-    ax.plot(b,label='b')
-    ax.set_ylabel('axis [pix]')
-    ax.set_xlabel(r'frame \#')
-
-
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(x0,y0)
-    ax.set_xlabel('x [px]')
-    ax.set_ylabel('y [px]')
-    ax.set_aspect('equal')
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(x0,label='x0')
-    ax.plot(y0,label='y0')
-    ax.legend(loc=0)
-    ax.set_ylabel('center location [px]')
-    ax.set_xlabel('frame \#')
-    
-    x0 = np.array(x0)
-    y0 = np.array(y0)
-    x0_0 = x0-np.mean(x0)
-    y0_0 = y0-np.mean(y0)
-    x0_0 = x0_0/np.sqrt(np.sum(x0_0**2))
-    y0_0 = y0_0/np.sqrt(np.sum(y0_0**2))
-    
-    print sum(x0_0 * y0_0)
-    
-
-
-
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.step(range(len(t0)),t0,label=r'$\theta_0$')
-    ax.axhline(-np.pi/2)
-    ax.axhline(np.pi/2)
-    ax.axhline(-np.pi)
-    ax.axhline(np.pi)
-    ax.legend(loc=0)
-    ax.set_ylabel(r'$\theta_0$ [rad]')
-    ax.set_xlabel('frame \#')
-    
-
-
-    
-        
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(10*(np.array(t0) - np.mean(t0)),label=r'$\theta_0$')
-    ax.plot(a-np.mean(a),label='a')
-    ax.plot(b-np.mean(b),label='b')
-    ax.set_ylabel('axis [pix]')
-    ax.set_xlabel('frame \#')
-    ax.legend(loc=0)
-    ax.set_ylabel(r'arb')
-    ax.set_xlabel('frame \#')
-    
-
-
-
-def resample_track(data,pt_num = 250,interp_type = 'linear'):
-    '''re-samples the curve on uniform points and averages out tilt
-    due to fringe ID error'''
-
-    # get data out
-    ch,th = data
-    th = np.array(th)
-    ch = np.array(ch)
-    
-    # make negative points positive
-    th = np.mod(th,2*np.pi)
-    indx = th.argsort()
-    # re-order to be monotonic
-    th = th[indx]
-    ch = ch[indx]
-    # sum the charges
-    ch = np.cumsum(ch)
-
-    # figure out the miss/match
-    miss_cnt = ch[-1]
-    corr_ln =th*(miss_cnt/(2*np.pi)) 
-    # add a linear line to make it come back to 0
-    ch -= corr_ln
-
-    # make sure that the full range is covered
-    if th[0] != 0:
-        ch = np.concatenate((ch[:1],ch))
-        th = np.concatenate(([0],th))
-    if th[-1] < 2*np.pi:
-        ch = np.concatenate((ch,ch[:1]))
-        th = np.concatenate((th,[2*np.pi]))
-
-    # set up interpolation 
-    f = sint.interp1d(th,ch,kind=interp_type)
-    # set up new points
-    th_new = np.linspace(0,2*np.pi,pt_num)
-    # get new interpolated values
-    ch_new = f(th_new)
-    # subtract off mean
-    ch_new -=np.mean(ch_new)
-    return ch_new,th_new
-
-
-def e_funx(p,r):
-    x,y = r
-    a,b,c,d,f = p
-        
-    return a* x*x + 2*b*x*y + c * y*y + 2 *d *x + 2 * f *y -1
-
-def fit_ellipse(r):
-    x,y = r
-    R2 = np.max(x - np.mean(x))**2
-
-    a = c = 1/R2
-    b = 0
-    d = -np.mean(x)/R2
-    f = -np.mean(y)/R2
-    
-    p0 = (a,a,c,d,f)
-    data = sodr.Data(r,1)
-    model = sodr.Model(e_funx,implicit=1)
-    worker = sodr.ODR(data,model,p0)
-    out = worker.run()
-    out = worker.restart()
-    return out
-
-# http://mathworld.wolfram.com/Ellipse.html
-def gen_to_parm(p):
-    a,b,c,d,f = p
-    g = -1
-    x0 = (c*d-b*f)/(b*b - a*c)
-    y0 = (a*f - b*d)/(b*b - a*c)
-    ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
-    bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (-np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
-
-    t0 =  (1/2) * np.arctan(2*b/(a-c))
-    
-    if a>c: 
-        t0 =  (1/2) * np.arctan(2*b/(a-c))
-        
-    else:
-        t0 = np.pi/2 + (1/2) * np.arctan(2*b/(c-a))
-        
-    
-
-    return (ap,bp,t0,x0,y0)
-
-
+WINDOW_DICT = {'flat':np.ones,'hanning':np.hanning,'hamming':np.hamming,'bartlett':np.bartlett,'blackman':np.blackman}
 def l_smooth(values,window_len=2,window='flat'):
     window_len = window_len*2+1
     s=np.r_[values[-(window_len-1):],values,values[0:(window_len-1)]]
@@ -675,17 +436,9 @@ def l_smooth(values,window_len=2,window='flat'):
     return values
 
 
-def do_comp():
-    pass
 
-def save_comp(fout_base,fout_path,fout_name,params):
-    # check status of h5 file
 
-    # either open or create h5 file
-
-    pass
-
-def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,curve,md_args):
+def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,curve,md_args={}):
     ''' 
     Takes in an hdf object and creates the following data sets in `parent_group`
 
@@ -728,7 +481,7 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,curve,md_args):
     write_raw_data = True
     write_res = True
     curve.write_to_hdf(parent_group)
-    for key,val in md_args.items:
+    for key,val in md_args.items():
         try:
             parent_group.attrs[key] = val
         except TypeError:
@@ -843,6 +596,7 @@ class ProcessStack(object):
         self.cine_name = None
         self.h5_name = None
         self.back_img = None
+        self.file_out = None
         pass
 
     @classmethod
@@ -863,20 +617,33 @@ class ProcessStack(object):
                 raise Exception("missing required argument %s"%s)
 
 
+        if 'bck_img' in kwargs:
+            this.bck_img = kwargs['bck_img']
+            del kwargs['bck_img']
+        else: 
+            this.bck_img = None
+        
         if 'fname_out' in kwargs:
             this.fname_out = kwargs['fname_out']
             del kwargs['fname_out']
         else: 
             this.fname_out = None
 
-        if 'bck_img' in kwargs:
-            this.bck_img = kwargs['bck_img']
-            del kwargs['bck_img']
-        else: 
-            this.bck_img = None
-                
         this.params = kwargs
         this.cine_ = cine.Cine(kwargs['fname'])
+        if this.fname_out is not None:
+            print 'making h5file'
+            try:
+                this.file_out = h5py.File(this.fname_out,'w')
+            
+                for key,val in this.params.items():
+                    try:
+                        this.file_out.attrs[key] = val
+                    except TypeError:
+                        print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
+                        print 'please reconsider your life choices'
+            except Exception as e:
+                print "FAILURE WITH HDF: " + e.__str__()
         return this
     
     def process_first_frame(self,new_pts):
@@ -885,12 +652,13 @@ class ProcessStack(object):
 
         self._process_frame(curve,0)
         
-    def process_next_frame(self):
+    def process_next_frame(self,pix_err = .03):
         '''process the next frame'''
         # get the curve from the previous 
-        curve = self.frames[-1][1].get_next_spline(pix_err=.03)
+
+        curve = self.frames[-1][1].get_next_spline(pix_err=pix_err)
         frame_num = self.frames[-1][0]+1
-        self._process_frame(curve,0)
+        self._process_frame(curve,frame_num)
         
     def _process_frame(self,curve,frame_num):
         # get the raw data, and convert to float
@@ -901,25 +669,10 @@ class ProcessStack(object):
         tm,trk_res,tim,tam,miv,mav = proc_frame(curve,tmp_img,**self.params)
         
         mbe = MemBackendFrame(curve,frame_num,res = trk_res,trk_lst = [tim,tam])
+        mbe.tm = tm
+        if self.file_out is not None:
+            mbe.write_to_hdf(self.file_out,clean=True)
         self.frames.append((frame_num,mbe))        
-        
-class StackStorage(object):
-    """
-    A class to deal with keeping track of and spitting back out the
-    results of given movie.  This class also keeps track of doing mid-level
-    processing and visualization.  
-    """
-    def __init__(self,cine_fname=None,bck_img=None):
-        self.back_img = bck_img
-        self.cine_fname = cine_fname
-        self.cine = Cine.cine(cine_fname)
-        self.frames = {}
-        pass
-
-    def add_frame(self,frame_num,data):
-        """ Adds a frame to the storage 
-        """
-        self.frames[frame_num] = data
 
 class MemBackendFrame(object):
     """A class for keeping all of the relevant results about a frame in memory
@@ -934,10 +687,11 @@ class MemBackendFrame(object):
         self.res = res
         self.trk_lst =trk_lst
         self.frame_number = frame_number
+        self.next_curve = None
         pass
-    def get_next_spline(self,pt_count=100,**kwargs):
-        if self.trk_lst is None:
-            self.compute_res_fram_raw()
+    def get_next_spline(self,**kwargs):
+        if self.next_curve is not None:
+            return self.next_curve
             
         tim,tam = self.trk_lst
            
@@ -964,9 +718,10 @@ class MemBackendFrame(object):
         r = r[indx]
         th = th[indx]
         # generate the new curve
+
         new_curve = SplineCurve.from_pts(self.curve.rt_to_xy(r,th),**kwargs)
 
-        
+        self.next_curve = new_curve
         return new_curve
 
     def plot_tracks(self,img,min_len = 0):
@@ -980,9 +735,13 @@ class MemBackendFrame(object):
         ax.plot(*self.curve.get_xy_samples(1000))
         plt.draw();
 
-    def write_to_hdf(self,parent_group):
-        group = parent_group.create_group(
-        _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],curve,md_args):
+    def write_to_hdf(self,parent_group,clean=False):
+        print 'frame_%05d'%self.frame_number
+        group = parent_group.create_group('frame_%05d'%self.frame_number)
+        _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],self.curve)
+        if clean:
+            self.get_next_spline()
+            self.trk_lst = None
         pass
     
 class HdfBackend(object):
@@ -1013,15 +772,6 @@ class HdfBackend(object):
             self.frames.append(self.get_frame(j,tck=tck,center=center))
 
             
-def plot_tracks(img,tim,tam,tck,center,min_len = 0):
-    fig = plt.figure();
-    ax = fig.gca()
-    c_img = ax.imshow(img,cmap=plt.get_cmap('jet'),interpolation='nearest');
-    c_img.set_clim([.5,1.5])
-    [t.plot_trk_img(tck,center,ax,color='b',linestyle='-') for t in tam if len(t) > min_len ];
-    [t.plot_trk_img(tck,center,ax,color='m',linestyle='-') for t in tim if len(t) > min_len ];
-    plt.draw();
-
 
 class SplineCurve(object):
     '''
@@ -1030,7 +780,9 @@ class SplineCurve(object):
     @classmethod
     def from_pts(cls,new_pts,**kwargs):
         _,tck,center = get_spline(new_pts,**kwargs)
-        return cls(tck,center)
+        this = cls(tck,center)
+        this.raw_pts = new_pts
+        return this
 
     @classmethod
     def from_hdf(cls,parent_group):
@@ -1085,7 +837,7 @@ class SplineCurve(object):
         
 
         
-def find_rim_fringes(curve, lfimg, s_width, s_num, s_pix_err=1.5, smooth_rng=2, *args, **kwargs):
+def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs):
     """
     Does the actual work of finding the fringes on the image
     """
