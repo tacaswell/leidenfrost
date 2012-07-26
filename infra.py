@@ -593,7 +593,10 @@ class ProcessStack(object):
         self.params = {}
         self.frames = []
         self.cine_ = None
+        self.cine_base_path = None
+        self.cine_path = None
         self.cine_name = None
+        self.cine_full_path = None
         self.h5_name = None
         self.back_img = None
         self.file_out = None
@@ -611,31 +614,35 @@ class ProcessStack(object):
         this = cls()
         '''Sets up the object based on arguments
         '''
-        req_args_lst = ['search_range','fname','s_width','s_num']
+        req_args_lst = ['search_range','cine_base_path','cine_path','cine_name','s_width','s_num']
         for s in req_args_lst:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
 
 
-        if 'bck_img' in kwargs:
-            this.bck_img = kwargs['bck_img']
-            del kwargs['bck_img']
-        else: 
+        try:
+            this.bck_img = kwargs.pop('bck_img')
+        except KeyError:
             this.bck_img = None
         
-        if 'fname_out' in kwargs:
-            this.fname_out = kwargs['fname_out']
-            del kwargs['fname_out']
-        else: 
+        try:
+            this.fname_out = kwargs.pop('fname_out')
+        except KeyError:
             this.fname_out = None
 
+        self.cine_base_path = kwargs.pop('cine_base_path')
+
+        self.cine_path = kwargs['cine_path']
+        self.cine_name = kwargs['cine_name']
+        self.cine_full_path = self.cine_base_path + self.cine_path + self.cine_name
+        
         this.params = kwargs
-        this.cine_ = cine.Cine(kwargs['fname'])
+        this.cine_ = cine.Cine(self.cine_full_path)
         if this.fname_out is not None:
             print 'making h5file'
             try:
                 this.file_out = h5py.File(this.fname_out,'w')
-            
+                this.file_out.attrs['ver'] = '0.1'
                 for key,val in this.params.items():
                     try:
                         this.file_out.attrs[key] = val
