@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.interpolate as sint
-
+import matplotlib.pyplot as plt
 
 def gen_ellipse(a,b,t,x,y,theta):
     # a is always the major axis, x is always the major axis, can be rotated away by t
