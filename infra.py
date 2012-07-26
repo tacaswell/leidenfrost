@@ -589,19 +589,23 @@ def _read_frame_tracks_from_file_res(parent_group):
 class ProcessStack(object):
     req_args_lst = ['search_range','cine_path','cine_name','s_width','s_num']
     def __init__(self):
-        self.params = {}
-        self.frames = []
-        self.cine_ = None
-        self.cine_base_path = None
-        self.cine_path = None
-        self.cine_name = None
-        self.cine_full_path = None
-        self.h5_name = None
-        self.back_img = None
-        self.file_out = None
-        self.seed_curve = None
-        pass
+        self.frames = []                  # list of the frames processed
+        
+        self.params = {}                  # the parameters to feed to proc_frame
 
+        self.cine_base_path = None        # the base path of the cine file
+        self.cine_path = None             # the path of the cine file
+        self.cine_name = None             # the name of the cine file
+        self.cine_ = None                 # the cine object
+
+        self.back_img = None              # back ground image for normalization
+        
+        self.h5_name = None               # name of the h5 file to write to, if None does not write out
+        self.file_out = None              # the h5 file object
+
+        self.seed_curve = None            # the curve to use for the first frame
+
+        
     @classmethod
     def from_hdf_file(cls,cine_base_path,fname):
         ''' Sets up object to process data based on MD in an hdf file.
@@ -614,51 +618,61 @@ class ProcessStack(object):
             if s not in keys_lst:
                 tmp_file.close()
                 raise Exception("missing required argument %s"%s)
-        curve = SplineCurve.from_hdf(tmp_file)
-        self.params = dict(tmp_file.attrs)
         
+        self.params = dict(tmp_file.attrs)
+
+        for k in lc_req_args:
+            del self.params[k]
+
         self.cine_base_path = cine_base_path
         self.cine_path = self.params.pop('cine_path')
         self.cine_name = self.params.pop('cine_name')
-        
-        self.cine_full_path = self.cine_base_path + self.cine_path + self.cine_name
-        self.cine_ = cine.Cine(self.cine_full_path)
+        self.cine_ = cine.Cine(self.cine_base_path + self.cine_path + self.cine_name)
+
+        self.back_img = gen_bck_img(self.cine_base_path + self.cine_path + self.cine_name)
+
+        self.h5_name = fname
         self.file_out = tmp_file
+
+        self.seed_curve = SplineCurve.from_hdf(tmp_file)
         pass
 
     @classmethod
-    def from_args(cls,cine_base_path,*args,**kwargs):
+    def from_args(cls,new_pts,cine_base_path,*args,**kwargs):
         self = cls()
         '''Sets up the object based on arguments
         '''
-
+        
         for s in cls.req_args_lst:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
 
-
+        self.params = kwargs
         try:
-            self.bck_img = kwargs.pop('bck_img')
+            self.bck_img = self.params.pop('bck_img')
         except KeyError:
             self.bck_img = None
-        
-        try:
-            self.fname_out = kwargs.pop('fname_out')
-        except KeyError:
-            self.fname_out = None
+                    
 
         self.cine_base_path = cine_base_path
 
-        self.cine_path = kwargs['cine_path']
-        self.cine_name = kwargs['cine_name']
-        self.cine_full_path = self.cine_base_path + self.cine_path + self.cine_name
+        self.cine_path = self.params['cine_path']
+        self.cine_name = self.params['cine_name']
+                
+        self.cine_ = cine.Cine(self.cine_base_path + self.cine_path + self.cine_name)
+
+        if self.bck_img is None:
+            self.bck_img = gen_bck_img(self.cine_base_path + self.cine_path + self.cine_name)
         
-        self.params = kwargs
-        self.cine_ = cine.Cine(self.cine_full_path)
-        if self.fname_out is not None:
+        try:
+            self.h5_name = self.params.pop('fname_out')
+        except KeyError:
+            self.fname_out = None
+
+        if self.h5_name is not None:
             print 'making h5file'
             try:
-                self.file_out = h5py.File(self.fname_out,'w')
+                self.file_out = h5py.File(self.h5_name,'w')
                 self.file_out.attrs['ver'] = '0.1'
                 for key,val in self.params.items():
                     try:
@@ -668,23 +682,20 @@ class ProcessStack(object):
                         print 'please reconsider your life choices'
             except Exception as e:
                 print "FAILURE WITH HDF: " + e.__str__()
+                
+        self.seed_curve = SplineCurve.from_pts(new_pts)        
         return this
-    
-    def process_first_frame(self,new_pts):
-        '''Processes the first frame which requires feeding in the seed points'''
-        curve = SplineCurve.from_pts(new_pts)
-
-        self._process_frame(curve,0)
-        
-    def process_next_frame(self,pix_err = .03):
+            
+    def process_next_frame(self,pix_err = .05):
         '''process the next frame'''
         # get the curve from the previous 
-        
-        curve = self.frames[-1][1].get_next_spline(pix_err=pix_err)
-        frame_num = self.frames[-1][0]+1
-        self._process_frame(curve,frame_num)
-        
-    def _process_frame(self,curve,frame_num):
+        if len(self.frames) == 0:
+            curve = self.seed_curve
+            frame_num = 0
+        else:
+            curve = self.frames[-1].get_next_spline(pix_err=pix_err)
+            frame_num = self.frames[-1].frame_num + 1
+
         # get the raw data, and convert to float
         tmp_img = np.array(self.cine_.get_frame(frame_num),dtype='float')
         # if 
@@ -696,7 +707,7 @@ class ProcessStack(object):
         mbe.tm = tm
         if self.file_out is not None:
             mbe.write_to_hdf(self.file_out,clean=True)
-        self.frames.append((frame_num,mbe))        
+        self.frames.append(mbe)        
 
 class MemBackendFrame(object):
     """A class for keeping all of the relevant results about a frame in memory
