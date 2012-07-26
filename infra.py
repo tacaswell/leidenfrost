@@ -520,7 +520,7 @@ def _write_frame_tracks_to_file(parent_group,t_min_lst,t_max_lst,curve,md_args={
             parent_group[raw_track_md_name + n_mod][:] = tmp_raw_track_data
             
         if write_res:
-            good_t_lst  = [t for t in t_lst if t.charge is not None or t.charge != 0]
+            good_t_lst  = [t for t in t_lst if t.charge is not None and t.charge != 0]
             tmp_track_res = np.zeros((len(good_t_lst),3))
 
             # shove in results data
