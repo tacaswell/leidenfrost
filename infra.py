@@ -37,7 +37,7 @@ from trackpy.tracking import Track
 import find_peaks.peakdetect as pd
 import trackpy.tracking as pt
 
-
+import warnings
 
 
 
@@ -546,8 +546,6 @@ def _read_frame_tracks_from_file_raw(parent_group):
     raw_data_name = 'raw_data_'
     raw_track_md_name = 'raw_track_md_'
     name_mod = ('min','max')
-    center = parent_group.attrs['center']
-    tck = [parent_group.attrs['tck0'],parent_group.attrs['tck1'],parent_group.attrs['tck2']]
     trk_lsts_tmp = []
     for n_mod in name_mod:
         tmp_raw_data = parent_group[raw_data_name + n_mod][:]
@@ -561,7 +559,7 @@ def _read_frame_tracks_from_file_raw(parent_group):
             t_lst.append(tmp_trk)
         trk_lsts_tmp.append(t_lst)
 
-    return trk_lsts_tmp,tck,center
+    return trk_lsts_tmp
 
 
 
@@ -583,7 +581,7 @@ def _read_frame_tracks_from_file_res(parent_group):
         tmp_q = tmp_trk_res[:,2]
         res_lst.append((tmp_charge,tmp_phi,tmp_q))
 
-    return res_lst,tck,center
+    return res_lst
 
 
     
@@ -695,6 +693,13 @@ class MemBackendFrame(object):
         self.trk_lst =trk_lst
         self.frame_number = frame_number
         self.next_curve = None
+        new_res = []
+        for t_ in self.res:
+            tmp = ~np.isnan(t_[0])
+            tmp_lst = [r_[tmp] for r_ in t_]
+            new_res.append(tuple(tmp_lst))
+        self.res = new_res
+        
         pass
     def get_next_spline(self,**kwargs):
         if self.next_curve is not None:
@@ -757,20 +762,35 @@ class HdfBackend(object):
         self.file = h5py.File(fname,'r')
         self.raw = True
         self.res = True
+        self.cine_fname = self.file.attrs['fname']
+
+        try:
+            self.cine = cine.Cine(self.cine_fname)
+        except IOError:
+            if 'ver' not in self.file.attrs:
+                self.cine_fname = self.cine_fname.replace('leidenfrost_b','leidenfrost_a')
+            self.cine = cine.Cine(self.cine_fname)
+        self.frames = {}
         pass
 
     def __del__(self):
         self.file.close()
     def get_frame(self,frame_num,*args,**kwargs):
-        trk_lst = None
-        res = None
-        g = self.file['frame_%05d'%frame_num]
-        if self.raw:
-            trk_lst = _read_frame_tracks_from_file_raw(g)
-        if self.res:
-            res = _read_frame_tracks_from_file_res(g)
-        curve = SplineCurve.from_hdf(g)
-        return MemBackendFrame(curve,frame_num,res,trk_lst)
+        if frame_num not in self.frames:
+            trk_lst = None
+            res = None
+            g = self.file['frame_%05d'%frame_num]
+            if self.raw:
+                trk_lst = _read_frame_tracks_from_file_raw(g)
+            if self.res:
+                res = _read_frame_tracks_from_file_res(g)
+            curve = SplineCurve.from_hdf(g)
+            self.frames[frame_num] = MemBackendFrame(curve,frame_num,res,trk_lst)
+        return self.frames[frame_num]
+    def gen_back_img(self):
+        if self.cine_fname is not None:
+            self.bck_img = gen_bck_img(self.cine_fname)
+    
 
             
 
