@@ -702,13 +702,13 @@ class MemBackendFrame(object):
             
         tim,tam = self.trk_lst
            
-        t_q = np.array([t.q for t in tim+tam if len(t) > 30 and 
+        t_q = np.array([t.q for t in tim+tam if 
                         t.q is not None  
                         and t.phi is not None 
                         and t.charge is not None
                         and t.charge != 0])
 
-        t_phi = np.array([t.phi for t in tim+tam if len(t) > 30 and 
+        t_phi = np.array([t.phi for t in tim+tam if 
                         t.q is not None  
                         and t.phi is not None 
                         and t.charge is not None
