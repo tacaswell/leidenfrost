@@ -587,7 +587,7 @@ def _read_frame_tracks_from_file_res(parent_group):
     
 
 class ProcessStack(object):
-    req_args_lst = ['search_range','cine_path','cine_name','s_width','s_num']
+    req_args_lst = ['search_range','cine_path','cine_name','s_width','s_num','pix_err']
     def __init__(self):
         self.frames = []                  # list of the frames processed
         
@@ -686,14 +686,14 @@ class ProcessStack(object):
         self.seed_curve = SplineCurve.from_pts(new_pts)        
         return this
             
-    def process_next_frame(self,pix_err = .05):
+    def process_next_frame(self):
         '''process the next frame'''
         # get the curve from the previous 
         if len(self.frames) == 0:
             curve = self.seed_curve
             frame_num = 0
         else:
-            curve = self.frames[-1].get_next_spline(pix_err=pix_err)
+            curve = self.frames[-1].get_next_spline(pix_err=self.params['pix_err'])
             frame_num = self.frames[-1].frame_num + 1
 
         # get the raw data, and convert to float
@@ -707,7 +707,14 @@ class ProcessStack(object):
         mbe.tm = tm
         if self.file_out is not None:
             mbe.write_to_hdf(self.file_out,clean=True)
-        self.frames.append(mbe)        
+        self.frames.append(mbe)     
+
+    def get_frame(self,frame_num):
+        if frame_num < len(self.frames):
+            return self.frames[frame_num]
+        while self.frames[-1].frame_num < frame_num:
+            self.process_next_frame()
+        return self.frames[-1]
 
 class MemBackendFrame(object):
     """A class for keeping all of the relevant results about a frame in memory
