@@ -587,6 +587,7 @@ def _read_frame_tracks_from_file_res(parent_group):
     
 
 class ProcessStack(object):
+    req_args_lst = ['search_range','cine_path','cine_name','s_width','s_num']
     def __init__(self):
         self.params = {}
         self.frames = []
@@ -598,52 +599,70 @@ class ProcessStack(object):
         self.h5_name = None
         self.back_img = None
         self.file_out = None
+        self.seed_curve = None
         pass
 
     @classmethod
-    def from_hdf_file(cls,fname):
+    def from_hdf_file(cls,cine_base_path,fname):
         ''' Sets up object to process data based on MD in an hdf file.
         '''
+        self = cls()
+        tmp_file = h5py.File(fname,'r+')
+        keys_lst = tmp_file.attrs.keys()
+        lc_req_args = ['tck0','tck1','tck2','center']
+        for s in cls.req_args_lst + lc_req_args:
+            if s not in keys_lst:
+                tmp_file.close()
+                raise Exception("missing required argument %s"%s)
+        curve = SplineCurve.from_hdf(tmp_file)
+        self.params = dict(tmp_file.attrs)
         
+        self.cine_base_path = cine_base_path
+        self.cine_path = self.params.pop('cine_path')
+        self.cine_name = self.params.pop('cine_name')
+        
+        self.cine_full_path = self.cine_base_path + self.cine_path + self.cine_name
+        self.cine_ = cine.Cine(self.cine_full_path)
+        self.file_out = tmp_file
         pass
 
     @classmethod
-    def from_args(cls,*args,**kwargs):
-        this = cls()
+    def from_args(cls,cine_base_path,*args,**kwargs):
+        self = cls()
         '''Sets up the object based on arguments
         '''
-        req_args_lst = ['search_range','cine_base_path','cine_path','cine_name','s_width','s_num']
-        for s in req_args_lst:
+
+        for s in cls.req_args_lst:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
 
 
         try:
-            this.bck_img = kwargs.pop('bck_img')
+            self.bck_img = kwargs.pop('bck_img')
         except KeyError:
-            this.bck_img = None
+            self.bck_img = None
         
         try:
-            this.fname_out = kwargs.pop('fname_out')
+            self.fname_out = kwargs.pop('fname_out')
         except KeyError:
-            this.fname_out = None
+            self.fname_out = None
 
-        self.cine_base_path = kwargs.pop('cine_base_path')
+        self.cine_base_path = cine_base_path
 
         self.cine_path = kwargs['cine_path']
         self.cine_name = kwargs['cine_name']
         self.cine_full_path = self.cine_base_path + self.cine_path + self.cine_name
         
-        this.params = kwargs
-        this.cine_ = cine.Cine(self.cine_full_path)
-        if this.fname_out is not None:
+        self.params = kwargs
+        self.cine_ = cine.Cine(self.cine_full_path)
+        if self.fname_out is not None:
             print 'making h5file'
             try:
-                this.file_out = h5py.File(this.fname_out,'w')
-                this.file_out.attrs['ver'] = '0.1'
-                for key,val in this.params.items():
+                self.file_out = h5py.File(self.fname_out,'w')
+                self.file_out.attrs['ver'] = '0.1'
+                for key,val in self.params.items():
                     try:
-                        this.file_out.attrs[key] = val
+                        self.file_out.attrs[key] = val
                     except TypeError:
                         print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
                         print 'please reconsider your life choices'
@@ -660,7 +679,7 @@ class ProcessStack(object):
     def process_next_frame(self,pix_err = .03):
         '''process the next frame'''
         # get the curve from the previous 
-
+        
         curve = self.frames[-1][1].get_next_spline(pix_err=pix_err)
         frame_num = self.frames[-1][0]+1
         self._process_frame(curve,frame_num)
