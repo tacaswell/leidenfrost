@@ -18,29 +18,29 @@ from __future__ import division
 
 import hashlib
 import time
+import collections
+import warnings
 
-
-
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy.linalg as nl
+import matplotlib.pyplot as plt
 import scipy
 import scipy.ndimage
 import scipy.interpolate as sint
 import scipy.interpolate as si
 import scipy.odr as sodr
-import h5py
 
+import h5py
 import cine
 from trackpy.tracking import Point
 from trackpy.tracking import Track
 import find_peaks.peakdetect as pd
 import trackpy.tracking as pt
 
-import warnings
 
 
 
+FilePath = collections.namedtuple('FilePath',['base_path','path','fname'])
 
 class hash_line_angular(object):
     '''1D hash table with linked ends for doing the ridge linking
@@ -584,6 +584,35 @@ def _read_frame_tracks_from_file_res(parent_group):
     return res_lst
 
 
+
+
+def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
+    for s in ProcessStack.req_args_lst:
+        if s not in params:
+            raise RuntimeError('Necessary key ' + s + ' not included')
+    proc_path = '/'.join(h5_fname[:1]
+    if not os.path.exists(proc_path):
+        os.makedirs(proc_path,0751)        
+
+    file_out = h5py.File('/'.join(h5_fname),'w-')
+    
+    file_out.attrs['ver'] = '0.1'
+    for key,val in params.items():
+        try:
+            file_out.attrs[key] = val
+        except TypeError:
+            print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
+            print 'please reconsider your life choices'
+        except Exception as e:
+            print "FAILURE WITH HDF: " + e.__str__()
+               
+    file_out.attrs['cine_path'] = cine_fname['path']
+    file_out.attrs['cine_fname'] = cine_fname['fname']
+
+    if seed_curve is not None:
+        seed_curve.write_to_hdf(file_out)
+    file_out.close()
+    
     
 
 class ProcessStack(object):
@@ -593,25 +622,23 @@ class ProcessStack(object):
         
         self.params = {}                  # the parameters to feed to proc_frame
 
-        self.cine_base_path = None        # the base path of the cine file
-        self.cine_path = None             # the path of the cine file
-        self.cine_name = None             # the name of the cine file
+        self.cine_fname = FilePath(None,None,None)   # file name
         self.cine_ = None                 # the cine object
 
         self.back_img = None              # back ground image for normalization
         
-        self.h5_name = None               # name of the h5 file to write to, if None does not write out
+        self.h5_fname = None              # name of the h5 file to write to, if None does not write out
         self.file_out = None              # the h5 file object
 
         self.seed_curve = None            # the curve to use for the first frame
 
         
     @classmethod
-    def from_hdf_file(cls,cine_base_path,fname):
+    def from_hdf_file(cls,cine_base_path,h5_fname):
         ''' Sets up object to process data based on MD in an hdf file.
         '''
         self = cls()
-        tmp_file = h5py.File(fname,'r+')
+        tmp_file = h5py.File('/'.join(h5_fname),'r+')
         keys_lst = tmp_file.attrs.keys()
         lc_req_args = ['tck0','tck1','tck2','center']
         for s in cls.req_args_lst + lc_req_args:
@@ -624,21 +651,23 @@ class ProcessStack(object):
         for k in lc_req_args:
             del self.params[k]
 
-        self.cine_base_path = cine_base_path
-        self.cine_path = self.params.pop('cine_path')
-        self.cine_name = self.params.pop('cine_name')
-        self.cine_ = cine.Cine(self.cine_base_path + self.cine_path + self.cine_name)
+        self.cine_fname['base_path'] = cine_base_path
+        self.cine_fname['path'] = self.params.pop('cine_path')
+        self.cine_fname['fname'] = self.params.pop('cine_name')
+        self.cine_ = cine.Cine('/'.join(self.cine_fname)
 
-        self.back_img = gen_bck_img(self.cine_base_path + self.cine_path + self.cine_name)
-
-        self.h5_name = fname
-        self.file_out = tmp_file
+        self.back_img = gen_bck_img('/'.join(self.cine_fname)
 
         self.seed_curve = SplineCurve.from_hdf(tmp_file)
+        
+        self.h5_fname = h5_fname
+        self.file_out = tmp_file
+
+
         pass
 
     @classmethod
-    def from_args(cls,new_pts,cine_base_path,*args,**kwargs):
+    def from_args(cls,new_pts,cine_fname,h5_fname=None,*args,**kwargs):
         self = cls()
         '''Sets up the object based on arguments
         '''
@@ -653,37 +682,25 @@ class ProcessStack(object):
         except KeyError:
             self.bck_img = None
                     
-
-        self.cine_base_path = cine_base_path
-
-        self.cine_path = self.params['cine_path']
-        self.cine_name = self.params['cine_name']
+        self.cine_fname = cine_fname
                 
-        self.cine_ = cine.Cine(self.cine_base_path + self.cine_path + self.cine_name)
+        self.cine_ = cine.Cine('/'.join(self.cine_fname)
 
         if self.bck_img is None:
-            self.bck_img = gen_bck_img(self.cine_base_path + self.cine_path + self.cine_name)
+            self.bck_img = gen_bck_img('/'.join(self.cine_fname)
         
-        try:
-            self.h5_name = self.params.pop('fname_out')
-        except KeyError:
-            self.fname_out = None
 
-        if self.h5_name is not None:
-            print 'making h5file'
-            try:
-                self.file_out = h5py.File(self.h5_name,'w')
-                self.file_out.attrs['ver'] = '0.1'
-                for key,val in self.params.items():
-                    try:
-                        self.file_out.attrs[key] = val
-                    except TypeError:
-                        print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
-                        print 'please reconsider your life choices'
-            except Exception as e:
-                print "FAILURE WITH HDF: " + e.__str__()
-                
         self.seed_curve = SplineCurve.from_pts(new_pts)        
+
+        self.h5_fname = h5_fname
+        if self.h5_fname is not None:
+            print 'making h5file'
+            gen_stub_h5(cine_fname,h5_fname,self.params,self.seed_curve)
+            self.file_out = h5py.File('/'.join(h5_fname),'r+')
+        else:
+            self.file_out = None
+            
+
         return this
             
     def process_next_frame(self):
