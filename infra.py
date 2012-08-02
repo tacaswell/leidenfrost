@@ -590,7 +590,7 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
     for s in ProcessStack.req_args_lst:
         if s not in params:
             raise RuntimeError('Necessary key ' + s + ' not included')
-    proc_path = '/'.join(h5_fname[:1]
+    proc_path = '/'.join(h5_fname[:1])
     if not os.path.exists(proc_path):
         os.makedirs(proc_path,0751)        
 
@@ -654,9 +654,9 @@ class ProcessStack(object):
         self.cine_fname['base_path'] = cine_base_path
         self.cine_fname['path'] = self.params.pop('cine_path')
         self.cine_fname['fname'] = self.params.pop('cine_name')
-        self.cine_ = cine.Cine('/'.join(self.cine_fname)
+        self.cine_ = cine.Cine('/'.join(self.cine_fname))
 
-        self.back_img = gen_bck_img('/'.join(self.cine_fname)
+        self.back_img = gen_bck_img('/'.join(self.cine_fname))
 
         self.seed_curve = SplineCurve.from_hdf(tmp_file)
         
@@ -684,10 +684,10 @@ class ProcessStack(object):
                     
         self.cine_fname = cine_fname
                 
-        self.cine_ = cine.Cine('/'.join(self.cine_fname)
+        self.cine_ = cine.Cine('/'.join(self.cine_fname))
 
         if self.bck_img is None:
-            self.bck_img = gen_bck_img('/'.join(self.cine_fname)
+            self.bck_img = gen_bck_img('/'.join(self.cine_fname))
         
 
         self.seed_curve = SplineCurve.from_pts(new_pts)        
