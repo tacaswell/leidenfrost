@@ -20,6 +20,7 @@ import hashlib
 import time
 import collections
 import warnings
+import os
 
 import numpy as np
 import numpy.linalg as nl
@@ -590,7 +591,8 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
     for s in ProcessStack.req_args_lst:
         if s not in params:
             raise RuntimeError('Necessary key ' + s + ' not included')
-    proc_path = '/'.join(h5_fname[:1])
+    proc_path = '/'.join(h5_fname[:2])
+    print proc_path
     if not os.path.exists(proc_path):
         os.makedirs(proc_path,0751)        
 
@@ -606,8 +608,8 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
         except Exception as e:
             print "FAILURE WITH HDF: " + e.__str__()
                
-    file_out.attrs['cine_path'] = cine_fname['path']
-    file_out.attrs['cine_fname'] = cine_fname['fname']
+    file_out.attrs['cine_path'] = cine_fname.path
+    file_out.attrs['cine_fname'] = cine_fname.fname
 
     if seed_curve is not None:
         seed_curve.write_to_hdf(file_out)
@@ -616,16 +618,17 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
     
 
 class ProcessStack(object):
-    req_args_lst = ['search_range','cine_path','cine_name','s_width','s_num','pix_err']
+    req_args_lst = ['search_range','s_width','s_num','pix_err']
+
     def __init__(self):
         self.frames = []                  # list of the frames processed
         
         self.params = {}                  # the parameters to feed to proc_frame
 
-        self.cine_fname = FilePath(None,None,None)   # file name
+        self.cine_fname = None   # file name
         self.cine_ = None                 # the cine object
 
-        self.back_img = None              # back ground image for normalization
+        self.bck_img = None              # back ground image for normalization
         
         self.h5_fname = None              # name of the h5 file to write to, if None does not write out
         self.file_out = None              # the h5 file object
@@ -651,12 +654,10 @@ class ProcessStack(object):
         for k in lc_req_args:
             del self.params[k]
 
-        self.cine_fname['base_path'] = cine_base_path
-        self.cine_fname['path'] = self.params.pop('cine_path')
-        self.cine_fname['fname'] = self.params.pop('cine_name')
+        self.cine_fname = FilePath(cine_base_path,self.params.pop('cine_path'),self.params.pop('cine_fname'))
         self.cine_ = cine.Cine('/'.join(self.cine_fname))
 
-        self.back_img = gen_bck_img('/'.join(self.cine_fname))
+        self.bck_img = gen_bck_img('/'.join(self.cine_fname))
 
         self.seed_curve = SplineCurve.from_hdf(tmp_file)
         
@@ -664,15 +665,15 @@ class ProcessStack(object):
         self.file_out = tmp_file
 
 
-        pass
+        return self
 
     @classmethod
     def from_args(cls,new_pts,cine_fname,h5_fname=None,*args,**kwargs):
         self = cls()
         '''Sets up the object based on arguments
         '''
-        
-        for s in cls.req_args_lst:
+        h5_req_args = ['cine_path','cine_name']
+        for s in cls.req_args_lst + h5_req_args:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
 
@@ -708,31 +709,39 @@ class ProcessStack(object):
         # get the curve from the previous 
         if len(self.frames) == 0:
             curve = self.seed_curve
-            frame_num = 0
+            frame_number = 0
         else:
             curve = self.frames[-1].get_next_spline(pix_err=self.params['pix_err'])
-            frame_num = self.frames[-1].frame_num + 1
+            frame_number = self.frames[-1].frame_number + 1
 
         # get the raw data, and convert to float
-        tmp_img = np.array(self.cine_.get_frame(frame_num),dtype='float')
+        tmp_img = np.array(self.cine_.get_frame(frame_number),dtype='float')
         # if 
         if self.bck_img is not None:
+            print 'normed'
             tmp_img /= self.bck_img
         tm,trk_res,tim,tam,miv,mav = proc_frame(curve,tmp_img,**self.params)
         
-        mbe = MemBackendFrame(curve,frame_num,res = trk_res,trk_lst = [tim,tam])
+        mbe = MemBackendFrame(curve,frame_number,res = trk_res,trk_lst = [tim,tam])
         mbe.tm = tm
         if self.file_out is not None:
             mbe.write_to_hdf(self.file_out,clean=True)
         self.frames.append(mbe)     
 
-    def get_frame(self,frame_num):
-        if frame_num < len(self.frames):
-            return self.frames[frame_num]
-        while self.frames[-1].frame_num < frame_num:
+    def get_frame(self,frame_number):
+        if frame_number < len(self.frames):
+            return self.frames[frame_number]
+        
+        while len(self.frames) == 0  or  self.frames[-1].frame_number < frame_number:
             self.process_next_frame()
         return self.frames[-1]
 
+    def __del__(self):
+        if self.file_out is not None:
+            self.file_out.close()
+            self.file_out = None
+
+            
 class MemBackendFrame(object):
     """A class for keeping all of the relevant results about a frame in memory
 
@@ -741,16 +750,17 @@ class MemBackendFrame(object):
      - add logic to generate res from raw
      - add visualization code to this object
     """
-    def __init__(self,curve,frame_number,res=None,trk_lst=None,*args,**kwarg):
+    def __init__(self,curve,frame_number,res,trk_lst=None,img = None,*args,**kwarg):
         self.curve = curve
         self.res = res
         self.trk_lst =trk_lst
         self.frame_number = frame_number
         self.next_curve = None
+        self.img = img
         new_res = []
         for t_ in self.res:
             tmp = ~np.isnan(t_[0])
-            tmp_lst = [r_[tmp] for r_ in t_]
+            tmp_lst = [np.array(r)[tmp] for r in t_]
             new_res.append(tuple(tmp_lst))
         self.res = new_res
         
@@ -790,11 +800,12 @@ class MemBackendFrame(object):
         self.next_curve = new_curve
         return new_curve
 
-    def plot_tracks(self,img,min_len = 0):
+    def plot_tracks(self,min_len = 0):
         fig = plt.figure();
         ax = fig.gca()
-        c_img = ax.imshow(img,cmap=plt.get_cmap('jet'),interpolation='nearest');
-        c_img.set_clim([.5,1.5])
+        if self.img is not None:
+            c_img = ax.imshow(self.img,cmap=plt.get_cmap('jet'),interpolation='nearest');
+            c_img.set_clim([.5,1.5])
         color_cycle = ['r','b']
         for tk_l,c in zip(self.trk_lst,color_cycle):
             [t.plot_trk_img(self.curve.tck,self.curve.center,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len ];
@@ -812,18 +823,17 @@ class MemBackendFrame(object):
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
-    def __init__(self,fname,*args,**kwargs):
-        self.file = h5py.File(fname,'r')
+    def __init__(self,fname,cine_base_path = None,*args,**kwargs):
+        self.file = h5py.File('/'.join(fname),'r')
         self.raw = True
         self.res = True
-        self.cine_fname = self.file.attrs['fname']
-
-        try:
+        self.bck_img = None
+        if cine_base_path is not None:
+            self.cine_fname = cine_base_path + '/' + self.file.attrs['cine_path'] + '/' + self.file.attrs['cine_fname']
             self.cine = cine.Cine(self.cine_fname)
-        except IOError:
-            if 'ver' not in self.file.attrs:
-                self.cine_fname = self.cine_fname.replace('leidenfrost_b','leidenfrost_a')
-            self.cine = cine.Cine(self.cine_fname)
+        else:
+            self.cine_fname = None
+            self.cine = None
         self.frames = {}
         pass
 
@@ -833,13 +843,18 @@ class HdfBackend(object):
         if frame_num not in self.frames:
             trk_lst = None
             res = None
+            img = None
             g = self.file['frame_%05d'%frame_num]
             if self.raw:
                 trk_lst = _read_frame_tracks_from_file_raw(g)
             if self.res:
                 res = _read_frame_tracks_from_file_res(g)
             curve = SplineCurve.from_hdf(g)
-            self.frames[frame_num] = MemBackendFrame(curve,frame_num,res,trk_lst)
+            if self.cine is not None:
+                img = np.array(self.cine.get_frame(frame_num),dtype='float')
+                if self.bck_img is not None:
+                    img /= self.bck_img
+            self.frames[frame_num] = MemBackendFrame(curve,frame_num,res,trk_lst,img=img)
         return self.frames[frame_num]
     def gen_back_img(self):
         if self.cine_fname is not None:
