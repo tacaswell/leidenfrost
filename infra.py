@@ -172,7 +172,14 @@ class lf_Track(Track):
             self.q = None
             self.phi = None
             return
-
+        
+        # if the track does not straddle the seed curve, probably junk
+        if np.min(q) > 1 or np.max(q) < 1:
+            self.charge =  None
+            self.q = None
+            self.phi = None
+            return
+        
         a = np.vstack([q**2,q,np.ones(np.size(q))]).T
         X,res,rnk,s = nl.lstsq(a,phi)
         phif = a.dot(X)
@@ -302,7 +309,7 @@ class lf_Track(Track):
 
 
 
-def get_spline(points,point_count=None,pix_err = 2):
+def get_spline(points,point_count=None,pix_err = 2,**kwargs):
     '''
     Returns a closed spline for the points handed in.  Input is assumed to be a (2xN) array
 
@@ -328,6 +335,7 @@ def get_spline(points,point_count=None,pix_err = 2):
     center
        The center of mass the initial points
     '''
+
     if type(points) is np.ndarray:
         # make into a list
         pt_lst = zip(*points)
@@ -353,9 +361,10 @@ def get_spline(points,point_count=None,pix_err = 2):
     # do spline fitting
 
     tck,u = si.splprep(pt_array,s=len(pt_lst)*(pix_err**2),per=True)
-    if point_count is None:
-        point_count = len(pt_lst) -1
-    new_pts = si.splev(np.linspace(0,1,point_count),tck)
+    if point_count is not None:
+        new_pts = si.splev(np.linspace(0,1,point_count),tck)
+    else:
+        new_pts = []
     pt_lst.pop(-1)
     return new_pts,tck,center
 
@@ -619,7 +628,11 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
 
 class ProcessStack(object):
     req_args_lst = ['search_range','s_width','s_num','pix_err']
-
+    def __len__(self):
+        if self.cine_ is not None:
+            return len(self.cine_)
+        else:
+            return 0
     def __init__(self):
         self.frames = []                  # list of the frames processed
         
@@ -644,7 +657,8 @@ class ProcessStack(object):
         tmp_file = h5py.File('/'.join(h5_fname),'r+')
         keys_lst = tmp_file.attrs.keys()
         lc_req_args = ['tck0','tck1','tck2','center']
-        for s in cls.req_args_lst + lc_req_args:
+        h5_req_args = ['cine_path','cine_fname']
+        for s in cls.req_args_lst + lc_req_args + h5_req_args:
             if s not in keys_lst:
                 tmp_file.close()
                 raise Exception("missing required argument %s"%s)
@@ -668,12 +682,12 @@ class ProcessStack(object):
         return self
 
     @classmethod
-    def from_args(cls,new_pts,cine_fname,h5_fname=None,*args,**kwargs):
+    def from_args(cls,curve,cine_fname,h5_fname=None,*args,**kwargs):
         self = cls()
         '''Sets up the object based on arguments
         '''
-        h5_req_args = ['cine_path','cine_name']
-        for s in cls.req_args_lst + h5_req_args:
+
+        for s in cls.req_args_lst:
             if s not in kwargs:
                 raise Exception("missing required argument %s"%s)
 
@@ -691,7 +705,7 @@ class ProcessStack(object):
             self.bck_img = gen_bck_img('/'.join(self.cine_fname))
         
 
-        self.seed_curve = SplineCurve.from_pts(new_pts)        
+        self.seed_curve = curve
 
         self.h5_fname = h5_fname
         if self.h5_fname is not None:
@@ -702,7 +716,7 @@ class ProcessStack(object):
             self.file_out = None
             
 
-        return this
+        return self
             
     def process_next_frame(self):
         '''process the next frame'''
@@ -711,22 +725,22 @@ class ProcessStack(object):
             curve = self.seed_curve
             frame_number = 0
         else:
-            curve = self.frames[-1].get_next_spline(pix_err=self.params['pix_err'])
+            curve = self.frames[-1].get_next_spline(**self.params)
             frame_number = self.frames[-1].frame_number + 1
 
         # get the raw data, and convert to float
         tmp_img = np.array(self.cine_.get_frame(frame_number),dtype='float')
         # if 
         if self.bck_img is not None:
-            print 'normed'
             tmp_img /= self.bck_img
         tm,trk_res,tim,tam,miv,mav = proc_frame(curve,tmp_img,**self.params)
         
-        mbe = MemBackendFrame(curve,frame_number,res = trk_res,trk_lst = [tim,tam])
+        mbe = MemBackendFrame(curve,frame_number,res = trk_res,trk_lst = [tim,tam],img = tmp_img)
         mbe.tm = tm
         if self.file_out is not None:
-            mbe.write_to_hdf(self.file_out,clean=True)
+            mbe.write_to_hdf(self.file_out,clean=True,**self.params)
         self.frames.append(mbe)     
+        return mbe
 
     def get_frame(self,frame_number):
         if frame_number < len(self.frames):
@@ -757,6 +771,7 @@ class MemBackendFrame(object):
         self.frame_number = frame_number
         self.next_curve = None
         self.img = img
+        self.mix_in_count = None
         new_res = []
         for t_ in self.res:
             tmp = ~np.isnan(t_[0])
@@ -765,28 +780,33 @@ class MemBackendFrame(object):
         self.res = new_res
         
         pass
-    def get_next_spline(self,**kwargs):
-        if self.next_curve is not None:
+    def get_next_spline(self,mix_in_count=0,**kwargs):
+        if self.next_curve is not None and self.mix_in_count == mix_in_count:
             return self.next_curve
-            
+
+
         tim,tam = self.trk_lst
-           
+
+        # this is a parameter to forcibly mix in some sumber of 
+
         t_q = np.array([t.q for t in tim+tam if 
                         t.q is not None  
                         and t.phi is not None 
                         and t.charge is not None
-                        and t.charge != 0])
+                        and t.charge != 0] + 
+                        [1]*mix_in_count)
 
-        t_phi = np.array([t.phi for t in tim+tam if 
+        t_phi = np.array([np.mod(t.phi,(2*np.pi))/(2*np.pi) for t in tim+tam if 
                         t.q is not None  
                         and t.phi is not None 
                         and t.charge is not None
-                        and t.charge != 0])
+                        and t.charge != 0] +  
+                        list(np.linspace(0,1,mix_in_count,endpoint=False)))
 
         # seed the next round of points
 
         # get the (r,t) of _this_ frames spline
-        r,th = self.curve.sample_rt(np.mod(t_phi,2*np.pi)/(2*np.pi))
+        r,th = self.curve.sample_rt(t_phi)
         # scale the radius
         r *= t_q
         # sort by theta
@@ -798,6 +818,8 @@ class MemBackendFrame(object):
         new_curve = SplineCurve.from_pts(self.curve.rt_to_xy(r,th),**kwargs)
 
         self.next_curve = new_curve
+        self.mix_in_count = mix_in_count
+        
         return new_curve
 
     def plot_tracks(self,min_len = 0):
@@ -812,12 +834,12 @@ class MemBackendFrame(object):
         ax.plot(*self.curve.get_xy_samples(1000))
         plt.draw();
 
-    def write_to_hdf(self,parent_group,clean=False):
+    def write_to_hdf(self,parent_group,clean=False,**kwargs):
         print 'frame_%05d'%self.frame_number
         group = parent_group.create_group('frame_%05d'%self.frame_number)
         _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],self.curve)
         if clean:
-            self.get_next_spline()
+            self.get_next_spline(**kwargs)
             self.trk_lst = None
         pass
     
