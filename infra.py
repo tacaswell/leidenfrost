@@ -38,7 +38,7 @@ from trackpy.tracking import Track
 import find_peaks.peakdetect as pd
 import trackpy.tracking as pt
 
-
+import matplotlib.animation as animation
 
 
 FilePath = collections.namedtuple('FilePath',['base_path','path','fname'])
@@ -816,13 +816,18 @@ class MemBackendFrame(object):
         _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],self.curve)
         del group
 
+    def get_profile(self):
+        
+        return resample_track(self.res[:2])
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
     def __init__(self,fname,cine_base_path = None,*args,**kwargs):
+        self._iter_cur_item = -1
         self.file = h5py.File('/'.join(fname),'r')
+        self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
         self.raw = True
-        self.res = True
+        self.get_img = True
         if 'bck_img' in self.file.keys():
             self.bck_img = self.file['bck_img'][:]
         else:
@@ -833,34 +838,53 @@ class HdfBackend(object):
         else:
             self.cine_fname = None
             self.cine = None
-        self.frames = {}
-        pass
 
+        pass
+    def __len__(self):
+        return self.num_frames
     def __del__(self):
         self.file.close()
-    def get_frame(self,frame_num,*args,**kwargs):
-        if frame_num not in self.frames:
-            trk_lst = None
-            res = None
-            img = None
-            g = self.file['frame_%05d'%frame_num]
-            if self.raw:
-                trk_lst = _read_frame_tracks_from_file_raw(g)
-            if self.res:
-                res = _read_frame_tracks_from_file_res(g)
-            curve = SplineCurve.from_hdf(g)
+    def get_frame(self,frame_num,raw=None,get_img = None,*args,**kwargs):
+        trk_lst = None
+        img = None
+        g = self.file['frame_%05d'%frame_num]
+        if raw is None:
+            raw = self.raw
+        if raw:
+            trk_lst = _read_frame_tracks_from_file_raw(g)
+        if get_img is None:
+            get_img = self.get_img
+        if get_img:
             if self.cine is not None:
                 img = np.array(self.cine.get_frame(frame_num),dtype='float')
                 if self.bck_img is not None:
                     img /= self.bck_img
-            self.frames[frame_num] = MemBackendFrame(curve,frame_num,res,trk_lst,img=img)
-        return self.frames[frame_num]
+
+        res = _read_frame_tracks_from_file_res(g)
+        curve = SplineCurve.from_hdf(g)
+        return MemBackendFrame(curve,frame_num,res,trk_lst=trk_lst,img=img)
+        
+    
     def gen_back_img(self):
         if self.cine_fname is not None:
             self.bck_img = gen_bck_img(self.cine_fname)
-    
 
-            
+    def __iter__(self):
+        self._iter_cur_item = -1
+        return self
+
+    def next(self):
+        self._iter_cur_item += 1
+        if self._iter_cur_item >= self.num_frames:
+            raise StopIteration
+        else:
+            return self.get_frame(self._iter_cur_item)
+
+    def __getitem__(self, key):
+        if type(key) == slice:
+            return map(self.get_frame, range(self.num_frames)[key])
+
+        return self.get_frame(key)
 
 class SplineCurve(object):
     '''
@@ -1026,3 +1050,110 @@ def link_ridges(vec,search_range,memory=0,**kwargs):
 
     trks.sort(key=lambda x: x.phi)
     return trks
+
+
+def resample_track(data,pt_num = 250,interp_type = 'linear'):
+    '''re-samples the curve on uniform points and averages out tilt
+    due to fringe ID error'''
+
+    # get data out
+    ch,th = data
+    th = np.array(th)
+    ch = np.array(ch)
+    
+    # make negative points positive
+    th = np.mod(th,2*np.pi)
+    indx = th.argsort()
+    # re-order to be monotonic
+    th = th[indx]
+    ch = ch[indx]
+    # sum the charges
+    ch = np.cumsum(ch)
+
+    # figure out the miss/match
+    miss_cnt = ch[-1]
+    corr_ln =th*(miss_cnt/(2*np.pi)) 
+    # add a linear line to make it come back to 0
+    ch -= corr_ln
+
+    # make sure that the full range is covered
+    if th[0] != 0:
+        ch = np.concatenate((ch[:1],ch))
+        th = np.concatenate(([0],th))
+    if th[-1] < 2*np.pi:
+        ch = np.concatenate((ch,ch[:1]))
+        th = np.concatenate((th,[2*np.pi]))
+
+    # set up interpolation 
+    f = sint.interp1d(th,ch,kind=interp_type)
+    # set up new points
+    th_new = np.linspace(0,2*np.pi,pt_num)
+    # get new interpolated values
+    ch_new = f(th_new)
+    # subtract off mean
+    ch_new -=np.mean(ch_new)
+    return ch_new,th_new
+
+
+def animate_profile(data_iter):
+    def ln_helper(data,line,yscale = 1,xscale=1):
+        ch,th = data
+
+        th = np.asarray(th)
+        th = np.mod(th,2*np.pi)
+        ch = np.asarray(ch)
+        indx = th.argsort()
+
+        # re-order to be monotonic
+        th = th[indx]
+        ch = ch[indx]
+
+        ch = np.cumsum(ch)
+        miss_cnt = ch[-1]
+        corr_ln =th*(miss_cnt/(2*np.pi)) 
+        ch -= corr_ln
+        #        ch = concatenate([ch,ch[:50]])
+        ch -= np.mean(ch)
+        #        th = concatenate([th,asarray(th[:50])+2*pi])
+
+        line.set_xdata(th*xscale)
+        line.set_ydata(ch*yscale)
+
+
+
+        return miss_cnt
+
+    def update_lines(mbe,lines,txt,miss_txt):
+        txt.set_text('%0.3e s'%(mbe.frame_number*1/2900))
+
+        circ = mbe.curve.circumference()/(2*np.pi)*11
+
+        min_t,max_t = mbe.res
+        miss_min = ln_helper(min_t[:2],lines[0],yscale=.543/2,xscale=circ)
+
+        miss_max = ln_helper(max_t[:2],lines[1],yscale=.543/2,xscale=circ)
+
+        miss_bth = ln_helper([tuple(t) + tuple(tt) for t,tt in zip(max_t[:2],min_t[:2])],lines[2],yscale=.543/4,xscale=circ)
+
+        miss_txt.set_text("min miss: %(i)d max miss: %(a)d"%{'i':miss_min,'a':miss_max})
+        return (txt,miss_txt) + lines
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    tmp_ch = np.cumsum(data_iter[0].res[0][0])
+    tmp_ch -= np.mean(tmp_ch)
+    
+
+    lim = np.max(np.abs(tmp_ch))*(.543/4)*2
+    circ = data_iter[0].curve.circumference()*11
+    line1, = ax.plot([0,circ],[-lim ,lim],'o-r',label='mins')
+    line2, = ax.plot([0,circ],[-lim ,lim],'o-b',label='maxes')
+    line3, = ax.plot([0,circ],[-lim ,lim],'o-g',label='maxes')
+    ax.set_ylabel(r' height [$\mu$ m]')
+    ax.set_xlabel(r' position [$\mu$ m]')
+    fr_num = ax.text(.05,-lim*.95,'')
+    miss_txt = ax.text(.05,lim*.95,'')
+
+    #legend(loc=0)
+    prof_ani = animation.FuncAnimation(fig,update_lines,data_iter,fargs=((line2,line1,line3),fr_num,miss_txt),interval=100)
+    return prof_ani
