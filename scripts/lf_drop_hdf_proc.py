@@ -1,6 +1,7 @@
 import argparse
 import os
 import lf_drop.infra as li
+import h5py
 
 parser = argparse.ArgumentParser()
 parser.add_argument("cine_base_path",help="The base path for where the (cine) data files are located")
@@ -18,8 +19,15 @@ else:
 
 hdf_fname = li.FilePath(hdf_base_path,args.hdf_path,args.hdf_fname)
 
-stack = li.ProcessStack.from_hdf_file(cine_base_path,hdf_fname)
-try:
-    stack.get_frame(len(stack))
-finally:
-    del stack
+stack,seed_curve = li.ProcessBackend.from_hdf_file(cine_base_path,hdf_fname)
+file_out = h5py.File('/'.join(hdf_fname),'r+')
+
+for j in range(len(stack)):
+    mbe,seed_curve = stack.process_frame(j,seed_curve)
+    mbe.write_to_hdf(file_out)
+    del mbe
+    file_out.flush()
+
+
+file_out.close()
+

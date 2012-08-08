@@ -363,7 +363,10 @@ def get_spline(points,point_count=None,pix_err = 2,**kwargs):
     tck,u = si.splprep(pt_array,s=len(pt_lst)*(pix_err**2),per=True)
     if point_count is not None:
         new_pts = si.splev(np.linspace(0,1,point_count),tck)
+        center = np.mean(points,axis=1).reshape(2,1)
     else:
+        new_pts = si.splev(np.linspace(0,1,1000),tck)
+        center = np.mean(points,axis=1).reshape(2,1)
         new_pts = []
     pt_lst.pop(-1)
     return new_pts,tck,center
@@ -596,8 +599,8 @@ def _read_frame_tracks_from_file_res(parent_group):
 
 
 
-def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
-    for s in ProcessStack.req_args_lst:
+def gen_stub_h5(cine_fname,h5_fname,params,seed_curve,bck_img = None):
+    for s in ProcessBackend.req_args_lst:
         if s not in params:
             raise RuntimeError('Necessary key ' + s + ' not included')
     proc_path = '/'.join(h5_fname[:2])
@@ -607,7 +610,7 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
 
     file_out = h5py.File('/'.join(h5_fname),'w-')
     
-    file_out.attrs['ver'] = '0.1'
+    file_out.attrs['ver'] = '0.1.1'
     for key,val in params.items():
         try:
             file_out.attrs[key] = val
@@ -622,11 +625,18 @@ def gen_stub_h5(cine_fname,h5_fname,params,seed_curve):
 
     if seed_curve is not None:
         seed_curve.write_to_hdf(file_out)
+    if bck_img is not None:
+        file_out.create_dataset('bck_img',
+                                bck_img.shape,
+                                np.float,
+                                compression='szip')
+        file_out['bck_img'][:] = bck_img
+        
     file_out.close()
     
     
 
-class ProcessStack(object):
+class ProcessBackend(object):
     req_args_lst = ['search_range','s_width','s_num','pix_err']
     def __len__(self):
         if self.cine_ is not None:
@@ -642,11 +652,6 @@ class ProcessStack(object):
         self.cine_ = None                 # the cine object
 
         self.bck_img = None              # back ground image for normalization
-        
-        self.h5_fname = None              # name of the h5 file to write to, if None does not write out
-        self.file_out = None              # the h5 file object
-
-        self.seed_curve = None            # the curve to use for the first frame
 
         
     @classmethod
@@ -654,7 +659,7 @@ class ProcessStack(object):
         ''' Sets up object to process data based on MD in an hdf file.
         '''
         self = cls()
-        tmp_file = h5py.File('/'.join(h5_fname),'r+')
+        tmp_file = h5py.File('/'.join(h5_fname),'r')
         keys_lst = tmp_file.attrs.keys()
         lc_req_args = ['tck0','tck1','tck2','center']
         h5_req_args = ['cine_path','cine_fname']
@@ -671,18 +676,20 @@ class ProcessStack(object):
         self.cine_fname = FilePath(cine_base_path,self.params.pop('cine_path'),self.params.pop('cine_fname'))
         self.cine_ = cine.Cine('/'.join(self.cine_fname))
 
-        self.bck_img = gen_bck_img('/'.join(self.cine_fname))
 
-        self.seed_curve = SplineCurve.from_hdf(tmp_file)
+        if 'bck_img' in tmp_file.keys():
+            self.bck_img = tmp_file['bck_img'][:]
+        else:
+            self.bck_img = gen_bck_img('/'.join(self.cine_fname))
+
+        seed_curve = SplineCurve.from_hdf(tmp_file)
         
-        self.h5_fname = h5_fname
-        self.file_out = tmp_file
-
-
-        return self
+        tmp_file.close()
+        
+        return self,seed_curve
 
     @classmethod
-    def from_args(cls,curve,cine_fname,h5_fname=None,*args,**kwargs):
+    def from_args(cls,cine_fname,h5_fname=None,*args,**kwargs):
         self = cls()
         '''Sets up the object based on arguments
         '''
@@ -705,28 +712,12 @@ class ProcessStack(object):
             self.bck_img = gen_bck_img('/'.join(self.cine_fname))
         
 
-        self.seed_curve = curve
 
-        self.h5_fname = h5_fname
-        if self.h5_fname is not None:
-            print 'making h5file'
-            gen_stub_h5(cine_fname,h5_fname,self.params,self.seed_curve)
-            self.file_out = h5py.File('/'.join(h5_fname),'r+')
-        else:
-            self.file_out = None
-            
-
+        
         return self
             
-    def process_next_frame(self):
-        '''process the next frame'''
-        # get the curve from the previous 
-        if len(self.frames) == 0:
-            curve = self.seed_curve
-            frame_number = 0
-        else:
-            curve = self.frames[-1].get_next_spline(**self.params)
-            frame_number = self.frames[-1].frame_number + 1
+    def process_frame(self,frame_number,curve):
+
 
         # get the raw data, and convert to float
         tmp_img = np.array(self.cine_.get_frame(frame_number),dtype='float')
@@ -737,23 +728,8 @@ class ProcessStack(object):
         
         mbe = MemBackendFrame(curve,frame_number,res = trk_res,trk_lst = [tim,tam],img = tmp_img)
         mbe.tm = tm
-        if self.file_out is not None:
-            mbe.write_to_hdf(self.file_out,clean=True,**self.params)
-        self.frames.append(mbe)     
-        return mbe
 
-    def get_frame(self,frame_number):
-        if frame_number < len(self.frames):
-            return self.frames[frame_number]
-        
-        while len(self.frames) == 0  or  self.frames[-1].frame_number < frame_number:
-            self.process_next_frame()
-        return self.frames[-1]
-
-    def __del__(self):
-        if self.file_out is not None:
-            self.file_out.close()
-            self.file_out = None
+        return mbe,mbe.get_next_spline(**self.params)
 
             
 class MemBackendFrame(object):
@@ -787,7 +763,7 @@ class MemBackendFrame(object):
 
         tim,tam = self.trk_lst
 
-        # this is a parameter to forcibly mix in some sumber of 
+        # this is a parameter to forcibly mix in some number of points from the last curve
 
         t_q = np.array([t.q for t in tim+tam if 
                         t.q is not None  
@@ -826,7 +802,7 @@ class MemBackendFrame(object):
         fig = plt.figure();
         ax = fig.gca()
         if self.img is not None:
-            c_img = ax.imshow(self.img,cmap=plt.get_cmap('jet'),interpolation='nearest');
+            c_img = ax.imshow(self.img,cmap=plt.get_cmap('gray'),interpolation='nearest');
             c_img.set_clim([.5,1.5])
         color_cycle = ['r','b']
         for tk_l,c in zip(self.trk_lst,color_cycle):
@@ -834,14 +810,12 @@ class MemBackendFrame(object):
         ax.plot(*self.curve.get_xy_samples(1000))
         plt.draw();
 
-    def write_to_hdf(self,parent_group,clean=False,**kwargs):
+    def write_to_hdf(self,parent_group):
         print 'frame_%05d'%self.frame_number
         group = parent_group.create_group('frame_%05d'%self.frame_number)
         _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],self.curve)
-        if clean:
-            self.get_next_spline(**kwargs)
-            self.trk_lst = None
-        pass
+        del group
+
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
@@ -849,7 +823,10 @@ class HdfBackend(object):
         self.file = h5py.File('/'.join(fname),'r')
         self.raw = True
         self.res = True
-        self.bck_img = None
+        if 'bck_img' in self.file.keys():
+            self.bck_img = self.file['bck_img'][:]
+        else:
+            self.bck_img = None
         if cine_base_path is not None:
             self.cine_fname = cine_base_path + '/' + self.file.attrs['cine_path'] + '/' + self.file.attrs['cine_fname']
             self.cine = cine.Cine(self.cine_fname)
@@ -969,8 +946,12 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
     
     R = np.max(r_new)*(1+s_width)*1.1
     x_shift = int(x0-R)
+    if x_shift<0:
+        x_shift = 0
     x_lim = int(x0+R)
     y_shift = int(y0-R)
+    if y_shift < 0:
+        y_shift = 0
     y_lim = int(y0+R)
     dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
 
@@ -996,7 +977,6 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
 
         # select out the right region
         zv = zv_all[j*sample_count:(j+1)*sample_count] 
-
         # smooth the curve
         zv = l_smooth(zv,smooth_rng,'blackman')
 
