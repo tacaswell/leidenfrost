@@ -224,49 +224,6 @@ def set_up_efitter(fname,bck_img = None):
     return ef
 
 
-def resample_track(data,pt_num = 250,interp_type = 'linear'):
-    '''re-samples the curve on uniform points and averages out tilt
-    due to fringe ID error'''
-
-    # get data out
-    ch,th = data
-    th = np.array(th)
-    ch = np.array(ch)
-    
-    # make negative points positive
-    th = np.mod(th,2*np.pi)
-    indx = th.argsort()
-    # re-order to be monotonic
-    th = th[indx]
-    ch = ch[indx]
-    # sum the charges
-    ch = np.cumsum(ch)
-
-    # figure out the miss/match
-    miss_cnt = ch[-1]
-    corr_ln =th*(miss_cnt/(2*np.pi)) 
-    # add a linear line to make it come back to 0
-    ch -= corr_ln
-
-    # make sure that the full range is covered
-    if th[0] != 0:
-        ch = np.concatenate((ch[:1],ch))
-        th = np.concatenate(([0],th))
-    if th[-1] < 2*np.pi:
-        ch = np.concatenate((ch,ch[:1]))
-        th = np.concatenate((th,[2*np.pi]))
-
-    # set up interpolation 
-    f = sint.interp1d(th,ch,kind=interp_type)
-    # set up new points
-    th_new = np.linspace(0,2*np.pi,pt_num)
-    # get new interpolated values
-    ch_new = f(th_new)
-    # subtract off mean
-    ch_new -=np.mean(ch_new)
-    return ch_new,th_new
-
-
         
 class StackStorage(object):
     """

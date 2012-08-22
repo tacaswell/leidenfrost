@@ -42,6 +42,7 @@ import matplotlib.animation as animation
 
 
 FilePath = collections.namedtuple('FilePath',['base_path','path','fname'])
+HdfBEPram = collections.namedtuple('HdfBEPram',['raw','get_img'])
 
 class hash_line_angular(object):
     '''1D hash table with linked ends for doing the ridge linking
@@ -826,8 +827,7 @@ class HdfBackend(object):
         self._iter_cur_item = -1
         self.file = h5py.File('/'.join(fname),'r')
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
-        self.raw = True
-        self.get_img = True
+        self.prams = HdfBEPram(True,True)
         if 'bck_img' in self.file.keys():
             self.bck_img = self.file['bck_img'][:]
         else:
@@ -843,17 +843,18 @@ class HdfBackend(object):
     def __len__(self):
         return self.num_frames
     def __del__(self):
-        self.file.close()
+        if self.file:
+            self.file.close()
     def get_frame(self,frame_num,raw=None,get_img = None,*args,**kwargs):
         trk_lst = None
         img = None
         g = self.file['frame_%05d'%frame_num]
         if raw is None:
-            raw = self.raw
+            raw = self.prams.raw
         if raw:
             trk_lst = _read_frame_tracks_from_file_raw(g)
         if get_img is None:
-            get_img = self.get_img
+            get_img = self.prams.get_img
         if get_img:
             if self.cine is not None:
                 img = np.array(self.cine.get_frame(frame_num),dtype='float')
@@ -920,7 +921,7 @@ class SplineCurve(object):
         '''
         new_pts = self.get_xy_samples(sample_count)
         new_pts -= self.center
-        return np.sqrt(np.sum(new_pts**2,axis=0)).reshape(1,-1),np.arctan2(*(new_pts[::-1]))
+        return np.sqrt(np.sum(new_pts**2,axis=0)).reshape(1,-1),np.arctan2(*(new_pts[::-1])).reshape(1,-1)
 
     def write_to_hdf(self,parent_group):
         parent_group.attrs['tck0'] = self.tck[0]
