@@ -364,10 +364,10 @@ def get_spline(points,point_count=None,pix_err = 2,**kwargs):
     tck,u = si.splprep(pt_array,s=len(pt_lst)*(pix_err**2),per=True)
     if point_count is not None:
         new_pts = si.splev(np.linspace(0,1,point_count),tck)
-        center = np.mean(points,axis=1).reshape(2,1)
+        center = np.mean(new_pts,axis=1).reshape(2,1)
     else:
         new_pts = si.splev(np.linspace(0,1,1000),tck)
-        center = np.mean(points,axis=1).reshape(2,1)
+        center = np.mean(new_pts,axis=1).reshape(2,1)
         new_pts = []
     pt_lst.pop(-1)
     return new_pts,tck,center
@@ -900,8 +900,10 @@ class SplineCurve(object):
 
     @classmethod
     def from_hdf(cls,parent_group):
-        center = parent_group.attrs['center']
+        #        center = parent_group.attrs['center']
         tck = [parent_group.attrs['tck0'],parent_group.attrs['tck1'],parent_group.attrs['tck2']]
+        new_pts = si.splev(np.linspace(0,1,1000),tck)
+        center = np.mean(new_pts,axis=1).reshape(2,1)
         return cls(tck,center)
     
     def __init__(self,tck,center):
