@@ -829,7 +829,10 @@ class HdfBackend(object):
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
         self.prams = HdfBEPram(True,True)
         if 'bck_img' in self.file.keys():
-            self.bck_img = self.file['bck_img'][:]
+            try:
+                self.bck_img = self.file['bck_img'][:]
+            except:
+                self.bck_img = None
         else:
             self.bck_img = None
         if cine_base_path is not None:
@@ -838,7 +841,8 @@ class HdfBackend(object):
         else:
             self.cine_fname = None
             self.cine = None
-
+        if self.bck_img is None and self.cine is not None:
+            self.gen_back_img()
         pass
     def __len__(self):
         return self.num_frames
