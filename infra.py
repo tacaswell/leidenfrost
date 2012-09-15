@@ -120,22 +120,9 @@ class lf_Track(Track):
             kwargs['color'] = 'c'
 
         ax.plot(*zip(*[(p.q,p.phi) for p in self.points]) ,**kwargs)
-    def plot_trk_img(self,tck,center,ax,**kwargs):
-        if len(self.points) <2:
-            return
-        new_pts = si.splev(np.array([np.mod(p.phi,2*np.pi)/(2*np.pi) for p in self.points]),tck)
-        
-
-        new_pts -= center
-
-        th = np.arctan2(*(new_pts[::-1]))
-
-        # compute radius
-        r = np.sqrt(np.sum(new_pts**2,axis=0))
-
-        r *= np.array([p.q for p in self.points])
-
-        zp_all = np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + center
+    def plot_trk_img(self,curve,ax,**kwargs):
+        q,phi = zip(*[(p.q,p.phi) for p in self.points])
+        x,y = curve.q_phi_to_xy(q,phi)
         
         if self.charge is None:
             kwargs['marker'] = '*'
@@ -150,7 +137,7 @@ class lf_Track(Track):
         if 'markersize' not in kwargs:
             kwargs['markersize'] = 7.5
             
-        ax.plot(*zp_all,**kwargs)
+        ax.plot(x,y,**kwargs)
     def classify2(self,min_len = None,min_extent = None,**kwargs):
         ''' second attempt at the classify function''' 
         phi,q = zip(*[(p.phi,p.q) for p in self.points])
@@ -807,7 +794,7 @@ class MemBackendFrame(object):
             c_img.set_clim([.5,1.5])
         color_cycle = ['r','b']
         for tk_l,c in zip(self.trk_lst,color_cycle):
-            [t.plot_trk_img(self.curve.tck,self.curve.center,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len ];
+            [t.plot_trk_img(self.curve,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len ];
         ax.plot(*self.curve.get_xy_samples(1000))
         plt.draw();
 
@@ -952,7 +939,15 @@ class SplineCurve(object):
     def rt_to_xy(self,r,th):
         '''converts (r,t) coords to (x,y)'''
         return np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + self.center
-        
+
+    def q_phi_to_xy(self,q,phi):
+        '''Converts q,phi pairs -> x,y pairs.  All other code that
+        does this should move to using this so that there is minimal
+        breakage when we change over to using additive q instead of
+        multiplicative'''
+        r,th = self.sample_rt(np.mod(phi,2*np.pi)/(2*np.pi))
+        r*=q
+        return self.rt_to_xy(r,th)
 
         
 
@@ -1057,6 +1052,7 @@ def link_ridges(vec,search_range,memory=0,**kwargs):
 
     trks.sort(key=lambda x: x.phi)
     return trks
+
 
 
 def resample_track(data,pt_num = 250,interp_type = 'linear'):
