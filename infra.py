@@ -808,9 +808,32 @@ class MemBackendFrame(object):
         _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],self.curve)
         del group
 
-    def get_profile(self):
+    # this code is broken
+    # def get_profile(self):
+    #     return resample_track(self.get_profile_raw())
+    
+    # def get_profile_raw(self):
+    #     th,ch = self.res[0][:2]
+    #     th = np.array(th)
+    #     ch = np.array(ch)
         
-        return resample_track(self.res[:2])
+    #     # make negative points positive
+    #     th = np.mod(th,2*np.pi)
+    #     indx = th.argsort()
+    #     # re-order to be monotonic
+    #     th = th[indx]
+    #     ch = ch[indx]
+    #     # sum the charges
+    #     ch = np.cumsum(ch)
+        
+    #     # figure out the miss/match
+    #     miss_cnt = ch[-1]
+    #     corr_ln =th*(miss_cnt/(2*np.pi)) 
+    #     # add a linear line to make it come back to 0
+    #     ch -= corr_ln
+    #     return th,ch
+
+             
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
