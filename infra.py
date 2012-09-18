@@ -1081,12 +1081,8 @@ def link_ridges(vec,search_range,memory=0,**kwargs):
     return trks
 
 
-
-def resample_track(data,pt_num = 250,interp_type = 'linear'):
-    '''re-samples the curve on uniform points and averages out tilt
-    due to fringe ID error'''
-
-    # get data out
+def construct_corrected_profile(data):
+    '''Takes in [ch,th] and return [delta_h,th].  Flattens '''
     ch,th = data
     th = np.array(th)
     ch = np.array(ch)
@@ -1094,17 +1090,32 @@ def resample_track(data,pt_num = 250,interp_type = 'linear'):
     # make negative points positive
     th = np.mod(th,2*np.pi)
     indx = th.argsort()
+    rindx = indx.argsort()
     # re-order to be monotonic
     th = th[indx]
     ch = ch[indx]
     # sum the charges
-    ch = np.cumsum(ch)
+    delta_h = np.cumsum(ch - np.hstack((ch[0] - ch[-1],np.diff(ch)))/2)
 
     # figure out the miss/match
-    miss_cnt = ch[-1]
-    corr_ln =th*(miss_cnt/(2*np.pi)) 
+    miss_cnt = delta_h[-1]
+    # the first and last fringes should be off by one, choose up or down based on which side it missed on
+
+    if ch[0] == ch[-1]:
+        miss_cnt -= ch[0]
+    
+    corr_ln = th*(miss_cnt/(2*np.pi)) 
     # add a linear line to make it come back to 0
-    ch -= corr_ln
+    delta_h -= corr_ln
+    delta_h -= np.mean(delta_h)
+    return delta_h[rindx],th[rindx]
+
+def resample_track(data,pt_num = 250,interp_type = 'linear'):
+    '''re-samples the curve on uniform points and averages out tilt
+    due to fringe ID error'''
+
+    # get data out
+    ch,th = data
 
     # make sure that the full range is covered
     if th[0] != 0:
