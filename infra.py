@@ -840,10 +840,32 @@ class MemBackendFrame(object):
         th = th.ravel()
         return th[0]
 
+
+def change_base_path(fpath,new_base_path):
+    '''Returns a new FilePath object with a different base_path entry '''
+    return FilePath(new_base_path,fpath.path,fpath.fname)
+    
+def copy_to_buffer_disk(fname,buffer_base_path):
+    '''fname is a FilePath (or a 3 tuple with the layout (base_path,path,fname) '''
+    new_fname = change_base_path(fname,buffer_base_path)
+    buff_path = '/'.join(new_fname[:2])
+    ensure_path_exists(buff_path)
+    src_fname = '/'.join(fname)
+    buf_fname = '/'.join(new_fname)
+    if not os.path.exists(buf_fname) :
+        shutils.copy2(src_fname,buf_fname)
+    return new_fname
+
+def ensure_path_exists(path):
+    '''ensures that a given path exists, throws error if path points to a file'''
+    if not os.path.exists(h5_buff_path):
+        os.makedirs(h5_buff_path)    
+    if os.path.isfile(h5_buff_path):
+        raise Exception("there is a file where you think there is a path you clod!")
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
-    def __init__(self,fname,cine_base_path = None,*args,**kwargs):
+    def __init__(self,fname,cine_base_path = None,h5_buffer_base_path = None, cine_buffer_base_path=None,*args,**kwargs):
         self._iter_cur_item = -1
         self.file = h5py.File('/'.join(fname),'r')
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
