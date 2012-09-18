@@ -292,7 +292,11 @@ class lf_Track(Track):
         if self.charge is not None:
             self.classify()
 
+    def get_xy(self,curve):
+        """Returns the (x,y) coordinates of the points on the track
+        based on the conversion using curve"""
 
+        return curve.q_phi_to_xy(*zip(*[(p.q,p.phi) for p in self.points]))
 
 
 
