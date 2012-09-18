@@ -834,6 +834,12 @@ class MemBackendFrame(object):
     #     return th,ch
 
              
+
+    def get_theta_offset(self):
+        r,th = self.curve.get_rt_samples(2)
+        th = th.ravel()
+        return th[0]
+
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
@@ -1198,3 +1204,28 @@ def animate_profile(data_iter):
     #legend(loc=0)
     prof_ani = animation.FuncAnimation(fig,update_lines,data_iter,fargs=((line2,line1,line3),fr_num,miss_txt),interval=100)
     return prof_ani
+
+
+class FringeRing(object):
+    '''
+    A class to carry around and work with the location of fringes for
+    the purpose of tracking a fixed height faring from frame to frame. 
+    '''
+    def __init__(self,theta,charge,th_offset = 0,ringID = None):
+        
+        th_new,sum_charge = construct_corrected_profile(theta,charge,th_offset)
+        self.fringes = []
+        for th,h in zip(th_new,sum_charge):
+            self.fringes.append(Point1D_circ(ringID, th,h))
+
+    def __iter__(self):
+        return self.fringes.__iter__()
+
+
+
+def get_rf(hf,j):
+    mbe = hf[j]
+    th_offset = mbe.get_theta_offset()
+    rf = FringeRing(mbe.res[0][1],mbe.res[0][0],th_offset=th_offset,ringID = j)
+    return rf
+
