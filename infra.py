@@ -39,7 +39,7 @@ import find_peaks.peakdetect as pd
 import trackpy.tracking as pt
 
 import matplotlib.animation as animation
-
+import shutil
 
 FilePath = collections.namedtuple('FilePath',['base_path','path','fname'])
 HdfBEPram = collections.namedtuple('HdfBEPram',['raw','get_img'])
@@ -847,29 +847,37 @@ def change_base_path(fpath,new_base_path):
     
 def copy_to_buffer_disk(fname,buffer_base_path):
     '''fname is a FilePath (or a 3 tuple with the layout (base_path,path,fname) '''
+    if os.path.abspath(fname.base_path) == os.path.abspath(buffer_base_path):
+        raise Exception("can not buffer to self!!")
     new_fname = change_base_path(fname,buffer_base_path)
     buff_path = '/'.join(new_fname[:2])
     ensure_path_exists(buff_path)
     src_fname = '/'.join(fname)
     buf_fname = '/'.join(new_fname)
     if not os.path.exists(buf_fname) :
-        shutils.copy2(src_fname,buf_fname)
+        shutil.copy2(src_fname,buf_fname)
     return new_fname
 
 def ensure_path_exists(path):
     '''ensures that a given path exists, throws error if path points to a file'''
-    if not os.path.exists(h5_buff_path):
-        os.makedirs(h5_buff_path)    
-    if os.path.isfile(h5_buff_path):
+    if not os.path.exists(path):
+        os.makedirs(path)    
+    if os.path.isfile(path):
         raise Exception("there is a file where you think there is a path you clod!")
     
 class HdfBackend(object):
     """A class that wraps around an HDF results file"""
     def __init__(self,fname,cine_base_path = None,h5_buffer_base_path = None, cine_buffer_base_path=None,*args,**kwargs):
         self._iter_cur_item = -1
+        self.buffers = []
+        self.file = None
+        if h5_buffer_base_path is not None:
+            fname = copy_to_buffer_disk(fname,h5_buffer_base_path)
+            self.buffers.append(fname)
         self.file = h5py.File('/'.join(fname),'r')
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
         self.prams = HdfBEPram(True,True)
+
         if 'bck_img' in self.file.keys():
             try:
                 self.bck_img = self.file['bck_img'][:]
@@ -878,8 +886,11 @@ class HdfBackend(object):
         else:
             self.bck_img = None
         if cine_base_path is not None:
-            self.cine_fname = cine_base_path + '/' + self.file.attrs['cine_path'] + '/' + self.file.attrs['cine_fname']
-            self.cine = cine.Cine(self.cine_fname)
+            self.cine_fname = FilePath(cine_base_path, self.file.attrs['cine_path'],self.file.attrs['cine_fname'])
+            if cine_buffer_base_path is not None:
+                self.cine_fname = copy_to_buffer_disk(self.cine_fname,cine_buffer_base_path)
+                self.buffers.append(self.cine_fname)
+            self.cine = cine.Cine('/'.join(self.cine_fname))
         else:
             self.cine_fname = None
             self.cine = None
@@ -891,6 +902,11 @@ class HdfBackend(object):
     def __del__(self):
         if self.file:
             self.file.close()
+        for f in self.buffers:
+            print 'removing ' + '/'.join(f)
+            os.remove('/'.join(f))
+
+
     def get_frame(self,frame_num,raw=None,get_img = None,*args,**kwargs):
         trk_lst = None
         img = None
