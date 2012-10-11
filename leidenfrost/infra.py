@@ -1125,14 +1125,14 @@ def link_ridges(vec,search_range,memory=0,**kwargs):
     return trks
 
 
-def construct_corrected_profile(data):
+def construct_corrected_profile(data,th_offset = 0):
     '''Takes in [ch,th] and return [delta_h,th].  Flattens '''
     ch,th = data
     th = np.array(th)
     ch = np.array(ch)
     
     # make negative points positive
-    th = np.mod(th,2*np.pi)
+    th = np.mod(th+th_offset,2*np.pi)
     indx = th.argsort()
     rindx = indx.argsort()
     # re-order to be monotonic
@@ -1251,7 +1251,7 @@ class FringeRing(object):
     '''
     def __init__(self,theta,charge,th_offset = 0,ringID = None):
         
-        th_new,sum_charge = construct_corrected_profile(theta,charge,th_offset)
+        th_new,sum_charge = construct_corrected_profile((theta,charge),th_offset)
         self.fringes = []
         for th,h in zip(th_new,sum_charge):
             self.fringes.append(Point1D_circ(ringID, th,h))
