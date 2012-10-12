@@ -99,6 +99,14 @@ class Point1D_circ(Point):
             d = np.abs(2*np.pi - d)  
         return d
 
+    def __unicode__(self):
+        return 'q: %0.2f, phi: %0.2f'%(self.q,self.phi)
+
+    def __str__(self):
+        return unicode(self).encode('utf-8')
+
+    __repr__ = __unicode__
+
 class lf_Track(Track):
     def __init__(self, point=None):
         Track.__init__(self, point)
@@ -1125,34 +1133,6 @@ def link_ridges(vec,search_range,memory=0,**kwargs):
     return trks
 
 
-def construct_corrected_profile(data,th_offset = 0):
-    '''Takes in [ch,th] and return [delta_h,th].  Flattens '''
-    ch,th = data
-    th = np.array(th)
-    ch = np.array(ch)
-    
-    # make negative points positive
-    th = np.mod(th+th_offset,2*np.pi)
-    indx = th.argsort()
-    rindx = indx.argsort()
-    # re-order to be monotonic
-    th = th[indx]
-    ch = ch[indx]
-    # sum the charges
-    delta_h = np.cumsum(ch - np.hstack((ch[0] - ch[-1],np.diff(ch)))/2)
-
-    # figure out the miss/match
-    miss_cnt = delta_h[-1]
-    # the first and last fringes should be off by one, choose up or down based on which side it missed on
-
-    if ch[0] == ch[-1]:
-        miss_cnt -= ch[0]
-    
-    corr_ln = th*(miss_cnt/(2*np.pi)) 
-    # add a linear line to make it come back to 0
-    delta_h -= corr_ln
-    delta_h -= np.mean(delta_h)
-    return delta_h[rindx],th[rindx]
 
 def resample_track(data,pt_num = 250,interp_type = 'linear'):
     '''re-samples the curve on uniform points and averages out tilt
@@ -1250,17 +1230,52 @@ class FringeRing(object):
     the purpose of tracking a fixed height faring from frame to frame. 
     '''
     def __init__(self,theta,charge,th_offset = 0,ringID = None):
-        
-        th_new,sum_charge = construct_corrected_profile((theta,charge),th_offset)
+
+        rel_height,th_new = construct_corrected_profile((theta,charge),th_offset)
+
         self.fringes = []
-        for th,h in zip(th_new,sum_charge):
+
+        for th,h in zip(th_new,rel_height):
+            
             self.fringes.append(Point1D_circ(ringID, th,h))
 
     def __iter__(self):
         return self.fringes.__iter__()
 
+    def plot_fringe_flat(self,ax,**kwargs):
+        q,phi = zip(*sorted([(f.q,f.phi) for f in self.fringes],key=lambda x: x[1]))
+        ax.plot(phi,q,**kwargs)
+        plt.draw()
 
+def construct_corrected_profile(data,th_offset = 0):
+    '''Takes in [ch,th] and return [delta_h,th].  Flattens '''
+    th,ch = data
+    th = np.array(th)
+    ch = np.array(ch)
+    
+    # make negative points positive
+    th = np.mod(th+th_offset,2*np.pi)
+    indx = th.argsort()
+    rindx = indx.argsort()
+    # re-order to be monotonic
+    th = th[indx]
+    ch = ch[indx]
+    # sum the charges
+    delta_h = np.cumsum(ch - np.hstack((ch[0] - ch[-1],np.diff(ch)))/2)
 
+    # figure out the miss/match
+    miss_cnt = delta_h[-1]
+    # the first and last fringes should be off by one, choose up or down based on which side it missed on
+
+    if ch[0] == ch[-1]:
+        miss_cnt -= ch[0]
+    
+    corr_ln = th*(miss_cnt/(2*np.pi)) 
+    # add a linear line to make it come back to 0
+    delta_h -= corr_ln
+    delta_h -= np.mean(delta_h)
+    return delta_h[rindx],th[rindx]
+        
 def get_rf(hf,j):
     mbe = hf[j]
     th_offset = mbe.get_theta_offset()
