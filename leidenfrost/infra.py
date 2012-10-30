@@ -16,7 +16,7 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
 
-import hashlib
+
 import time
 import collections
 import warnings
@@ -1282,3 +1282,22 @@ def get_rf(hf,j):
     rf = FringeRing(mbe.res[0][1],mbe.res[0][0],th_offset=th_offset,ringID = j)
     return rf
 
+
+def setup_spline_fitter(fname,bck_img = None):
+    ''' gets the initial path '''
+    clims = [.5,1.5]
+    #open the first frame and find the initial circle
+    c_test = cine.Cine(fname)    
+    lfimg = c_test.get_frame(0)
+    if bck_img is None:
+        bck_img = np.ones(lfimg.shape)
+        clims = None
+    fig = plt.figure()
+    ax = fig.add_axes([.1,.1,.8,.8])
+    im = ax.imshow(lfimg/bck_img)
+    if clims is not None:
+        im.set_clim(clims)
+    ef = spline_fitter(ax)
+    plt.draw()
+
+    return ef

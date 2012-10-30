@@ -237,6 +237,8 @@ class StackStorage(object):
         self.cine = Cine.cine(cine_fname)
         self.frames = {}
         pass
+            
+            
 
     def add_frame(self,frame_num,data):
         """ Adds a frame to the storage 
