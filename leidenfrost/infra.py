@@ -21,6 +21,7 @@ import time
 import collections
 import warnings
 import os
+import itertools
 
 import numpy as np
 import numpy.linalg as nl
@@ -309,67 +310,6 @@ class lf_Track(Track):
 
 
 
-def get_spline(points,point_count=None,pix_err = 2,**kwargs):
-    '''
-    Returns a closed spline for the points handed in.  Input is assumed to be a (2xN) array
-
-    =====
-    input
-    =====
-
-    points
-        a 2xN array 
-
-    point_count (optional)
-        the number of new places to sample
-        
-    center
-        The center of the point for converting to a shifted radial coordinate system
-    =====
-    output
-    =====
-    new_points
-        a 2x{N,point_count} array with evenly sampled points
-    tck
-       The return data from the spline fitting
-    center
-       The center of mass the initial points
-    '''
-
-    if type(points) is np.ndarray:
-        # make into a list
-        pt_lst = zip(*points)
-        # get center
-        center = np.mean(points,axis=1).reshape(2,1)
-    else:
-        # make a copy of the list
-        pt_lst = list(points)
-        # compute center
-        center = np.array(reduce(lambda x,y: (x[0] + y[0],x[1] + y[1]),pt_lst)).reshape(2,1)/len(pt_lst)
-
-    if len(pt_lst)<5:
-        raise Exception("not enough points")
-
-
-    # sort the list by angle around center
-    pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
-    # add first point to end because it is periodic (makes the interpolation code happy)
-    pt_lst.append(pt_lst[0])
-
-    # make array for handing in to spline fitting
-    pt_array = np.vstack(pt_lst).T
-    # do spline fitting
-
-    tck,u = si.splprep(pt_array,s=len(pt_lst)*(pix_err**2),per=True)
-    if point_count is not None:
-        new_pts = si.splev(np.linspace(0,1,point_count),tck)
-        center = np.mean(new_pts,axis=1).reshape(2,1)
-    else:
-        new_pts = si.splev(np.linspace(0,1,1000),tck)
-        center = np.mean(new_pts,axis=1).reshape(2,1)
-        new_pts = []
-    pt_lst.pop(-1)
-    return new_pts,tck,center
 
 
 
@@ -383,7 +323,7 @@ class spline_fitter(object):
         self.pt_plot = ax.plot([],[],marker='x',linestyle ='-')[0]
         self.sp_plot = ax.plot([],[],lw=3,color='k')[0]
         self.pix_err = pix_err
-        
+
     def click_event(self,event):
         ''' Extracts locations from the user'''
         if event.key == 'shift':
@@ -399,17 +339,23 @@ class spline_fitter(object):
         self.redraw()
 
     def remove_pt(self,loc):
-        self.pt_lst.pop(np.argmin(map(lambda x:np.sqrt( (x[0] - loc[0])**2 + (x[1] - loc[1])**2),self.pt_lst)))
+        if len(self.pt_lst) > 0:
+            self.pt_lst.pop(np.argmin(map(lambda x:np.sqrt( (x[0] - loc[0])**2 + (x[1] - loc[1])**2),self.pt_lst)))
     def redraw(self):
         if len(self.pt_lst) > 5:
-            new_pts,tck,center = get_spline(self.pt_lst,point_count=1000,pix_err = self.pix_err)
+            SC = SplineCurve.from_pts(self.pt_lst,pix_err = self.pix_err)
+            new_pts = SC.get_xy_samples(1000)
+            center = SC.center
             self.sp_plot.set_xdata(new_pts[0])
             self.sp_plot.set_ydata(new_pts[1])
             self.pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
         else:
             self.sp_plot.set_xdata([])
             self.sp_plot.set_ydata([])
-        x,y = zip(*self.pt_lst)
+        if len(self.pt_lst) > 0:
+            x,y = zip(*self.pt_lst)
+        else:
+            x,y = [],[]
         self.pt_plot.set_xdata(x)
         self.pt_plot.set_ydata(y)
 
@@ -423,7 +369,8 @@ class spline_fitter(object):
         '''Returns the clicked points in the format the rest of the code expects'''
         return np.vstack(self.pt_lst).T
 
-
+    def return_SplineCurve(self):
+        return SplineCurve.from_pts(self.pt_lst,pix_err = self.pix_err)
 
 
 def gen_bck_img(fname):
@@ -816,9 +763,13 @@ class MemBackendFrame(object):
         _write_frame_tracks_to_file(group,self.trk_lst[0],self.trk_lst[1],self.curve)
         del group
 
-    # this code is broken
-    # def get_profile(self):
-    #     return resample_track(self.get_profile_raw())
+
+    def get_profile(self):
+        ch,th = zip(*sorted([(t.charge,t.phi) for t in itertools.chain(*self.trk_lst) if t.charge and len(t) > 15],key=lambda x:x[-1]))
+
+        dh,th_new = construct_corrected_profile((th,ch)) 
+        
+        return th_new,dh
     
     # def get_profile_raw(self):
     #     th,ch = self.res[0][:2]
@@ -848,7 +799,25 @@ class MemBackendFrame(object):
         th = th.ravel()
         return th[0]
 
+    def get_xyz_points(self,min_track_length = 15):
+        
+        X,Y,ch,th = zip(*sorted([tuple(t.get_xy(self.curve))+(t.charge,t.phi) for t in itertools.chain(*self.trk_lst) if t.charge and len(t) > 15],key=lambda x:x[-1]))
 
+        dh,th_new = construct_corrected_profile((th,ch)) 
+        Z = [z*np.ones(x.shape) for z,x in zip(dh,X)]
+
+        return X,Y,Z
+    def get_xyz_curve(self,min_track_length=15):
+
+
+        q,ch,th = zip(*sorted([(t.q,t.charge,t.phi) for t in itertools.chain(*self.trk_lst) if t.charge and len(t) > min_track_length],key=lambda x:x[-1]))
+
+        # scale the radius
+        x,y = self.curve.q_phi_to_xy(q,th)
+
+        z,th_new = construct_corrected_profile((th,ch)) 
+
+        return x,y,z
 def change_base_path(fpath,new_base_path):
     '''Returns a new FilePath object with a different base_path entry '''
     return FilePath(new_base_path,fpath.path,fpath.fname)
@@ -961,9 +930,72 @@ class SplineCurve(object):
     '''
     A class that wraps the scipy.interpolation objects
     '''
+    @classmethod 
+    def _get_spline(cls,points,point_count=None,pix_err = 2,**kwargs):
+        '''
+        Returns a closed spline for the points handed in.  Input is assumed to be a (2xN) array
+
+        =====
+        input
+        =====
+
+        points
+            a 2xN array 
+
+        point_count (optional)
+            the number of new places to sample
+
+        center
+            The center of the point for converting to a shifted radial coordinate system
+        =====
+        output
+        =====
+        new_points
+            a 2x{N,point_count} array with evenly sampled points
+        tck
+           The return data from the spline fitting
+        center
+           The center of mass the initial points
+        '''
+
+        if type(points) is np.ndarray:
+            # make into a list
+            pt_lst = zip(*points)
+            # get center
+            center = np.mean(points,axis=1).reshape(2,1)
+        else:
+            # make a copy of the list
+            pt_lst = list(points)
+            # compute center
+            center = np.array(reduce(lambda x,y: (x[0] + y[0],x[1] + y[1]),pt_lst)).reshape(2,1)/len(pt_lst)
+
+        if len(pt_lst)<5:
+            raise Exception("not enough points")
+
+
+        # sort the list by angle around center
+        pt_lst.sort(key=lambda x: np.arctan2(x[1]-center[1],x[0]-center[0]))
+        # add first point to end because it is periodic (makes the interpolation code happy)
+        pt_lst.append(pt_lst[0])
+
+        # make array for handing in to spline fitting
+        pt_array = np.vstack(pt_lst).T
+        # do spline fitting
+
+        tck,u = si.splprep(pt_array,s=len(pt_lst)*(pix_err**2),per=True)
+        if point_count is not None:
+            new_pts = si.splev(np.linspace(0,1,point_count),tck)
+            center = np.mean(new_pts,axis=1).reshape(2,1)
+        else:
+            new_pts = si.splev(np.linspace(0,1,1000),tck)
+            center = np.mean(new_pts,axis=1).reshape(2,1)
+            new_pts = []
+        pt_lst.pop(-1)
+        return new_pts,tck,center
+
     @classmethod
     def from_pts(cls,new_pts,**kwargs):
-        _,tck,center = get_spline(new_pts,**kwargs)
+        _,tck,center = cls._get_spline(new_pts,**kwargs)
         this = cls(tck,center)
         this.raw_pts = new_pts
         return this
@@ -1025,6 +1057,15 @@ class SplineCurve(object):
         breakage when we change over to using additive q instead of
         multiplicative'''
         r,th = self.sample_rt(np.mod(phi,2*np.pi)/(2*np.pi))
+        r+=q
+        return self.rt_to_xy(r,th)
+
+    def q_phi_to_xy_old(self,q,phi):
+        '''Converts q,phi pairs -> x,y pairs.  All other code that
+        does this should move to using this so that there is minimal
+        breakage when we change over to using additive q instead of
+        multiplicative'''
+        r,th = self.sample_rt(np.mod(phi,2*np.pi)/(2*np.pi))
         r*=q
         return self.rt_to_xy(r,th)
 
@@ -1041,33 +1082,37 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
 
     # sample points at ~ 2/pix
     sample_count = int(np.ceil(C*2))
-
-    r_new,th_new = curve.get_rt_samples(sample_count)
-
-
+    
     # get center of curve
     x0,y0 = curve.center[:,0]
 
     
-    R = np.max(r_new)*(1+s_width)*1.1
-    x_shift = int(x0-R)
+    q_vec = np.linspace(-s_width,s_width,s_num).reshape(-1,1)   #q sampling 
+    phi_vec = np.linspace(0,2*np.pi,sample_count)   #angular sampling
+    Q,P = [_.T.ravel() for _ in np.meshgrid(q_vec,phi_vec) ]  #turn into mesh
+
+    X,Y = curve.q_phi_to_xy(Q,P)          #get the x-y locations of the mesh
+
+
+    # compute the region of interest in the image
+    Rx = (np.max(X)-np.min(X))/2
+    Ry = (np.max(Y)-np.min(Y))/2
+
+    x_shift = int(x0-Rx)
     if x_shift<0:
         x_shift = 0
-    x_lim = int(x0+R)
-    y_shift = int(y0-R)
+    x_lim = int(x0+Rx)
+    
+    y_shift = int(y0-Ry)
     if y_shift < 0:
         y_shift = 0
-    y_lim = int(y0+R)
+    y_lim = int(y0+Ry)
+
+    # chop down the image
     dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
 
-    # this will approximately  double sample.
-    ma_scale_vec = np.linspace(1-s_width,1 +s_width,s_num).reshape(-1,1)
 
-    
-    r_scaled = ma_scale_vec.dot(r_new)
-
-    X = np.cos(th_new)*r_scaled
-    Y = np.sin(th_new)*r_scaled
+    # shove into 
     zp_all = np.vstack(((Y).reshape(-1),(X).reshape(-1))) + np.flipud(curve.center) - np.array((y_shift,x_shift)).reshape(2,1)
 
     # extract the values at those locations from the image.  The
@@ -1078,7 +1123,7 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
     min_vec = []
     max_vec = []
     theta = np.linspace(0,2*np.pi,sample_count)
-    for j,ma_scale in enumerate(ma_scale_vec.reshape(-1)):
+    for j,q in enumerate(q_vec.reshape(-1)):
 
         # select out the right region
         zv = zv_all[j*sample_count:(j+1)*sample_count] 
@@ -1093,8 +1138,8 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
         min_pk = np.vstack(peaks[1])
         
         # append to the export vectors
-        min_vec.append((ma_scale,min_pk))
-        max_vec.append((ma_scale,max_pk))
+        min_vec.append((q,min_pk))
+        max_vec.append((q,max_pk))
         
         
     return min_vec,max_vec
@@ -1256,6 +1301,7 @@ def construct_corrected_profile(data,th_offset = 0):
     # make negative points positive
     th = np.mod(th+th_offset,2*np.pi)
     indx = th.argsort()
+    # reverse index for putting everything back in the order it came in 
     rindx = indx.argsort()
     # re-order to be monotonic
     th = th[indx]
@@ -1294,7 +1340,7 @@ def setup_spline_fitter(fname,bck_img = None):
         clims = None
     fig = plt.figure()
     ax = fig.add_axes([.1,.1,.8,.8])
-    im = ax.imshow(lfimg/bck_img)
+    im = ax.imshow(lfimg/bck_img,cmap='cubehelix')
     if clims is not None:
         im.set_clim(clims)
     ef = spline_fitter(ax)
