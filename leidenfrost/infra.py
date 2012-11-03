@@ -1017,29 +1017,95 @@ class SplineCurve(object):
         '''
         Returns the x-y coordinates of uniformly sampled points on the
         spline.  
-        '''
-        return si.splev(np.linspace(0,1,sample_count),self.tck)
-    def get_rt_samples(self,sample_count):
-        '''
 
+        STOP USING THIS
         '''
-        new_pts = self.get_xy_samples(sample_count)
-        new_pts -= self.center
-        return np.sqrt(np.sum(new_pts**2,axis=0)).reshape(1,-1),np.arctan2(*(new_pts[::-1])).reshape(1,-1)
+        return self.q_phi_to_xy(0,linspace(0,2*np.pi,sample_count))
+        
 
     def write_to_hdf(self,parent_group):
+        '''
+        Writes out the essential data (spline of central curve) to hdf file.
+        '''
         parent_group.attrs['tck0'] = self.tck[0]
         parent_group.attrs['tck1'] = np.vstack(self.tck[1])
         parent_group.attrs['tck2'] = self.tck[2]
         parent_group.attrs['center'] = self.center
 
+        
     def circumference(self):
         '''returns a rough estimate of the circumference'''
-        new_pts = self.get_xy_samples(100)
+        new_pts = si.splev(np.linspace(0,1,1000),self.tck,ext=2)
         return np.sum(np.sqrt(np.sum(np.diff(new_pts,axis=1)**2,axis=0)))
 
-    def sample_rt(self,points):
-        '''Samples at the given points and returns the locations in (r,t)'''
+    
+    
+    def q_phi_to_xy(self,q,phi,cross =None):
+        '''Converts q,phi pairs -> x,y pairs.  All other code that
+        does this should move to using this so that there is minimal
+        breakage when we change over to using additive q instead of
+        multiplicative'''
+        # make sure data is arrays
+        q = np.asarray(q)
+        # convert real units -> interpolation units
+        phi = np.mod(np.asarray(phi),2*np.pi)/(2*np.pi)
+        # get the shapes
+        q_shape,phi_shape = [_.shape if _.shape != () and len(_) > 1 else None for _ in (q,phi)]
+
+        # flatten everything
+        sqrt_q = np.sqrt(np.abs(q.ravel()))*np.sign(q.ravel())
+        phi = phi.ravel()
+        # sanity checks on shapes
+        if cross == False:
+            if phi_shape != q_shape:
+                raise ValueError("q and phi must have same dimensions to broadcast")
+        if cross is None:
+            if phi_shape is not None and q_shape is not None and  phi_shape == q_shape:
+                print 'option A'
+                cross = False
+            elif q_shape is None:
+                print 'option B'
+                cross = False
+                sqrt_q = sqrt_q[0]
+            else:
+                print 'option C'
+                cross = True
+
+        
+        x,y = si.splev(phi,self.tck,ext=2)
+        dx,dy = si.splev(phi,self.tck,der=1,ext=2)
+        norm = np.sqrt(dx**2 + dy**2)
+        nx,ny = dy/norm,-dx/norm
+
+        # if cross, then 
+        if cross:
+            data_out = zip(*map(lambda sq_q: ((x +sq_q*nx).reshape(phi_shape),
+                                              (y +sq_q*ny).reshape(phi_shape)),
+                           sqrt_q))
+        else:
+
+            data_out = [(x + sqrt_q*nx).reshape(phi_shape),
+                        (y + sqrt_q*ny).reshape(phi_shape)]
+
+        return data_out
+
+
+
+
+    def q_phi_to_xy_old(self,q,phi):
+        '''Converts q,phi pairs -> x,y pairs.  All other code that
+        does this should move to using this so that there is minimal
+        breakage when we change over to using additive q instead of
+        multiplicative'''
+        r,th = self._sample_rt(np.mod(phi,2*np.pi)/(2*np.pi))
+        r*=q
+        return np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + self.center
+
+    
+    def _sample_rt(self,points):
+        '''Samples at the given points and returns the locations in (r,t)
+
+        This is here for compatibility with old code DON"T USE THIS'''
         tmp_pts = si.splev(points,self.tck)
         tmp_pts -= self.center
         th = np.arctan2(*(tmp_pts[::-1]))
@@ -1047,27 +1113,6 @@ class SplineCurve(object):
 
         return r,th
 
-    def rt_to_xy(self,r,th):
-        '''converts (r,t) coords to (x,y)'''
-        return np.vstack(((np.cos(th)*r),(np.sin(th)*r))) + self.center
-
-    def q_phi_to_xy(self,q,phi):
-        '''Converts q,phi pairs -> x,y pairs.  All other code that
-        does this should move to using this so that there is minimal
-        breakage when we change over to using additive q instead of
-        multiplicative'''
-        r,th = self.sample_rt(np.mod(phi,2*np.pi)/(2*np.pi))
-        r+=q
-        return self.rt_to_xy(r,th)
-
-    def q_phi_to_xy_old(self,q,phi):
-        '''Converts q,phi pairs -> x,y pairs.  All other code that
-        does this should move to using this so that there is minimal
-        breakage when we change over to using additive q instead of
-        multiplicative'''
-        r,th = self.sample_rt(np.mod(phi,2*np.pi)/(2*np.pi))
-        r*=q
-        return self.rt_to_xy(r,th)
 
         
 
