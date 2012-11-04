@@ -715,45 +715,39 @@ class MemBackendFrame(object):
         t_q = np.array([t.q for t in tim+tam if 
                         t.q is not None  
                         and t.phi is not None 
-                        and t.charge is not None
-                        and t.charge != 0] + 
-                        [1]*mix_in_count)
+                        and bool(t.charge)] + 
+                        [0]*mix_in_count)
 
-        t_phi = np.array([np.mod(t.phi,(2*np.pi))/(2*np.pi) for t in tim+tam if 
+        t_phi = np.array([t.phi for t in tim+tam if 
                         t.q is not None  
                         and t.phi is not None 
-                        and t.charge is not None
-                        and t.charge != 0] +  
-                        list(np.linspace(0,1,mix_in_count,endpoint=False)))
+                        and bool(t.charge)] +  
+                        list(np.linspace(0,2*np.pi,mix_in_count,endpoint=False)))
 
-        # seed the next round of points
-
-        # get the (r,t) of _this_ frames spline
-        r,th = self.curve.sample_rt(t_phi)
-        # scale the radius
-        r *= t_q
-        # sort by theta
-        indx =th.argsort()
-        r = r[indx]
-        th = th[indx]
+        indx =t_phi.argsort()
+        t_q = t_q[indx]
+        t_phi = t_phi[indx]
         # generate the new curve
+        x,y = self.curve.q_phi_to_xy(t_q,t_phi,cross=False)
 
-        new_curve = SplineCurve.from_pts(self.curve.rt_to_xy(r,th),**kwargs)
+        new_curve = SplineCurve.from_pts(np.vstack((x,y)),
+                                         **kwargs)
+        
 
         self.next_curve = new_curve
         self.mix_in_count = mix_in_count
         
         return new_curve
 
-    def plot_tracks(self,min_len = 0):
+    def plot_tracks(self,min_len = 0,all_tracks=True):
         fig = plt.figure();
         ax = fig.gca()
         if self.img is not None:
-            c_img = ax.imshow(self.img,cmap=plt.get_cmap('gray'),interpolation='nearest');
+            c_img = ax.imshow(self.img,cmap=plt.get_cmap('cubehelix'),interpolation='nearest');
             c_img.set_clim([.5,1.5])
         color_cycle = ['r','b']
         for tk_l,c in zip(self.trk_lst,color_cycle):
-            [t.plot_trk_img(self.curve,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len ];
+            [t.plot_trk_img(self.curve,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len and (all_tracks or bool(t.charge)) ];
         ax.plot(*self.curve.get_xy_samples(1000))
         plt.draw();
 
@@ -1020,8 +1014,9 @@ class SplineCurve(object):
 
         STOP USING THIS
         '''
-        return self.q_phi_to_xy(0,linspace(0,2*np.pi,sample_count))
-        
+        return self.q_phi_to_xy(0,np.linspace(0,2*np.pi,sample_count))
+
+    
 
     def write_to_hdf(self,parent_group):
         '''
@@ -1053,7 +1048,7 @@ class SplineCurve(object):
         q_shape,phi_shape = [_.shape if _.shape != () and len(_) > 1 else None for _ in (q,phi)]
 
         # flatten everything
-        sqrt_q = np.sqrt(np.abs(q.ravel()))*np.sign(q.ravel())
+        q = q.ravel()
         phi = phi.ravel()
         # sanity checks on shapes
         if cross == False:
@@ -1061,14 +1056,11 @@ class SplineCurve(object):
                 raise ValueError("q and phi must have same dimensions to broadcast")
         if cross is None:
             if phi_shape is not None and q_shape is not None and  phi_shape == q_shape:
-                print 'option A'
                 cross = False
             elif q_shape is None:
-                print 'option B'
                 cross = False
-                sqrt_q = sqrt_q[0]
+                q = q[0]
             else:
-                print 'option C'
                 cross = True
 
         
@@ -1079,13 +1071,13 @@ class SplineCurve(object):
 
         # if cross, then 
         if cross:
-            data_out = zip(*map(lambda sq_q: ((x +sq_q*nx).reshape(phi_shape),
-                                              (y +sq_q*ny).reshape(phi_shape)),
-                           sqrt_q))
+            data_out = zip(*map(lambda q_: ((x +q_*nx).reshape(phi_shape),
+                                              (y +q_*ny).reshape(phi_shape)),
+                           q))
         else:
 
-            data_out = [(x + sqrt_q*nx).reshape(phi_shape),
-                        (y + sqrt_q*ny).reshape(phi_shape)]
+            data_out = [(x + q*nx).reshape(phi_shape),
+                        (y + q*ny).reshape(phi_shape)]
 
         return data_out
 
@@ -1117,7 +1109,7 @@ class SplineCurve(object):
         
 
         
-def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs):
+def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2,oversample = 4, *args, **kwargs):
     """
     Does the actual work of finding the fringes on the image
     """
@@ -1126,7 +1118,7 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
     C = curve.circumference()
 
     # sample points at ~ 2/pix
-    sample_count = int(np.ceil(C*2))
+    sample_count = int(np.ceil(C*int(oversample)))
     
     # get center of curve
     x0,y0 = curve.center[:,0]
@@ -1134,32 +1126,32 @@ def find_rim_fringes(curve, lfimg, s_width, s_num, smooth_rng=2, *args, **kwargs
     
     q_vec = np.linspace(-s_width,s_width,s_num).reshape(-1,1)   #q sampling 
     phi_vec = np.linspace(0,2*np.pi,sample_count)   #angular sampling
-    Q,P = [_.T.ravel() for _ in np.meshgrid(q_vec,phi_vec) ]  #turn into mesh
 
-    X,Y = curve.q_phi_to_xy(Q,P)          #get the x-y locations of the mesh
 
+    X,Y = [np.hstack(_) for _ in curve.q_phi_to_xy(q_vec,phi_vec)]
 
     # compute the region of interest in the image
-    Rx = (np.max(X)-np.min(X))/2
-    Ry = (np.max(Y)-np.min(Y))/2
+    R = (np.sqrt(((np.max(X)-np.min(X)))**2 + ((np.max(Y)-np.min(Y)))**2)*1.1)/2
 
-    x_shift = int(x0-Rx)
+
+    x_shift = int(x0-R)
     if x_shift<0:
         x_shift = 0
-    x_lim = int(x0+Rx)
+    x_lim = int(x0+R)
     
-    y_shift = int(y0-Ry)
+    y_shift = int(y0-R)
     if y_shift < 0:
         y_shift = 0
-    y_lim = int(y0+Ry)
+    y_lim = int(y0+R)
 
     # chop down the image
     dlfimg = lfimg[y_shift:y_lim,x_shift:x_lim]
 
 
     # shove into 
-    zp_all = np.vstack(((Y).reshape(-1),(X).reshape(-1))) + np.flipud(curve.center) - np.array((y_shift,x_shift)).reshape(2,1)
+    zp_all = np.vstack((Y.ravel(),X.ravel())) - np.array((y_shift,x_shift)).reshape(2,1)
 
+    
     # extract the values at those locations from the image.  The
     # extra flipud is to take a transpose of the points to deal
     # with the fact that the definition of the first direction
