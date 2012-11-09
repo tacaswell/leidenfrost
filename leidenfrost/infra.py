@@ -146,7 +146,8 @@ class lf_Track(Track):
         if 'markersize' not in kwargs:
             kwargs['markersize'] = 7.5
             
-        ax.plot(x,y,**kwargs)
+        ln, = ax.plot(x,y,**kwargs)
+        return ln
     def classify2(self,min_len = None,min_extent = None,**kwargs):
         ''' second attempt at the classify function''' 
         phi,q = zip(*[(p.phi,p.q) for p in self.points])
@@ -317,13 +318,23 @@ class lf_Track(Track):
 
 class spline_fitter(object):
     def __init__(self,ax,pix_err = 1):
-        fig = ax.get_figure()
-        fig.canvas.mpl_connect('button_press_event',self.click_event)
+        self.canvas = ax.get_figure().canvas
+        self.cid = None
         self.pt_lst = []
         self.pt_plot = ax.plot([],[],marker='x',linestyle ='-')[0]
         self.sp_plot = ax.plot([],[],lw=3,color='k')[0]
         self.pix_err = pix_err
-
+        self.connect_sf()
+        
+    def connect_sf(self):
+        if self.cid is None:
+            self.cid = self.canvas.mpl_connect('button_press_event',self.click_event)        
+        
+    def disconnect_sf(self):
+        if self.cid is not None:
+            self.canvas.mpl_disconnect(self.cid)
+            self.cid = None
+            
     def click_event(self,event):
         ''' Extracts locations from the user'''
         if event.key == 'shift':
@@ -359,7 +370,7 @@ class spline_fitter(object):
         self.pt_plot.set_xdata(x)
         self.pt_plot.set_ydata(y)
 
-        plt.draw()
+        self.canvas.draw()
 
 
     def get_params(self):
@@ -591,8 +602,6 @@ class ProcessBackend(object):
         else:
             return 0
     def __init__(self):
-        self.frames = []                  # list of the frames processed
-        
         self.params = {}                  # the parameters to feed to proc_frame
 
         self.cine_fname = None   # file name
@@ -667,16 +676,28 @@ class ProcessBackend(object):
 
 
         # get the raw data, and convert to float
-        tmp_img = np.array(self.cine_.get_frame(frame_number),dtype='float')
-        # if 
-        if self.bck_img is not None:
-            tmp_img /= self.bck_img
+        tmp_img = self.get_frame(frame_number)
         tm,trk_res,tim,tam,miv,mav = proc_frame(curve,tmp_img,**self.params)
         
         mbe = MemBackendFrame(curve,frame_number,res = trk_res,trk_lst = [tim,tam],img = tmp_img)
         mbe.tm = tm
 
         return mbe,mbe.get_next_spline(**self.params)
+
+    def get_frame(self,frame_number):
+        '''Simply return the (possibly normalized) image for the given frame '''
+
+        # get the raw data, and convert to float
+        tmp_img = np.array(self.cine_[frame_number],dtype='float')
+        # if 
+        if self.bck_img is not None:
+            tmp_img /= self.bck_img
+
+        return tmp_img
+
+    def update_param(self,key,val):
+        '''Updates the parameters'''
+        self.params[key] = val
 
             
 class MemBackendFrame(object):
@@ -716,7 +737,7 @@ class MemBackendFrame(object):
                         t.q is not None  
                         and t.phi is not None 
                         and bool(t.charge)] + 
-                        [0]*mix_in_count)
+                        [0]*int(mix_in_count))
 
         t_phi = np.array([t.phi for t in tim+tam if 
                         t.q is not None  
@@ -742,15 +763,33 @@ class MemBackendFrame(object):
     def plot_tracks(self,min_len = 0,all_tracks=True):
         fig = plt.figure();
         ax = fig.gca()
+        self.ax_draw_img(ax)
+        self.ax_plot_tracks(ax,min_len,all_tracks)
+        self.ax_draw_center_curves(ax)
+        plt.draw();
+
+    def ax_plot_tracks(self,ax,min_len=0,all_tracks=True):
+        color_cycle = ['r','b']
+        lines = []
+        for tk_l,c in zip(self.trk_lst,color_cycle):
+            lines.extend([t.plot_trk_img(self.curve,ax,color=c,linestyle='-') 
+                          for t in tk_l 
+                          if len(t) > min_len and (all_tracks or bool(t.charge)) ])
+        return lines
+    
+    def ax_draw_center_curves(self,ax):
+        lo, = ax.plot(*self.curve.get_xy_samples(1000),color='g')
+        new_curve = self.get_next_spline(mix_in_count = 0)
+        ln, = ax.plot(*new_curve.get_xy_samples(1000),color='m')
+        return lo,ln
+        
+    def ax_draw_img(self,ax):
         if self.img is not None:
             c_img = ax.imshow(self.img,cmap=plt.get_cmap('cubehelix'),interpolation='nearest');
             c_img.set_clim([.5,1.5])
-        color_cycle = ['r','b']
-        for tk_l,c in zip(self.trk_lst,color_cycle):
-            [t.plot_trk_img(self.curve,ax,color=c,linestyle='-') for t in tk_l if len(t) > min_len and (all_tracks or bool(t.charge)) ];
-        ax.plot(*self.curve.get_xy_samples(1000))
-        plt.draw();
-
+            return c_img
+        return None
+        
     def write_to_hdf(self,parent_group):
         print 'frame_%05d'%self.frame_number
         group = parent_group.create_group('frame_%05d'%self.frame_number)
