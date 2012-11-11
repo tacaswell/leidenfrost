@@ -325,6 +325,16 @@ class spline_fitter(object):
         self.sp_plot = ax.plot([],[],lw=3,color='k')[0]
         self.pix_err = pix_err
         self.connect_sf()
+
+    def set_visible(self,visible):
+        '''sets if the curves are visible '''
+        self.pt_plot.set_visible(visible)
+        self.sp_plot.set_visible(visible)        
+
+    def clear(self):
+        '''Clears the points'''
+        self.pt_lst = []
+        self.redraw()
         
     def connect_sf(self):
         if self.cid is None:
