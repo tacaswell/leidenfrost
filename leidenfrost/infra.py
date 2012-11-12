@@ -565,45 +565,6 @@ def _read_frame_tracks_from_file_res(parent_group):
     return res_lst
 
 
-
-
-def gen_stub_h5(cine_fname,h5_fname,params,seed_curve,bck_img = None):
-    for s in ProcessBackend.req_args_lst:
-        if s not in params:
-            raise RuntimeError('Necessary key ' + s + ' not included')
-    proc_path = '/'.join(h5_fname[:2])
-    print proc_path
-    if not os.path.exists(proc_path):
-        os.makedirs(proc_path,0751)        
-
-    file_out = h5py.File('/'.join(h5_fname),'w-')
-    
-    file_out.attrs['ver'] = '0.1.1'
-    for key,val in params.items():
-        try:
-            file_out.attrs[key] = val
-        except TypeError:
-            print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
-            print 'please reconsider your life choices'
-        except Exception as e:
-            print "FAILURE WITH HDF: " + e.__str__()
-               
-    file_out.attrs['cine_path'] = cine_fname.path
-    file_out.attrs['cine_fname'] = cine_fname.fname
-
-    if seed_curve is not None:
-        seed_curve.write_to_hdf(file_out)
-    if bck_img is not None:
-        file_out.create_dataset('bck_img',
-                                bck_img.shape,
-                                np.float,
-                                compression='szip')
-        file_out['bck_img'][:] = bck_img
-        
-    file_out.close()
-    
-    
-
 class ProcessBackend(object):
     req_args_lst = ['search_range','s_width','s_num','pix_err']
     def __len__(self):
@@ -708,6 +669,39 @@ class ProcessBackend(object):
     def update_param(self,key,val):
         '''Updates the parameters'''
         self.params[key] = val
+
+
+    def gen_stub_h5(self,h5_fname,seed_curve):
+        '''Generates a h5 file that can be read back in for later
+        processing.  This assumes that the location of the h5 file is
+        valid'''
+
+        
+        file_out = h5py.File(h5_fname,'w-')   # open file
+        file_out.attrs['ver'] = '0.1.2'       # set meta-data
+        for key,val in self.params.items():
+            try:
+                file_out.attrs[key] = val
+            except TypeError:
+                print 'key: ' + key + ' can not be gracefully shoved into an hdf object, ' 
+                print 'please reconsider your life choices'
+            except Exception as e:
+                print "FAILURE WITH HDF: " + e.__str__()
+
+        file_out.attrs['cine_path'] = self.cine_fname.path
+        file_out.attrs['cine_fname'] = self.cine_fname.fname
+
+        if seed_curve is not None:
+            seed_curve.write_to_hdf(file_out)
+        if self.bck_img is not None:
+            file_out.create_dataset('bck_img',
+                                    self.bck_img.shape,
+                                    np.float,
+                                    compression='szip')
+            file_out['bck_img'][:] = self.bck_img
+
+        file_out.close()
+
 
             
 class MemBackendFrame(object):
