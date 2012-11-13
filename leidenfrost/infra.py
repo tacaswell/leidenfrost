@@ -1400,7 +1400,7 @@ def construct_corrected_profile(data,th_offset = 0):
     corr_ln = th*(miss_cnt/(2*np.pi)) 
     # add a linear line to make it come back to 0
     delta_h -= corr_ln
-    delta_h -= np.mean(delta_h)
+    delta_h -= np.min(delta_h)
     return delta_h[rindx],th[rindx]
         
 def get_rf(hf,j):
