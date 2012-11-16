@@ -720,6 +720,7 @@ class MemBackendFrame(object):
         self.next_curve = None
         self.img = img
         self.mix_in_count = None
+        self.pix_err = None
         new_res = []
         for t_ in self.res:
             tmp = ~np.isnan(t_[0])
@@ -728,7 +729,7 @@ class MemBackendFrame(object):
         self.res = new_res
         
         pass
-    def get_next_spline(self,mix_in_count=0,**kwargs):
+    def get_next_spline(self,mix_in_count=None,pix_err= None,**kwargs):
         if self.next_curve is not None and self.mix_in_count == mix_in_count:
             return self.next_curve
 
@@ -782,9 +783,9 @@ class MemBackendFrame(object):
         return lines
     
     def ax_draw_center_curves(self,ax):
-        lo, = ax.plot(*self.curve.get_xy_samples(1000),color='g')
-        new_curve = self.get_next_spline(mix_in_count = 0)
-        ln, = ax.plot(*new_curve.get_xy_samples(1000),color='m')
+        lo, = ax.plot(*self.curve.get_xy_samples(1000),color='g',lw=2)
+        new_curve = self.next_curve
+        ln, = ax.plot(*new_curve.get_xy_samples(1000),color='m',lw=2)
         return lo,ln
         
     def ax_draw_img(self,ax):
