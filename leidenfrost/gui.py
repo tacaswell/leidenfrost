@@ -53,7 +53,7 @@ class LFWorker(QtCore.QObject):
     def proc_frame(self,ind,curve):
         
         self.mbe,self.next_curve = self.process_backend.process_frame(ind,curve)
-        self.frame_proced.emit()
+        self.frame_proced.emit(True,True)
 
     def get_mbe(self):
         return self.mbe
@@ -82,13 +82,14 @@ class LFWorker(QtCore.QObject):
         print cine_fname,params
         self.clear()
         self.process_backend = infra.ProcessBackend.from_args(cine_fname,bck_img = None,**params)
-        self.frame_proced.emit()
+        self.frame_proced.emit(True,True)
 
     
 class LFGui(QtGui.QMainWindow):
     proc = QtCore.Signal(int,infra.SplineCurve)
     open_file_sig  = QtCore.Signal(infra.FilePath,dict)
     kill_thread = QtCore.Signal()
+    redraw_sig = QtCore.Signal(bool,bool)
     spinner_lst = [
                {'name':'s_width','min':0,'max':50,'step':.5,'prec':1,'type':np.float,'default':10},
                {'name':'s_num','min':1,'max':500,'step':1,'type':np.int,'default':100},
@@ -135,10 +136,12 @@ class LFGui(QtGui.QMainWindow):
         self.create_diag()
         self.create_status_bar()
 
-        self.on_draw()
+        self.on_draw(True,True)
         self.worker.frame_proced.connect(self.on_draw)        
         self.proc.connect(self.worker.proc_frame)    
         self.open_file_sig.connect(self.worker.set_new_fname)    
+        self.redraw_sig.connect(self.on_draw)
+        
         self.kill_thread.connect(self.thread.quit)
 
         self.show()
@@ -184,8 +187,9 @@ class LFGui(QtGui.QMainWindow):
     def set_fringes_visible(self,i):
         self.draw_fringes = bool(i)
         self.refresh_lines_flg = True
-        self.on_draw()
-        
+        self.redraw_sig.emit(True,False)
+
+    @QtCore.Slot(bool,bool)
     def on_draw(self,refresh_lines=True,refresh_img=True):
         """ Redraws the figure
         """
@@ -236,15 +240,16 @@ class LFGui(QtGui.QMainWindow):
             self.sf_show.setChecked(True)
         else:
             self.sf.disconnect_sf()
-            
-        self.on_draw()
+        self.redraw_sig.emit(False,False)
+
             
     def set_spline_fitter_visible(self,i):
         self.sf.set_visible(i)
         # if we can't see it, don't let is screw with it
         if not bool(i):
             self.sf_check.setChecked(False)
-        self.on_draw()
+        self.redraw_sig.emit(False,False)
+
                 
     def set_cur_frame(self,i):
         old_frame = self.cur_frame
@@ -256,12 +261,13 @@ class LFGui(QtGui.QMainWindow):
             if self.draw_fringes:
                 self._proc_this_frame()
             else:
-                self.on_draw()
+                self.redraw_sig.emit(False,True)
+
         else:
-            self.refresh_img = True
             self.draw_fringes = False
             self.worker.clear()
-            self.on_draw()
+            self.redraw_sig.emit(True,True)
+
             
         
 
@@ -303,7 +309,7 @@ class LFGui(QtGui.QMainWindow):
 
         path_,fname_ = os.path.split(fname[(len(self.base_dir)+1):])
         new_cine_fname = infra.FilePath(self.base_dir,path_,fname_)
-        self.fname_text.setText('/'.join(new_cine_fname[1:])
+        self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
         default_params = dict((d['name'],d['default']) for d in LFGui.spinner_lst)
         self.open_file_sig.emit(new_cine_fname,default_params)
@@ -394,8 +400,13 @@ class LFGui(QtGui.QMainWindow):
         fc_vboxes.addWidget(clear_mbe_button)
 
 
-        self.draw_fringes_ck = QtGui.QCheckBox('Draw Fringes')
-        self.draw_fringes_ck.stateChanged.connect(self.set_fringes_visible)
+        self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
+        self.fringe_grp_bx.setCheckable(True)
+        self.fringe_grp_bx.setChecked(False)
+        self.fringe_grp_bx.toggled.connect(self.set_fringes_visible)
+        all_fringe_rb = QtGui.QRadioButton('All Fringes')
+        valid_fringes_rm = QtGui.QRadioButton('Valid Fringes')
+        all_fringe_rb.toggled.connect(lambda i: self.all_fringes_flg = i)
         self.draw_fringes_ck.setChecked(self.draw_fringes)
         fc_vboxes.addWidget(self.draw_fringes_ck)
 
@@ -498,7 +509,7 @@ class LFGui(QtGui.QMainWindow):
         self.prog_bar.setRange(0,0)
         self.prog_bar.hide()
         self.statusBar().addWidget(self.prog_bar, 1)
-        self.statusBar().addPermanentWidget(fname_text)
+        self.statusBar().addPermanentWidget(self.fname_text)
 
     def closeEvent(self,ce):
         self.kill_thread.emit()
