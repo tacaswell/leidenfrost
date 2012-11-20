@@ -39,7 +39,7 @@ import cine
 
 
 class LFWorker(QtCore.QObject):
-    frame_proced = QtCore.Signal()
+    frame_proced = QtCore.Signal(bool,bool)
     
     def __init__(self,cine_fname,bck_img,params,parent=None):
         QtCore.QObject.__init__(self,parent)
@@ -84,7 +84,8 @@ class LFWorker(QtCore.QObject):
         self.process_backend = infra.ProcessBackend.from_args(cine_fname,bck_img = None,**params)
         self.frame_proced.emit(True,True)
 
-    
+
+
 class LFGui(QtGui.QMainWindow):
     proc = QtCore.Signal(int,infra.SplineCurve)
     open_file_sig  = QtCore.Signal(infra.FilePath,dict)
@@ -106,8 +107,8 @@ class LFGui(QtGui.QMainWindow):
         self.base_dir = cine_fname[0]
         self.cur_frame = 0
 
-        self.refresh_lines_flg = True
-        self.refresh_img = True        
+
+
         self.draw_fringes = False
         
         default_params = dict((d['name'],d['default']) for d in LFGui.spinner_lst)
@@ -128,7 +129,7 @@ class LFGui(QtGui.QMainWindow):
 
         self.fringe_lines = []
 
-
+        self.all_fringes_flg = False
 
         self.create_main_frame()
         self.create_actions()
@@ -146,56 +147,60 @@ class LFGui(QtGui.QMainWindow):
 
         self.show()
         self.thread.start()
-        #        self.thread.exec_()
         QtGui.qApp.exec_()
         
 
     def grab_sf_curve(self):
         try:
             self.cur_curve = self.sf.return_SplineCurve()
-            self.ptf_button.setEnabled(True)
-            self.save_param_acc.setEnabled(True)
+            if self.cur_curve is not None:
+                self.proc_this_frame_acc.setEnabled(True)
+                self.save_param_acc.setEnabled(True)
+            else:
+                print 'no spline!?'
         except:
             print 'spline fitter not ready'
             self.cur_curve = None
         
     def update_param(self,key,val):
         self.worker.update_param(key,val)
-        if self.draw_fringes:
-            self._proc_this_frame()
+
+        self._proc_this_frame()
             
     def _proc_this_frame(self):
 
-        
+        print 'entered _proc_this_frame'
         self.prog_bar.show()
         self.diag.setEnabled(False)
         self.draw_fringes = True
-                
-        self.pnf_button.setEnabled(True)
+        self.proc_next_frame_acc.setEnabled(True)
         self.iterate_button.setEnabled(True)
-        self.refresh_lines_flg = True
-
 
         self.proc.emit(self.cur_frame,self.cur_curve)
 
         
+        
     def _proc_next_frame(self):
+
         self.frame_spinner.setValue(self.cur_frame + 1)
         self.diag.setEnabled(False)
         self._proc_this_frame()
 
     def set_fringes_visible(self,i):
         self.draw_fringes = bool(i)
-        self.refresh_lines_flg = True
+        
+        self.redraw_sig.emit(True,False)
+
+    def set_all_friges(self,i):
+        self.all_fringes_flg = bool(i)
         self.redraw_sig.emit(True,False)
 
     @QtCore.Slot(bool,bool)
     def on_draw(self,refresh_lines=True,refresh_img=True):
         """ Redraws the figure
         """
-        self.draw_fringes_ck.setChecked(self.draw_fringes)
-        print 'entered on_draw'
-        print refresh_lines,refresh_img,self.draw_fringes
+        self.fringe_grp_bx.setChecked(self.draw_fringes)
+
         # update the image
         if refresh_img:
             self.im.set_data(self.worker.get_frame(self.cur_frame))
@@ -214,7 +219,7 @@ class LFGui(QtGui.QMainWindow):
                 mbe = self.worker.get_mbe()   # grab new mbe from thread object
                 self.next_curve = self.worker.get_next_curve()   # grab new next curve
                 if self.draw_fringes and mbe is not None:
-                    self.fringe_lines.extend(mbe.ax_plot_tracks(self.axes,min_len = 15,all_tracks = False))
+                    self.fringe_lines.extend(mbe.ax_plot_tracks(self.axes,min_len = 0,all_tracks = self.all_fringes_flg))
                     self.fringe_lines.extend(mbe.ax_draw_center_curves(self.axes))
 
         self.canvas.draw()
@@ -225,12 +230,12 @@ class LFGui(QtGui.QMainWindow):
     def clear_mbe(self):
         self.cur_curve = None
         self.next_curve = None
-        self.pnf_button.setEnabled(False)
-        self.ptf_button.setEnabled(False)
+        self.proc_this_frame_acc.setEnabled(False)
+        self.proc_next_frame_acc.setEnabled(False)
         self.save_param_acc.setEnabled(False)
         self.iterate_button.setEnabled(False)
         self.refresh_lines_flg = True
-        self.draw_fringes_ck.setChecked(False)
+        self.self.fringe_grp_bx.setChecked(False)
 
         
     def set_spline_fitter(self,i):
@@ -382,17 +387,24 @@ class LFGui(QtGui.QMainWindow):
         grab_button.clicked.connect(self.grab_sf_curve)
         fc_vboxes.addWidget(grab_button)
         # button to process this frame
+
         ptf_button = QtGui.QPushButton('Process This Frame')
-        ptf_button.clicked.connect(self._proc_this_frame)
-        ptf_button.setEnabled(False)
+        ptf_button.clicked.connect(self.proc_this_frame_acc.trigger)
+        ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled())
+        self.proc_this_frame_acc.changed.connect(lambda : ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled()))
+
+
         fc_vboxes.addWidget(ptf_button)
-        self.ptf_button = ptf_button
+
         # button to process next frame
         pnf_button = QtGui.QPushButton('Process Next Frame')
-        pnf_button.clicked.connect(self._proc_next_frame)
-        pnf_button.setEnabled(False)
+        pnf_button.clicked.connect(self.proc_next_frame_acc.trigger)
+        pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled())
+        self.proc_next_frame_acc.changed.connect(lambda : pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled()))
+
+
         fc_vboxes.addWidget(pnf_button)
-        self.pnf_button = pnf_button
+
         # nuke tracking data
         
         clear_mbe_button = QtGui.QPushButton('Clear fringes')
@@ -404,11 +416,17 @@ class LFGui(QtGui.QMainWindow):
         self.fringe_grp_bx.setCheckable(True)
         self.fringe_grp_bx.setChecked(False)
         self.fringe_grp_bx.toggled.connect(self.set_fringes_visible)
+        #        self.proc_this_frame_acc.triggered.connect(lambda : self.fringe_grp_bx.setChecked(True))
         all_fringe_rb = QtGui.QRadioButton('All Fringes')
-        valid_fringes_rm = QtGui.QRadioButton('Valid Fringes')
-        all_fringe_rb.toggled.connect(lambda i: self.all_fringes_flg = i)
-        self.draw_fringes_ck.setChecked(self.draw_fringes)
-        fc_vboxes.addWidget(self.draw_fringes_ck)
+        valid_fringes_rb = QtGui.QRadioButton('Valid Fringes')
+        rb_vbox = QtGui.QVBoxLayout()
+        rb_vbox.addWidget(valid_fringes_rb)
+        rb_vbox.addWidget(all_fringe_rb)
+        self.fringe_grp_bx.setLayout(rb_vbox)
+        all_fringe_rb.toggled.connect(self.set_all_friges)
+        all_fringe_rb.setChecked(False)
+        valid_fringes_rb.setChecked(True)
+        fc_vboxes.addWidget(self.fringe_grp_bx)
 
 
         
@@ -424,6 +442,8 @@ class LFGui(QtGui.QMainWindow):
 
         save_param_bttn.setEnabled(self.save_param_acc.isEnabled())
         self.save_param_acc.changed.connect(lambda : save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
+
+
         
 
         
@@ -445,7 +465,7 @@ class LFGui(QtGui.QMainWindow):
         self.sf_show.stateChanged.connect(self.set_spline_fitter_visible)
         spline_cntrls.addWidget(self.sf_show)
         
-        clear_spline_button = QtGui.QPushButton('Clear Supline')
+        clear_spline_button = QtGui.QPushButton('Clear Spline')
         clear_spline_button.clicked.connect(self.clear_spline)
         spline_cntrls.addWidget(clear_spline_button)
 
@@ -471,7 +491,7 @@ class LFGui(QtGui.QMainWindow):
         self.axes = self.fig.add_subplot(111)
         tmp = self.worker.get_frame(self.cur_frame)
 
-        self.im = self.axes.imshow(tmp,cmap='cubehelix',interpolation = 'nearest')
+        self.im = self.axes.imshow(tmp,cmap='gray',interpolation = 'nearest')
         self.axes.set_aspect('equal')
         self.im.set_clim([.5,1.5])
 
@@ -533,6 +553,15 @@ class LFGui(QtGui.QMainWindow):
         self.open_file_acc =  QtGui.QAction(u'Open &File',self)
         self.open_file_acc.triggered.connect(self.open_file)
 
+        self.proc_this_frame_acc = QtGui.QAction('Process this Frame',self)
+        self.proc_this_frame_acc.setEnabled(False)
+        self.proc_this_frame_acc.triggered.connect(self._proc_this_frame)
+
+
+        self.proc_next_frame_acc = QtGui.QAction('Process next Frame',self)
+        self.proc_next_frame_acc.setEnabled(False)
+        self.proc_next_frame_acc.triggered.connect(self._proc_next_frame)
+
     def create_menu_bar(self):
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
@@ -540,3 +569,8 @@ class LFGui(QtGui.QMainWindow):
         fileMenu.addAction(self.save_param_acc)
         fileMenu.addAction(self.set_base_dir_acc)
         fileMenu.addAction(self.open_file_acc)
+
+        procMenu = menubar.addMenu('&Process')
+        procMenu.addAction(self.proc_this_frame_acc)
+        procMenu.addAction(self.proc_next_frame_acc)
+
