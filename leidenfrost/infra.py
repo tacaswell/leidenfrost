@@ -134,7 +134,7 @@ class lf_Track(Track):
         x,y = curve.q_phi_to_xy(q,phi)
         
         if self.charge is None:
-            kwargs['marker'] = '*'
+            kwargs['marker'] = 's'
         elif self.charge == 1:
             kwargs['marker'] = '^'
         elif self.charge == -1:
