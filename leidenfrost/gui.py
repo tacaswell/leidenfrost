@@ -19,7 +19,8 @@ from __future__ import division
 
 import os
 
-# do this to make me learn where stuff is and to make it easy to switch to PyQt later
+# do this to make me learn where stuff is and to make it easy to
+# switch to PyQt later
 import PySide.QtCore as QtCore
 import PySide.QtGui as QtGui
 
@@ -34,26 +35,25 @@ import leidenfrost.infra as infra
 import cine
 
 
-
-
-
-
 class LFWorker(QtCore.QObject):
-    frame_proced = QtCore.Signal(bool,bool)
-    
-    def __init__(self,cine_fname,bck_img,params,parent=None):
-        QtCore.QObject.__init__(self,parent)
+    frame_proced = QtCore.Signal(bool, bool)
 
-        self.process_backend = infra.ProcessBackend.from_args(cine_fname,bck_img = bck_img,**params)
-        
+    def __init__(self, cine_fname, bck_img, params, parent=None):
+        QtCore.QObject.__init__(self, parent)
+
+        self.process_backend = infra.ProcessBackend.from_args(cine_fname,
+                                                              bck_img=bck_img,
+                                                              **params)
+
         self.mbe = None
         self.next_curve = None
 
-    @QtCore.Slot(int,infra.SplineCurve)
-    def proc_frame(self,ind,curve):
-        
-        self.mbe,self.next_curve = self.process_backend.process_frame(ind,curve)
-        self.frame_proced.emit(True,True)
+    @QtCore.Slot(int, infra.SplineCurve)
+    def proc_frame(self, ind, curve):
+
+        self.mbe, self.next_curve = self.process_backend.process_frame(ind,
+                                                                       curve)
+        self.frame_proced.emit(True, True)
 
     def get_mbe(self):
         return self.mbe
@@ -61,71 +61,101 @@ class LFWorker(QtCore.QObject):
     def get_next_curve(self):
         return self.next_curve
 
+    def update_param(self, key, val):
+        self.process_backend.update_param(key, val)
 
-
-
-
-    def update_param(self,key,val):
-        self.process_backend.update_param(key,val)
-
-    def get_frame(self,ind):
+    def get_frame(self, ind):
         tmp = self.process_backend.get_frame(ind)
-        return np.asarray(tmp,dtype=np.float)
+        return np.asarray(tmp, dtype=np.float)
+
     def clear(self):
         self.mbe = None
         self.next_curve = None
+
     def __len__(self):
         return len(self.process_backend)
 
-    @QtCore.Slot(infra.FilePath,dict)
-    def set_new_fname(self,cine_fname,params):
-        print cine_fname,params
+    @QtCore.Slot(infra.FilePath, dict)
+    def set_new_fname(self, cine_fname, params):
+        print cine_fname, params
         self.clear()
-        self.process_backend = infra.ProcessBackend.from_args(cine_fname,bck_img = None,**params)
-        self.frame_proced.emit(True,True)
-
+        self.process_backend = infra.ProcessBackend.from_args(cine_fname,
+                                                              bck_img=None,
+                                                              **params)
+        self.frame_proced.emit(True, True)
 
 
 class LFGui(QtGui.QMainWindow):
-    proc = QtCore.Signal(int,infra.SplineCurve)
-    open_file_sig  = QtCore.Signal(infra.FilePath,dict)
+    proc = QtCore.Signal(int, infra.SplineCurve)
+    open_file_sig = QtCore.Signal(infra.FilePath, dict)
     kill_thread = QtCore.Signal()
-    redraw_sig = QtCore.Signal(bool,bool)
+    redraw_sig = QtCore.Signal(bool, bool)
     spinner_lst = [
-               {'name':'s_width','min':0,'max':50,'step':.5,'prec':1,'type':np.float,'default':10},
-               {'name':'s_num','min':1,'max':500,'step':1,'type':np.int,'default':100},
-               {'name':'search_range','min':.001,'max':2*np.pi,'step':.005,'prec':3,'type':np.float,'default':.01},
-               {'name':'memory','min':0,'max':500,'step':1,'type':np.int,'default':0},
-               {'name':'pix_err','min':0,'max':5,'step':.1,'prec':1,'type':np.float,'default':2},
-               {'name':'mix_in_count','min':0,'max':100,'step':1,'type':np.int,'default':10},
-               ]
-    
-    def __init__(self,cine_fname,bck_img=None, parent=None):
+        {'name': 's_width',
+         'min': 0,
+         'max': 50,
+         'step': .5,
+         'prec': 1,
+         'type': np.float,
+         'default': 10},
+         {'name': 's_num',
+          'min': 1,
+          'max': 500,
+          'step': 1,
+          'type': np.int,
+          'default': 100},
+        {'name': 'search_range',
+         'min': .001,
+         'max': 2 * np.pi,
+         'step': .005,
+         'prec': 3,
+         'type': np.float,
+         'default': .01},
+        {'name': 'memory',
+         'min': 0,
+         'max': 500,
+         'step': 1,
+         'type': np.int,
+         'default': 0},
+        {'name': 'pix_err',
+         'min': 0,
+         'max': 5,
+         'step': .1,
+         'prec': 1,
+         'type': np.float,
+         'default': 2},
+        {'name': 'mix_in_count',
+         'min': 0,
+         'max': 100,
+         'step': 1,
+         'type': np.int,
+         'default': 10}
+         ]
+
+    def __init__(self, cine_fname, bck_img=None, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
         self.cine_fname = cine_fname
         self.base_dir = cine_fname[0]
         self.cur_frame = 0
 
-
-
         self.draw_fringes = False
-        
-        default_params = dict((d['name'],d['default']) for d in LFGui.spinner_lst)
+
+        default_params = dict((d['name'], d['default']) for
+                              d in LFGui.spinner_lst)
 
         self.base_path = cine_fname[0]
 
         self.thread = QtCore.QThread(parent=self)
 
-
-        self.worker = LFWorker(cine_fname,bck_img,default_params,parent=None)
+        self.worker = LFWorker(cine_fname,
+                               bck_img,
+                               default_params,
+                               parent=None)
         self.worker.moveToThread(self.thread)
-
-        
 
         self.cur_curve = None
         self.next_curve = None
-
 
         self.fringe_lines = []
 
@@ -137,18 +167,17 @@ class LFGui(QtGui.QMainWindow):
         self.create_diag()
         self.create_status_bar()
 
-        self.on_draw(True,True)
-        self.worker.frame_proced.connect(self.on_draw)        
-        self.proc.connect(self.worker.proc_frame)    
-        self.open_file_sig.connect(self.worker.set_new_fname)    
+        self.on_draw(True, True)
+        self.worker.frame_proced.connect(self.on_draw)
+        self.proc.connect(self.worker.proc_frame)
+        self.open_file_sig.connect(self.worker.set_new_fname)
         self.redraw_sig.connect(self.on_draw)
-        
+
         self.kill_thread.connect(self.thread.quit)
 
         self.show()
         self.thread.start()
         QtGui.qApp.exec_()
-        
 
     def grab_sf_curve(self):
         try:
@@ -161,12 +190,12 @@ class LFGui(QtGui.QMainWindow):
         except:
             print 'spline fitter not ready'
             self.cur_curve = None
-        
-    def update_param(self,key,val):
-        self.worker.update_param(key,val)
+
+    def update_param(self, key, val):
+        self.worker.update_param(key, val)
 
         self._proc_this_frame()
-            
+
     def _proc_this_frame(self):
 
         print 'entered _proc_this_frame'
@@ -176,27 +205,25 @@ class LFGui(QtGui.QMainWindow):
         self.proc_next_frame_acc.setEnabled(True)
         self.iterate_button.setEnabled(True)
 
-        self.proc.emit(self.cur_frame,self.cur_curve)
+        self.proc.emit(self.cur_frame, self.cur_curve)
 
-        
-        
     def _proc_next_frame(self):
 
         self.frame_spinner.setValue(self.cur_frame + 1)
         self.diag.setEnabled(False)
         self._proc_this_frame()
 
-    def set_fringes_visible(self,i):
+    def set_fringes_visible(self, i):
         self.draw_fringes = bool(i)
-        
-        self.redraw_sig.emit(True,False)
 
-    def set_all_friges(self,i):
+        self.redraw_sig.emit(True, False)
+
+    def set_all_friges(self, i):
         self.all_fringes_flg = bool(i)
-        self.redraw_sig.emit(True,False)
+        self.redraw_sig.emit(True, False)
 
-    @QtCore.Slot(bool,bool)
-    def on_draw(self,refresh_lines=True,refresh_img=True):
+    @QtCore.Slot(bool, bool)
+    def on_draw(self, refresh_lines=True, refresh_img=True):
         """ Redraws the figure
         """
         self.fringe_grp_bx.setChecked(self.draw_fringes)
@@ -212,15 +239,22 @@ class LFGui(QtGui.QMainWindow):
                 ln.remove()
             # nuke all those objects
             self.fringe_lines = []
-        
+
             if self.draw_fringes:
                 # if we should draw new ones, do so
-                
-                mbe = self.worker.get_mbe()   # grab new mbe from thread object
-                self.next_curve = self.worker.get_next_curve()   # grab new next curve
+
+                # grab new mbe from thread object
+                mbe = self.worker.get_mbe()
+                # grab new next curve
+                self.next_curve = self.worker.get_next_curve()
                 if self.draw_fringes and mbe is not None:
-                    self.fringe_lines.extend(mbe.ax_plot_tracks(self.axes,min_len = 0,all_tracks = self.all_fringes_flg))
-                    self.fringe_lines.extend(mbe.ax_draw_center_curves(self.axes))
+                    self.fringe_lines.extend(
+                        mbe.ax_plot_tracks(self.axes,
+                                           min_len=0,
+                                           all_tracks=self.all_fringes_flg)
+                        )
+                    self.fringe_lines.extend(
+                        mbe.ax_draw_center_curves(self.axes))
 
         self.canvas.draw()
         self.status_text.setNum(self.cur_frame)
@@ -237,127 +271,122 @@ class LFGui(QtGui.QMainWindow):
         self.refresh_lines_flg = True
         self.self.fringe_grp_bx.setChecked(False)
 
-        
-    def set_spline_fitter(self,i):
+    def set_spline_fitter(self, i):
         if i:
             self.sf.connect_sf()
             # if we can screw with it, make it visible
             self.sf_show.setChecked(True)
         else:
             self.sf.disconnect_sf()
-        self.redraw_sig.emit(False,False)
+        self.redraw_sig.emit(False, False)
 
-            
-    def set_spline_fitter_visible(self,i):
+    def set_spline_fitter_visible(self, i):
         self.sf.set_visible(i)
         # if we can't see it, don't let is screw with it
         if not bool(i):
             self.sf_check.setChecked(False)
-        self.redraw_sig.emit(False,False)
+        self.redraw_sig.emit(False, False)
 
-                
-    def set_cur_frame(self,i):
+    def set_cur_frame(self, i):
         old_frame = self.cur_frame
         self.cur_frame = i
-        self.refresh_lines_flg = True        
+        self.refresh_lines_flg = True
         self.refresh_img = True
-        if old_frame  == self.cur_frame - 1:
+        if old_frame == self.cur_frame - 1:
             self.cur_curve = self.next_curve
             if self.draw_fringes:
                 self._proc_this_frame()
             else:
-                self.redraw_sig.emit(False,True)
+                self.redraw_sig.emit(False, True)
 
         else:
             self.draw_fringes = False
             self.worker.clear()
-            self.redraw_sig.emit(True,True)
-
-            
-        
+            self.redraw_sig.emit(True, True)
 
     def iterate_frame(self):
         self.cur_curve = self.next_curve
         self._proc_this_frame()
-        
 
     def clear_spline(self):
         self.sf.clear()
 
-
     def show_cntrls(self):
         self.diag.show()
 
-
     def save_config(self):
-        fname,_ = QtGui.QFileDialog.getSaveFileName(self,caption='Save File',dir = '/'.join(self.worker.process_backend.cine_fname[:1]))
+        fname, _ = QtGui.QFileDialog.getSaveFileName(self,
+                                                     caption='Save File',
+                                                     dir=self.base_dir)
         if len(fname) > 0:
-                self.worker.process_backend.gen_stub_h5(fname,self.cur_curve)
+                self.worker.process_backend.gen_stub_h5(fname, self.cur_curve)
 
     def set_base_dir(self):
-        base_dir = QtGui.QFileDialog.getExistingDirectory(self,caption='Base Directory',dir = self.base_dir)
+        base_dir = QtGui.QFileDialog.getExistingDirectory(self,
+                                                          caption='Base Directory',
+                                                          dir=self.base_dir)
         if len(base_dir) > 0:
             self.base_dir = base_dir
 
-            
     def open_file(self):
-        fname,_ = QtGui.QFileDialog.getOpenFileName(self,caption='Save File',dir = self.base_dir)
+        fname, _ = QtGui.QFileDialog.getOpenFileName(self,
+                                                     caption='Save File',
+                                                     dir=self.base_dir)
         if len(fname) == 0:
             return
-        
+
         while not self.base_dir == fname[:len(self.base_dir)]:
             print 'please set base_dir'
             self.set_base_dir()
-                    
+
         self.prog_bar.show()
         self.diag.setEnabled(False)
 
-        path_,fname_ = os.path.split(fname[(len(self.base_dir)+1):])
-        new_cine_fname = infra.FilePath(self.base_dir,path_,fname_)
+        path_, fname_ = os.path.split(fname[(len(self.base_dir) + 1):])
+        new_cine_fname = infra.FilePath(self.base_dir, path_, fname_)
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
-        default_params = dict((d['name'],d['default']) for d in LFGui.spinner_lst)
-        self.open_file_sig.emit(new_cine_fname,default_params)
-        
+        default_params = dict((d['name'], d['default']) for
+                              d in LFGui.spinner_lst)
+        self.open_file_sig.emit(new_cine_fname, default_params)
 
-        
     def create_diag(self):
         # make top level stuff
-        self.diag = QtGui.QDockWidget('controls',parent=self)
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea,self.diag)
+        self.diag = QtGui.QDockWidget('controls', parent=self)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
         diag_widget = QtGui.QWidget(self.diag)
         self.diag.setWidget(diag_widget)
         diag_layout = QtGui.QVBoxLayout()
         diag_widget.setLayout(diag_layout)
-        
 
         # frame number lives on top
         self.frame_spinner = QtGui.QSpinBox()
-        self.frame_spinner.setRange(0,len(self.worker)-1)
+        self.frame_spinner.setRange(0, len(self.worker) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
         fs_form = QtGui.QFormLayout()
-        fs_form.addRow(QtGui.QLabel('frame #'),self.frame_spinner)
-
+        fs_form.addRow(QtGui.QLabel('frame #'), self.frame_spinner)
 
         diag_layout.addLayout(fs_form)
-        
+
         # tool box for all the controls
         diag_tool_box = QtGui.QToolBox()
-        diag_layout.addWidget(diag_tool_box)        
+        diag_layout.addWidget(diag_tool_box)
 
-        
-        # section for dealing with fringe finding 
-        
+        # section for dealing with fringe finding
 
-        fringe_cntrls_w = QtGui.QWidget()   # the widget to shove into the toolbox
-        fc_vboxes = QtGui.QVBoxLayout()     # vbox layout for this panel
-        fringe_cntrls_w.setLayout(fc_vboxes)   # set the widget layout
-        diag_tool_box.addItem(fringe_cntrls_w,"Fringe Finding Settings") # add to the tool box
+        # the widget to shove into the toolbox
+        fringe_cntrls_w = QtGui.QWidget()
+        # vbox layout for this panel
+        fc_vboxes = QtGui.QVBoxLayout()
+        # set the widget layout
+        fringe_cntrls_w.setLayout(fc_vboxes)
+        # add to the tool box
+        diag_tool_box.addItem(fringe_cntrls_w, "Fringe Finding Settings")
 
-        
-        fringe_cntrls_spins = QtGui.QFormLayout()   # from layout to hold the spinners
-
-        fc_vboxes.addLayout(fringe_cntrls_spins)   # add spinner layout
+        # form layout to hold the spinners
+        fringe_cntrls_spins = QtGui.QFormLayout()
+        # add spinner layout
+        fc_vboxes.addLayout(fringe_cntrls_spins)
 
         # fill the spinners
         for spin_prams in LFGui.spinner_lst:
@@ -366,21 +395,21 @@ class LFGui(QtGui.QMainWindow):
 
             if s_type == 'i':
                 spin_box = QtGui.QSpinBox(parent=self)
-            elif s_type== 'f':
+            elif s_type == 'f':
                 spin_box = QtGui.QDoubleSpinBox(parent=self)
                 spin_box.setDecimals(spin_prams['prec'])
             else:
                 print s_type
                 continue
-            
-            spin_box.setRange(spin_prams['min'],spin_prams['max'])
+
+            spin_box.setRange(spin_prams['min'], spin_prams['max'])
             spin_box.setSingleStep(spin_prams['step'])
             spin_box.setValue(spin_prams['default'])
             name = spin_prams['name']
 
-
             spin_box.valueChanged.connect(self._gen_update_closure(name))
-            fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),spin_box)
+            fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
+                                       spin_box)
 
         # button to grab initial spline
         grab_button = QtGui.QPushButton('Grab Spline')
@@ -391,8 +420,8 @@ class LFGui(QtGui.QMainWindow):
         ptf_button = QtGui.QPushButton('Process This Frame')
         ptf_button.clicked.connect(self.proc_this_frame_acc.trigger)
         ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled())
-        self.proc_this_frame_acc.changed.connect(lambda : ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled()))
-
+        self.proc_this_frame_acc.changed.connect(
+            lambda: ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled()))
 
         fc_vboxes.addWidget(ptf_button)
 
@@ -400,23 +429,25 @@ class LFGui(QtGui.QMainWindow):
         pnf_button = QtGui.QPushButton('Process Next Frame')
         pnf_button.clicked.connect(self.proc_next_frame_acc.trigger)
         pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled())
-        self.proc_next_frame_acc.changed.connect(lambda : pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled()))
-
+        self.proc_next_frame_acc.changed.connect(
+            lambda: pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled()))
 
         fc_vboxes.addWidget(pnf_button)
 
         # nuke tracking data
-        
+
         clear_mbe_button = QtGui.QPushButton('Clear fringes')
         clear_mbe_button.clicked.connect(self.clear_mbe)
         fc_vboxes.addWidget(clear_mbe_button)
-
 
         self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
         self.fringe_grp_bx.setChecked(False)
         self.fringe_grp_bx.toggled.connect(self.set_fringes_visible)
-        #        self.proc_this_frame_acc.triggered.connect(lambda : self.fringe_grp_bx.setChecked(True))
+
+        #        self.proc_this_frame_acc.triggered.connect(
+        #   lambda:self.fringe_grp_bx.setChecked(True))
+
         all_fringe_rb = QtGui.QRadioButton('All Fringes')
         valid_fringes_rb = QtGui.QRadioButton('Valid Fringes')
         rb_vbox = QtGui.QVBoxLayout()
@@ -428,35 +459,26 @@ class LFGui(QtGui.QMainWindow):
         valid_fringes_rb.setChecked(True)
         fc_vboxes.addWidget(self.fringe_grp_bx)
 
-
-        
         iterate_button = QtGui.QPushButton('Iterate fringes')
         iterate_button.clicked.connect(self.iterate_frame)
         iterate_button.setEnabled(False)
         fc_vboxes.addWidget(iterate_button)
         self.iterate_button = iterate_button
-        
-        
+
         save_param_bttn = QtGui.QPushButton('Save Configuration')
         save_param_bttn.clicked.connect(self.save_param_acc.trigger)
 
         save_param_bttn.setEnabled(self.save_param_acc.isEnabled())
-        self.save_param_acc.changed.connect(lambda : save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
+        self.save_param_acc.changed.connect(
+            lambda: save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
 
-
-        
-
-        
         fc_vboxes.addWidget(save_param_bttn)
 
         # section for making spline fitting panel
-            
-
-        
         spline_cntrls = QtGui.QVBoxLayout()
         spline_cntrls_w = QtGui.QWidget()
         spline_cntrls_w.setLayout(spline_cntrls)
-            
+
         self.sf_check = QtGui.QCheckBox('enabled input')
         self.sf_check.stateChanged.connect(self.set_spline_fitter)
         spline_cntrls.addWidget(self.sf_check)
@@ -464,26 +486,24 @@ class LFGui(QtGui.QMainWindow):
         self.sf_show = QtGui.QCheckBox('display fitter')
         self.sf_show.stateChanged.connect(self.set_spline_fitter_visible)
         spline_cntrls.addWidget(self.sf_show)
-        
+
         clear_spline_button = QtGui.QPushButton('Clear Spline')
         clear_spline_button.clicked.connect(self.clear_spline)
         spline_cntrls.addWidget(clear_spline_button)
 
+        diag_tool_box.addItem(spline_cntrls_w, "Manual Spline Fitting")
 
-        
-        diag_tool_box.addItem(spline_cntrls_w,"Manual Spline Fitting")
-        
     def create_main_frame(self):
         self.main_frame = QtGui.QWidget()
-        # create the mpl Figure and FigCanvas objects. 
+        # create the mpl Figure and FigCanvas objects.
         # 5x4 inches, 100 dots-per-inch
         #
 
-        self.fig = Figure((24,24))
+        self.fig = Figure((24, 24))
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
 
-        # Since we have only one plot, we can use add_axes 
+        # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
         # configuration tool in the navigation toolbar wouldn't
         # work.
@@ -491,9 +511,9 @@ class LFGui(QtGui.QMainWindow):
         self.axes = self.fig.add_subplot(111)
         tmp = self.worker.get_frame(self.cur_frame)
 
-        self.im = self.axes.imshow(tmp,cmap='gray',interpolation = 'nearest')
+        self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
         self.axes.set_aspect('equal')
-        self.im.set_clim([.5,1.5])
+        self.im.set_clim([.5, 1.5])
 
         self.sf = infra.spline_fitter(self.axes)
         self.sf.disconnect_sf()
@@ -503,62 +523,57 @@ class LFGui(QtGui.QMainWindow):
         # Create the navigation toolbar, tied to the canvas
         #
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
-        
-        # Other GUI controls
-        # 
 
-        
+        # Other GUI controls
+        #
         # lay out main panel
-            
+
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.mpl_toolbar)
         vbox.addWidget(self.canvas)
 
-        
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
-    def _gen_update_closure(self,name):
-        return lambda x :self.update_param(name,x)
-    
+    def _gen_update_closure(self, name):
+        return lambda x: self.update_param(name, x)
+
     def create_status_bar(self):
         self.status_text = QtGui.QLabel(str(self.cur_frame))
-        self.fname_text =  QtGui.QLabel('/'.join(self.cine_fname[1:]))
+        self.fname_text = QtGui.QLabel('/'.join(self.cine_fname[1:]))
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
-        self.prog_bar.setRange(0,0)
+        self.prog_bar.setRange(0, 0)
         self.prog_bar.hide()
         self.statusBar().addWidget(self.prog_bar, 1)
         self.statusBar().addPermanentWidget(self.fname_text)
 
-    def closeEvent(self,ce):
+    def closeEvent(self, ce):
         self.kill_thread.emit()
         #        QtGui.qApp.quit()
         #        self.thread.quit()
         self.diag.close()
-        QtGui.QMainWindow.closeEvent(self,ce)
+        QtGui.QMainWindow.closeEvent(self, ce)
 
     def create_actions(self):
-        self.show_cntrl_acc = QtGui.QAction(u'show controls',self)
+        self.show_cntrl_acc = QtGui.QAction(u'show controls', self)
         self.show_cntrl_acc.triggered.connect(self.show_cntrls)
 
-        self.save_param_acc = QtGui.QAction(u'Save Parameters',self)
+        self.save_param_acc = QtGui.QAction(u'Save Parameters', self)
         self.save_param_acc.setEnabled(False)
         self.save_param_acc.triggered.connect(self.save_config)
 
-        self.set_base_dir_acc =  QtGui.QAction(u'Select base dir',self)
+        self.set_base_dir_acc = QtGui.QAction(u'Select base dir', self)
         self.set_base_dir_acc.triggered.connect(self.set_base_dir)
 
-        
-        self.open_file_acc =  QtGui.QAction(u'Open &File',self)
+        self.open_file_acc = QtGui.QAction(u'Open &File', self)
         self.open_file_acc.triggered.connect(self.open_file)
 
-        self.proc_this_frame_acc = QtGui.QAction('Process this Frame',self)
+        self.proc_this_frame_acc = QtGui.QAction('Process this Frame', self)
         self.proc_this_frame_acc.setEnabled(False)
         self.proc_this_frame_acc.triggered.connect(self._proc_this_frame)
 
-
-        self.proc_next_frame_acc = QtGui.QAction('Process next Frame',self)
+        self.proc_next_frame_acc = QtGui.QAction('Process next Frame', self)
         self.proc_next_frame_acc.setEnabled(False)
         self.proc_next_frame_acc.triggered.connect(self._proc_next_frame)
 
@@ -575,23 +590,22 @@ class LFGui(QtGui.QMainWindow):
         procMenu.addAction(self.proc_next_frame_acc)
 
 
-                
 class LFReader(QtCore.QObject):
-    frame_loaded = QtCore.Signal(bool,bool)
-    
-    def __init__(self,cine_fname,bck_img,params,parent=None):
-        QtCore.QObject.__init__(self,parent)
+    frame_loaded = QtCore.Signal(bool, bool)
 
-        self.backend = infra.ProcessBackend.from_args(cine_fname,bck_img = bck_img,**params)
-        
+    def __init__(self, cine_fname, bck_img, params, parent=None):
+        QtCore.QObject.__init__(self, parent)
+
+        self.backend = None
+
         self.mbe = None
         self.next_curve = None
 
     @QtCore.Slot(int)
-    def read_frame(self,ind):
-        
-        self.mbe,self.next_curve = self.process_backend.process_frame(ind,curve)
-        self.frame_loaded.emit(True,True)
+    def read_frame(self, ind):
+
+        self.mbe, self.next_curve = self.process_backend.process_frame(ind, curve)
+        self.frame_loaded.emit(True, True)
 
     def get_mbe(self):
         return self.mbe
@@ -599,11 +613,10 @@ class LFReader(QtCore.QObject):
     def get_next_curve(self):
         return self.next_curve
 
-    def get_frame_img(self,ind):
+    def get_frame_img(self, ind):
         tmp = self.process_backend.get_frame(ind)
-        return np.asarray(tmp,dtype=np.float)
+        return np.asarray(tmp, dtype=np.float)
 
-        
     def clear(self):
         self.mbe = None
         self.next_curve = None
@@ -611,42 +624,36 @@ class LFReader(QtCore.QObject):
     def __len__(self):
         return len(self.backend)
 
-    @QtCore.Slot(str,infra.FilePath)
-    def set_new_fname(self,str,hdf_fname):
-        print cine_fname,params
+    @QtCore.Slot(str, infra.FilePath)
+    def set_new_fname(self, str, hdf_fname):
+
         self.clear()
-        self.process_backend = infra.ProcessBackend.from_args(cine_fname,bck_img = None,**params)
-        self.frame_proced.emit(True,True)
+        self.process_backend = None
+
+        self.frame_proced.emit(True, True)
 
 
-        
 class LFReaderGui(QtGui.QMainWindow):
     read_request_sig = QtCore.Signal(int)
-    open_file_sig  = QtCore.Signal(infra.FilePath,dict)
+    open_file_sig = QtCore.Signal(infra.FilePath, dict)
     kill_thread = QtCore.Signal()
-    redraw_sig = QtCore.Signal(bool,bool)
+    redraw_sig = QtCore.Signal(bool, bool)
 
-    def __init__(self,cine_base_path,hdf_fname, parent=None):
+    def __init__(self, cine_base_path, hdf_fname, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Displayer')
 
-        
-
         self.draw_fringes = False
-        self.all_fringes_flg = False        
+        self.all_fringes_flg = False
 
         self.reader = LFReader()
         self.thread = QtCore.QThread(parent=self)
         self.reader.moveToThread(self.thread)
 
-        
-
         self.cur_curve = None
         self.next_curve = None
 
         self.fringe_lines = []
-
-
 
         self.create_main_frame()
         self.create_actions()
@@ -654,31 +661,30 @@ class LFReaderGui(QtGui.QMainWindow):
         self.create_diag()
         self.create_status_bar()
 
-        self.on_draw(True,True)
+        self.on_draw(True, True)
 
-        self.reader.frame_proced.connect(self.on_draw)        
-        self.read_request_sig.connect(self.reader.read_frame)    
-        self.open_file_sig.connect(self.worker.set_new_fname)    
+        self.reader.frame_proced.connect(self.on_draw)
+        self.read_request_sig.connect(self.reader.read_frame)
+        self.open_file_sig.connect(self.worker.set_new_fname)
         self.redraw_sig.connect(self.on_draw)
-        
+
         self.kill_thread.connect(self.thread.quit)
 
         self.show()
         self.thread.start()
         QtGui.qApp.exec_()
-        
 
-    def set_fringes_visible(self,i):
+    def set_fringes_visible(self, i):
         self.draw_fringes = bool(i)
-        
-        self.redraw_sig.emit(True,False)
 
-    def set_all_friges(self,i):
+        self.redraw_sig.emit(True, False)
+
+    def set_all_friges(self, i):
         self.all_fringes_flg = bool(i)
-        self.redraw_sig.emit(True,False)
+        self.redraw_sig.emit(True, False)
 
-    @QtCore.Slot(bool,bool)
-    def on_draw(self,refresh_lines=True,refresh_img=True):
+    @QtCore.Slot(bool, bool)
+    def on_draw(self, refresh_lines=True, refresh_img=True):
         """ Redraws the figure
         """
         self.fringe_grp_bx.setChecked(self.draw_fringes)
@@ -694,14 +700,17 @@ class LFReaderGui(QtGui.QMainWindow):
                 ln.remove()
             # nuke all those objects
             self.fringe_lines = []
-        
+
             if self.draw_fringes:
                 # if we should draw new ones, do so
-                
+
                 mbe = self.worker.get_mbe()   # grab new mbe from thread object
                 self.next_curve = self.worker.get_next_curve()   # grab new next curve
                 if self.draw_fringes and mbe is not None:
-                    self.fringe_lines.extend(mbe.ax_plot_tracks(self.axes,min_len = 0,all_tracks = self.all_fringes_flg))
+                    self.fringe_lines.extend(
+                        mbe.ax_plot_tracks(self.axes,
+                                           min_len=0,
+                                           all_tracks=self.all_fringes_flg))
                     self.fringe_lines.extend(mbe.ax_draw_center_curves(self.axes))
 
         self.canvas.draw()
@@ -719,124 +728,79 @@ class LFReaderGui(QtGui.QMainWindow):
         self.refresh_lines_flg = True
         self.self.fringe_grp_bx.setChecked(False)
 
-        
-    def set_spline_fitter(self,i):
-        if i:
-            self.sf.connect_sf()
-            # if we can screw with it, make it visible
-            self.sf_show.setChecked(True)
-        else:
-            self.sf.disconnect_sf()
-        self.redraw_sig.emit(False,False)
-
-            
-    def set_spline_fitter_visible(self,i):
-        self.sf.set_visible(i)
-        # if we can't see it, don't let is screw with it
-        if not bool(i):
-            self.sf_check.setChecked(False)
-        self.redraw_sig.emit(False,False)
-
-                
-    def set_cur_frame(self,i):
+    def set_cur_frame(self, i):
         old_frame = self.cur_frame
         self.cur_frame = i
-        self.refresh_lines_flg = True        
+        self.refresh_lines_flg = True
         self.refresh_img = True
-        if old_frame  == self.cur_frame - 1:
+        if old_frame == self.cur_frame - 1:
             self.cur_curve = self.next_curve
             if self.draw_fringes:
                 self._proc_this_frame()
             else:
-                self.redraw_sig.emit(False,True)
+                self.redraw_sig.emit(False, True)
 
         else:
             self.draw_fringes = False
             self.worker.clear()
-            self.redraw_sig.emit(True,True)
-
-            
-        
-
-    def iterate_frame(self):
-        self.cur_curve = self.next_curve
-        self._proc_this_frame()
-        
-
-    def clear_spline(self):
-        self.sf.clear()
-
+            self.redraw_sig.emit(True, True)
 
     def show_cntrls(self):
         self.diag.show()
 
-
-    def save_config(self):
-        fname,_ = QtGui.QFileDialog.getSaveFileName(self,caption='Save File',dir = '/'.join(self.worker.process_backend.cine_fname[:1]))
-        if len(fname) > 0:
-                self.worker.process_backend.gen_stub_h5(fname,self.cur_curve)
-
     def set_base_dir(self):
-        base_dir = QtGui.QFileDialog.getExistingDirectory(self,caption='Base Directory',dir = self.base_dir)
+        base_dir = QtGui.QFileDialog.getExistingDirectory(self,
+                                                          caption='Base Directory',
+                                                          dir=self.base_dir)
         if len(base_dir) > 0:
             self.base_dir = base_dir
 
-            
     def open_file(self):
-        fname,_ = QtGui.QFileDialog.getOpenFileName(self,caption='Save File',dir = self.base_dir)
+        fname, _ = QtGui.QFileDialog.getOpenFileName(self,
+                                                     caption='Save File',
+                                                     dir=self.base_dir)
         if len(fname) == 0:
             return
-        
-        while not self.base_dir == fname[:len(self.base_dir)]:
-            print 'please set base_dir'
-            self.set_base_dir()
-                    
+
         self.prog_bar.show()
         self.diag.setEnabled(False)
 
-        path_,fname_ = os.path.split(fname[(len(self.base_dir)+1):])
-        new_cine_fname = infra.FilePath(self.base_dir,path_,fname_)
+        path_, fname_ = os.path.split(fname[(len(self.base_dir) + 1):])
+        new_cine_fname = infra.FilePath(self.base_dir, path_, fname_)
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
-        default_params = dict((d['name'],d['default']) for d in LFGui.spinner_lst)
-        self.open_file_sig.emit(new_cine_fname,default_params)
-        
+        default_params = dict((d['name'], d['default']) for d in LFGui.spinner_lst)
+        self.open_file_sig.emit(new_cine_fname, default_params)
 
-        
     def create_diag(self):
         # make top level stuff
-        self.diag = QtGui.QDockWidget('controls',parent=self)
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea,self.diag)
+        self.diag = QtGui.QDockWidget('controls', parent=self)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
         diag_widget = QtGui.QWidget(self.diag)
         self.diag.setWidget(diag_widget)
         diag_layout = QtGui.QVBoxLayout()
         diag_widget.setLayout(diag_layout)
-        
 
         # frame number lives on top
         self.frame_spinner = QtGui.QSpinBox()
-        self.frame_spinner.setRange(0,len(self.worker)-1)
+        self.frame_spinner.setRange(0, len(self.worker) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
         fs_form = QtGui.QFormLayout()
-        fs_form.addRow(QtGui.QLabel('frame #'),self.frame_spinner)
-
+        fs_form.addRow(QtGui.QLabel('frame #'), self.frame_spinner)
 
         diag_layout.addLayout(fs_form)
-        
+
         # tool box for all the controls
         diag_tool_box = QtGui.QToolBox()
-        diag_layout.addWidget(diag_tool_box)        
+        diag_layout.addWidget(diag_tool_box)
 
-        
-        # section for dealing with fringe finding 
-        
+        # section for dealing with fringe finding
 
         fringe_cntrls_w = QtGui.QWidget()   # the widget to shove into the toolbox
         fc_vboxes = QtGui.QVBoxLayout()     # vbox layout for this panel
         fringe_cntrls_w.setLayout(fc_vboxes)   # set the widget layout
-        diag_tool_box.addItem(fringe_cntrls_w,"Fringe Finding Settings") # add to the tool box
+        diag_tool_box.addItem(fringe_cntrls_w, "Fringe Finding Settings")  # add to the tool box
 
-        
         fringe_cntrls_spins = QtGui.QFormLayout()   # from layout to hold the spinners
 
         fc_vboxes.addLayout(fringe_cntrls_spins)   # add spinner layout
@@ -848,21 +812,20 @@ class LFReaderGui(QtGui.QMainWindow):
 
             if s_type == 'i':
                 spin_box = QtGui.QSpinBox(parent=self)
-            elif s_type== 'f':
+            elif s_type == 'f':
                 spin_box = QtGui.QDoubleSpinBox(parent=self)
                 spin_box.setDecimals(spin_prams['prec'])
             else:
                 print s_type
                 continue
-            
-            spin_box.setRange(spin_prams['min'],spin_prams['max'])
+
+            spin_box.setRange(spin_prams['min'], spin_prams['max'])
             spin_box.setSingleStep(spin_prams['step'])
             spin_box.setValue(spin_prams['default'])
             name = spin_prams['name']
 
-
             spin_box.valueChanged.connect(self._gen_update_closure(name))
-            fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),spin_box)
+            fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']), spin_box)
 
         # button to grab initial spline
         grab_button = QtGui.QPushButton('Grab Spline')
@@ -873,8 +836,8 @@ class LFReaderGui(QtGui.QMainWindow):
         ptf_button = QtGui.QPushButton('Process This Frame')
         ptf_button.clicked.connect(self.proc_this_frame_acc.trigger)
         ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled())
-        self.proc_this_frame_acc.changed.connect(lambda : ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled()))
-
+        self.proc_this_frame_acc.changed.connect(
+            lambda: ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled()))
 
         fc_vboxes.addWidget(ptf_button)
 
@@ -882,17 +845,15 @@ class LFReaderGui(QtGui.QMainWindow):
         pnf_button = QtGui.QPushButton('Process Next Frame')
         pnf_button.clicked.connect(self.proc_next_frame_acc.trigger)
         pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled())
-        self.proc_next_frame_acc.changed.connect(lambda : pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled()))
-
+        self.proc_next_frame_acc.changed.connect(lambda: pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled()))
 
         fc_vboxes.addWidget(pnf_button)
 
         # nuke tracking data
-        
+
         clear_mbe_button = QtGui.QPushButton('Clear fringes')
         clear_mbe_button.clicked.connect(self.clear_mbe)
         fc_vboxes.addWidget(clear_mbe_button)
-
 
         self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
@@ -910,35 +871,26 @@ class LFReaderGui(QtGui.QMainWindow):
         valid_fringes_rb.setChecked(True)
         fc_vboxes.addWidget(self.fringe_grp_bx)
 
-
-        
         iterate_button = QtGui.QPushButton('Iterate fringes')
         iterate_button.clicked.connect(self.iterate_frame)
         iterate_button.setEnabled(False)
         fc_vboxes.addWidget(iterate_button)
         self.iterate_button = iterate_button
-        
-        
+
         save_param_bttn = QtGui.QPushButton('Save Configuration')
         save_param_bttn.clicked.connect(self.save_param_acc.trigger)
 
         save_param_bttn.setEnabled(self.save_param_acc.isEnabled())
-        self.save_param_acc.changed.connect(lambda : save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
+        self.save_param_acc.changed.connect(lambda: save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
 
-
-        
-
-        
         fc_vboxes.addWidget(save_param_bttn)
 
         # section for making spline fitting panel
-            
 
-        
         spline_cntrls = QtGui.QVBoxLayout()
         spline_cntrls_w = QtGui.QWidget()
         spline_cntrls_w.setLayout(spline_cntrls)
-            
+
         self.sf_check = QtGui.QCheckBox('enabled input')
         self.sf_check.stateChanged.connect(self.set_spline_fitter)
         spline_cntrls.addWidget(self.sf_check)
@@ -946,26 +898,24 @@ class LFReaderGui(QtGui.QMainWindow):
         self.sf_show = QtGui.QCheckBox('display fitter')
         self.sf_show.stateChanged.connect(self.set_spline_fitter_visible)
         spline_cntrls.addWidget(self.sf_show)
-        
+
         clear_spline_button = QtGui.QPushButton('Clear Spline')
         clear_spline_button.clicked.connect(self.clear_spline)
         spline_cntrls.addWidget(clear_spline_button)
 
+        diag_tool_box.addItem(spline_cntrls_w, "Manual Spline Fitting")
 
-        
-        diag_tool_box.addItem(spline_cntrls_w,"Manual Spline Fitting")
-        
     def create_main_frame(self):
         self.main_frame = QtGui.QWidget()
-        # create the mpl Figure and FigCanvas objects. 
+        # create the mpl Figure and FigCanvas objects.
         # 5x4 inches, 100 dots-per-inch
         #
 
-        self.fig = Figure((24,24))
+        self.fig = Figure((24, 24))
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
 
-        # Since we have only one plot, we can use add_axes 
+        # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
         # configuration tool in the navigation toolbar wouldn't
         # work.
@@ -973,9 +923,9 @@ class LFReaderGui(QtGui.QMainWindow):
         self.axes = self.fig.add_subplot(111)
         tmp = self.worker.get_frame(self.cur_frame)
 
-        self.im = self.axes.imshow(tmp,cmap='gray',interpolation = 'nearest')
+        self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
         self.axes.set_aspect('equal')
-        self.im.set_clim([.5,1.5])
+        self.im.set_clim([.5, 1.5])
 
         self.sf = infra.spline_fitter(self.axes)
         self.sf.disconnect_sf()
@@ -985,62 +935,58 @@ class LFReaderGui(QtGui.QMainWindow):
         # Create the navigation toolbar, tied to the canvas
         #
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
-        
-        # Other GUI controls
-        # 
 
-        
+        # Other GUI controls
+        #
+
         # lay out main panel
-            
+
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.mpl_toolbar)
         vbox.addWidget(self.canvas)
 
-        
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
-    def _gen_update_closure(self,name):
-        return lambda x :self.update_param(name,x)
-    
+    def _gen_update_closure(self, name):
+        return lambda x: self.update_param(name, x)
+
     def create_status_bar(self):
         self.status_text = QtGui.QLabel(str(self.cur_frame))
-        self.fname_text =  QtGui.QLabel('/'.join(self.cine_fname[1:]))
+        self.fname_text = QtGui.QLabel('/'.join(self.cine_fname[1:]))
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
-        self.prog_bar.setRange(0,0)
+        self.prog_bar.setRange(0, 0)
         self.prog_bar.hide()
         self.statusBar().addWidget(self.prog_bar, 1)
         self.statusBar().addPermanentWidget(self.fname_text)
 
-    def closeEvent(self,ce):
+    def closeEvent(self, ce):
         self.kill_thread.emit()
         #        QtGui.qApp.quit()
         #        self.thread.quit()
         self.diag.close()
-        QtGui.QMainWindow.closeEvent(self,ce)
+        QtGui.QMainWindow.closeEvent(self, ce)
 
     def create_actions(self):
-        self.show_cntrl_acc = QtGui.QAction(u'show controls',self)
+        self.show_cntrl_acc = QtGui.QAction(u'show controls', self)
         self.show_cntrl_acc.triggered.connect(self.show_cntrls)
 
-        self.save_param_acc = QtGui.QAction(u'Save Parameters',self)
+        self.save_param_acc = QtGui.QAction(u'Save Parameters', self)
         self.save_param_acc.setEnabled(False)
         self.save_param_acc.triggered.connect(self.save_config)
 
-        self.set_base_dir_acc =  QtGui.QAction(u'Select base dir',self)
+        self.set_base_dir_acc = QtGui.QAction(u'Select base dir', self)
         self.set_base_dir_acc.triggered.connect(self.set_base_dir)
 
-        
-        self.open_file_acc =  QtGui.QAction(u'Open &File',self)
+        self.open_file_acc = QtGui.QAction(u'Open &File', self)
         self.open_file_acc.triggered.connect(self.open_file)
 
-        self.proc_this_frame_acc = QtGui.QAction('Process this Frame',self)
+        self.proc_this_frame_acc = QtGui.QAction('Process this Frame', self)
         self.proc_this_frame_acc.setEnabled(False)
         self.proc_this_frame_acc.triggered.connect(self._proc_this_frame)
 
-
-        self.proc_next_frame_acc = QtGui.QAction('Process next Frame',self)
+        self.proc_next_frame_acc = QtGui.QAction('Process next Frame', self)
         self.proc_next_frame_acc.setEnabled(False)
         self.proc_next_frame_acc.triggered.connect(self._proc_next_frame)
 
@@ -1055,5 +1001,3 @@ class LFReaderGui(QtGui.QMainWindow):
         procMenu = menubar.addMenu('&Process')
         procMenu.addAction(self.proc_this_frame_acc)
         procMenu.addAction(self.proc_next_frame_acc)
-
-
