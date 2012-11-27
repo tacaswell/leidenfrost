@@ -28,7 +28,7 @@ import numpy.linalg as nl
 import matplotlib.pyplot as plt
 import scipy
 import scipy.ndimage
-import scipy.ndimage.interpolation.map_coordinates as map_coordinates
+from scipy.ndimage.interpolation import map_coordinates
 import scipy.interpolate as sint
 import scipy.interpolate as si
 import scipy.odr as sodr
@@ -190,14 +190,14 @@ class lf_Track(Track):
             self.phi = None
             return
 
-        a = np.vstack([q * *2, q, np.ones(np.size(q))]).T
+        a = np.vstack([q ** 2, q, np.ones(np.size(q))]).T
         X, res, rnk, s = nl.lstsq(a, phi)
         phif = a.dot(X)
         #        p = 1- ss.chi2.cdf(np.sum(((phif - phi)**2)/phif), len(q)-3)
 
         prop_c = -np.sign(X[0])
         prop_q = -X[1] / (2 * X[0])
-        prop_phi = prop_q * * 2 * X[0] + prop_q * X[1] + X[2]
+        prop_phi = prop_q ** 2 * X[0] + prop_q * X[1] + X[2]
 
         if prop_q < np.min(q) or prop_q > np.max(q):
             # the 'center' in outside of the data we have
