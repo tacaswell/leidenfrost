@@ -1,7 +1,11 @@
 import argparse
 import os
-import lf_drop.infra as li
+import leidenfrost.infra as li
 import h5py
+
+import find_peaks.peakdetect as pd
+
+pd.init_procs(8)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("cine_base_path",help="The base path for where the (cine) data files are located")
@@ -18,6 +22,8 @@ else:
     hdf_base_path = cine_base_path
 
 hdf_fname = li.FilePath(hdf_base_path,args.hdf_path,args.hdf_fname)
+print '/'.join(hdf_fname)
+
 
 stack,seed_curve = li.ProcessBackend.from_hdf_file(cine_base_path,hdf_fname)
 file_out = h5py.File('/'.join(hdf_fname),'r+')
@@ -31,3 +37,4 @@ for j in range(len(stack)):
 
 file_out.close()
 
+pd.kill_procs()
