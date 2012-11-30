@@ -668,6 +668,15 @@ class MemBackendFrame(object):
 
         pass
 
+    def get_extent(self):
+        if img is not None:
+            return [0,img.shape[1],0,img.shape[0]]
+        else:
+            x,y = self.curve.q_phi_to_xy(1,np.linspace(0,2*np.pi,100) )
+            return [.9 * np.min(y),1.1 * np.max(y), 
+                    .9 * np.min(x),1.1 * np.max(x)]
+                                         
+        
     def get_next_spline(self, mix_in_count=None, pix_err=None, **kwargs):
         if self.next_curve is not None and self.mix_in_count == mix_in_count:
             return self.next_curve
