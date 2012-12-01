@@ -669,8 +669,8 @@ class MemBackendFrame(object):
         pass
 
     def get_extent(self):
-        if img is not None:
-            return [0,img.shape[1],0,img.shape[0]]
+        if self.img is not None:
+            return [0,self.img.shape[1],0,self.img.shape[0]]
         else:
             x,y = self.curve.q_phi_to_xy(1,np.linspace(0,2*np.pi,100) )
             return [.9 * np.min(y),1.1 * np.max(y), 
@@ -840,6 +840,7 @@ class HdfBackend(object):
                  cine_buffer_base_path=None,
                  *args,
                  **kwargs):
+        print fname
         self._iter_cur_item = -1
         self.buffers = []
         self.file = None
