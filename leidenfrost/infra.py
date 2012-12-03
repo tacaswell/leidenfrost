@@ -677,7 +677,7 @@ class MemBackendFrame(object):
                     .9 * np.min(x),1.1 * np.max(x)]
                                          
         
-    def get_next_spline(self, mix_in_count=None, pix_err=None, **kwargs):
+    def get_next_spline(self, mix_in_count=0, pix_err=0, **kwargs):
         if self.next_curve is not None and self.mix_in_count == mix_in_count:
             return self.next_curve
 
