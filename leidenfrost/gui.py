@@ -316,6 +316,13 @@ class LFGui(QtGui.QMainWindow):
     def show_cntrls(self):
         self.diag.show()
 
+    def save_config(self):
+        fname, _ = QtGui.QFileDialog.getSaveFileName(self,
+                                                     caption='Save File',
+                                                     dir=self.base_dir)
+        if len(fname) > 0:
+                self.worker.process_backend.gen_stub_h5(fname, self.cur_curve)
+        
     def set_base_dir(self):
         base_dir = QtGui.QFileDialog.getExistingDirectory(self,
                                                           caption='Base Directory',
