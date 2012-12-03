@@ -322,7 +322,7 @@ class LFGui(QtGui.QMainWindow):
                                                      dir=self.base_dir)
         if len(fname) > 0:
                 self.worker.process_backend.gen_stub_h5(fname, self.cur_curve)
-        
+
     def set_base_dir(self):
         base_dir = QtGui.QFileDialog.getExistingDirectory(self,
                                                           caption='Base Directory',
@@ -510,7 +510,7 @@ class LFGui(QtGui.QMainWindow):
         # configuration tool in the navigation toolbar wouldn't
         # work.
         #
-        
+
         tmp = self.worker.get_frame(self.cur_frame)
 
         self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
@@ -611,7 +611,7 @@ class LFReader(QtCore.QObject):
                                                   raw=True,
                                                   get_img=True)
                 self.cur_frame = ind
-                
+
             self.frame_loaded.emit(True,True)
 
 
@@ -645,7 +645,7 @@ class LFReader(QtCore.QObject):
 
         self.file_loaded.emit(True,True)
 
-        
+
 
 
 class LFReaderGui(QtGui.QMainWindow):
@@ -654,7 +654,7 @@ class LFReaderGui(QtGui.QMainWindow):
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
     cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
-        
+
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Display')
@@ -672,7 +672,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.paths_dict = defaultdict(lambda :None)
 
-        
+
         self.create_main_frame()
         self.create_actions()
         self.create_menu_bar()
@@ -683,10 +683,10 @@ class LFReaderGui(QtGui.QMainWindow):
         self.kill_thread.connect(self.thread.quit)
         self.open_file_sig.connect(self.reader.set_fname)
         self.redraw_sig.connect(self.on_draw)
-        
+
         self.reader.frame_loaded.connect(self.on_draw)
         self.reader.file_loaded.connect(self.redraw)
-        
+
         self.show()
 
         self.thread.start()
@@ -712,7 +712,7 @@ class LFReaderGui(QtGui.QMainWindow):
         if mbe is None:
             #            self.clear()
             return
-        
+
         if refresh_lines:
             # clear the lines we have
             for ln in self.fringe_lines:
@@ -735,7 +735,7 @@ class LFReaderGui(QtGui.QMainWindow):
                         mbe.ax_draw_center_curves(self.axes))
 
 
-                
+
             pass
 
         if refresh_img:
@@ -744,17 +744,17 @@ class LFReaderGui(QtGui.QMainWindow):
                 self.im.set_data(img)
 
 
-        
-        
+
+
         self.canvas.draw()
         pass
 
-    
+
     @QtCore.Slot(bool,bool)
     def redraw(self,draw_img,draw_tracks):
         if self.im is not None:
             self.im.remove()
-        
+
         print 'entered redraw'
 
         # clear the lines we have
@@ -768,13 +768,13 @@ class LFReaderGui(QtGui.QMainWindow):
         self.fringe_lines = []
         self.im = None
         mbe = self.reader.get_mbe()
-        
+
         img = mbe.img
         if img is None:
             img = 1.5 * np.ones((1,1))
 
         extent = mbe.get_extent()
-        
+
         self.im = self.axes.imshow(img,
                                    cmap='gray',
                                    extent=extent,
@@ -783,40 +783,40 @@ class LFReaderGui(QtGui.QMainWindow):
         self.im.set_clim([.5, 1.5])
         self.axes.set_aspect('equal')
 
-        
+
         if self.draw_fringes:
             # if we should draw new ones, do so
             # grab new mbe from thread object
             # grab new next curve
-        
+
             if self.draw_fringes and mbe is not None:
                 self.fringe_lines.extend(
                     mbe.ax_plot_tracks(self.axes,
                                        min_len=0,
                                        all_tracks=self.all_fringes_flg)
                     )
-        
+
 
         #self.status_text.setText(label)
 
-        self.frame_spinner.setRange(0,len(self.reader)-1)        
+        self.frame_spinner.setRange(0,len(self.reader)-1)
         self.frame_spinner.setValue(0)
-        
+
         self.redraw_sig.emit(False,False)
 
-        
+
     def set_cur_frame(self, i):
         self.read_request_sig.emit(i)
-        
+
     def show_cntrls(self):
         self.diag.show()
 
     def open_file(self):
-        
+
         if self.paths_dict['hdf base path'] is None:
             self.directory_actions['hdf base path'].trigger()
         hdf_bp = self.paths_dict['hdf base path']
-            
+
         if self.paths_dict['cine base path'] is not None:
             cine_bp = self.paths_dict['cine base path']
         else:
@@ -843,15 +843,15 @@ class LFReaderGui(QtGui.QMainWindow):
         self.open_file_sig.emit(new_hdf_fname,cine_bp,tmp_dict)
 
     def create_diag(self):
-                
-        
+
+
         self.diag = QtGui.QDockWidget('controls',parent=self)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea,self.diag)
         diag_widget = QtGui.QWidget(self.diag)
         self.diag.setWidget(diag_widget)
         diag_layout = QtGui.QVBoxLayout()
         diag_widget.setLayout(diag_layout)
-        
+
 
         # frame number lives on top
         self.frame_spinner = QtGui.QSpinBox()
@@ -861,7 +861,7 @@ class LFReaderGui(QtGui.QMainWindow):
         fs_form.addRow(QtGui.QLabel('frame #'),self.frame_spinner)
 
 
-        
+
         self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
         self.fringe_grp_bx.setChecked(self.draw_fringes)
@@ -885,7 +885,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         diag_layout.addLayout(fs_form)
 
-        diag_layout.addWidget(self.fringe_grp_bx)        
+        diag_layout.addWidget(self.fringe_grp_bx)
         path_box = QtGui.QGroupBox("paths")
         pb_layout = QtGui.QVBoxLayout()
         path_box.setLayout(pb_layout)
@@ -894,11 +894,11 @@ class LFReaderGui(QtGui.QMainWindow):
             pb_layout.addWidget(ds)
             self.directory_actions[c].triggered.connect(ds.select_path)
             ds.selected.connect(lambda x,c=c : self.paths_dict.__setitem__(c,x))
-            
+
         diag_layout.addWidget(path_box)
         diag_layout.addStretch()
         pass
-        
+
     def create_main_frame(self):
         self.main_frame = QtGui.QWidget()
         # create the mpl Figure and FigCanvas objects.
@@ -962,28 +962,20 @@ class LFReaderGui(QtGui.QMainWindow):
             if len(base_dir) > 0:
                 d[cap] = base_dir
 
-
-
-        
         self.show_cntrl_acc = QtGui.QAction(u'show controls', self)
         self.show_cntrl_acc.triggered.connect(self.show_cntrls)
 
         cap_lst = self.cap_lst
         cta_lst = ['Select ' + x for x in cap_lst]
 
-
         self.directory_actions = {}
         for cap,cta in zip(cap_lst,cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
 
-
-
         self.open_file_acc = QtGui.QAction(u'Open &File', self)
         self.open_file_acc.triggered.connect(self.open_file)
 
-
-        
         self.set_fringes_acc = QtGui.QAction(u'&Display Fringes', self)
         self.set_fringes_acc.setCheckable(True)
         self.set_fringes_acc.setChecked(self.draw_fringes)
@@ -994,7 +986,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.set_all_fringes_acc.setChecked(self.all_fringes_flg)
         self.set_all_fringes_acc.toggled.connect(self.set_all_friges)
 
-        
+
     def create_menu_bar(self):
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
@@ -1005,8 +997,7 @@ class LFReaderGui(QtGui.QMainWindow):
         fringeMenu = menubar.addMenu('Fringes')
         fringeMenu.addAction(self.set_fringes_acc)
         fringeMenu.addAction(self.set_all_fringes_acc)
-        
-        
+
 
 class directory_selector(QtGui.QWidget):
     '''
@@ -1014,7 +1005,7 @@ class directory_selector(QtGui.QWidget):
     '''
 
     selected =  QtCore.Signal(str)
-    
+
     def __init__(self,caption,path='',parent=None):
         QtGui.QWidget.__init__(self, parent)
         print caption
@@ -1024,10 +1015,10 @@ class directory_selector(QtGui.QWidget):
         self.setLayout(layout)
 
         layout.addWidget(QtGui.QLabel(caption))
-        
+
         hlayout = QtGui.QHBoxLayout()
         layout.addLayout(hlayout)
-        
+
         self.label = QtGui.QLabel(path)
         hlayout.addWidget(self.label)
 
@@ -1036,9 +1027,9 @@ class directory_selector(QtGui.QWidget):
         button.clicked.connect(self.select_path)
         hlayout.addWidget(button)
 
-        
 
-        
+
+
     @QtCore.Slot(str)
     def set_path(self,path):
         pass
@@ -1048,7 +1039,7 @@ class directory_selector(QtGui.QWidget):
         path = QtGui.QFileDialog.getExistingDirectory(self,
                                                       caption=self.cap,
                                                       dir=None)
-        
+
         if len(path) > 0:
             self.selected.emit(path)
             self.label.setText(path)
@@ -1058,4 +1049,3 @@ class directory_selector(QtGui.QWidget):
             path = None
         self.path = path
         return path
-        
