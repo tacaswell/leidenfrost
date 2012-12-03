@@ -738,10 +738,14 @@ class MemBackendFrame(object):
         return lines
 
     def ax_draw_center_curves(self, ax):
-        lo, = ax.plot(*self.curve.get_xy_samples(1000), color='g', lw=2)
+        lo = ax.plot(*self.curve.get_xy_samples(1000), color='g', lw=2)
+        if self.next_curve is None:
+            self.get_next_spline()
+
         new_curve = self.next_curve
-        ln, = ax.plot(*new_curve.get_xy_samples(1000), color='m', lw=2)
-        return lo, ln
+        ln = ax.plot(*new_curve.get_xy_samples(1000), color='m', lw=2)
+
+        return lo + ln
 
     def ax_draw_img(self, ax):
         if self.img is not None:
