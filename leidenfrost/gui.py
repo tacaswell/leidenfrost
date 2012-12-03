@@ -731,6 +731,8 @@ class LFReaderGui(QtGui.QMainWindow):
                                            min_len=0,
                                            all_tracks=self.all_fringes_flg)
                         )
+                    self.fringe_lines.extend(
+                        mbe.ax_draw_center_curves(self.axes))
 
 
                 
@@ -812,7 +814,7 @@ class LFReaderGui(QtGui.QMainWindow):
     def open_file(self):
         
         if self.paths_dict['hdf base path'] is None:
-            self.hbp_acc.trigger()
+            self.directory_actions['hdf base path'].trigger()
         hdf_bp = self.paths_dict['hdf base path']
             
         if self.paths_dict['cine base path'] is not None:
@@ -821,8 +823,7 @@ class LFReaderGui(QtGui.QMainWindow):
             cine_bp = hdf_bp
 
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
-                                                     caption='Save File',
-                                                     dir=hdf_bp)
+                                                     caption='Save File')
         if len(fname) == 0:
             return
 
@@ -976,7 +977,7 @@ class LFReaderGui(QtGui.QMainWindow):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
 
-        self.hbp_acc, self.cpb_acc, self.ccp_acc,self.hcp = self.directory_actions
+
 
         self.open_file_acc = QtGui.QAction(u'Open &File', self)
         self.open_file_acc.triggered.connect(self.open_file)
