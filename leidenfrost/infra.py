@@ -708,6 +708,7 @@ class MemBackendFrame(object):
         x, y = self.curve.q_phi_to_xy(t_q, t_phi, cross=False)
 
         new_curve = SplineCurve.from_pts(np.vstack((x, y)),
+                                         pix_err=pix_err,
                                          **kwargs)
 
         self.next_curve = new_curve
