@@ -653,7 +653,8 @@ class LFReaderGui(QtGui.QMainWindow):
     open_file_sig = QtCore.Signal(infra.FilePath,str, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
-
+    cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
+        
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Display')
@@ -669,8 +670,8 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.fringe_lines = []
 
-        self.base_paths = defaultdict(lambda :None)
-        self.cache_paths = defaultdict(lambda :None)
+        self.paths_dict = defaultdict(lambda :None)
+
         
         self.create_main_frame()
         self.create_actions()
@@ -810,12 +811,12 @@ class LFReaderGui(QtGui.QMainWindow):
 
     def open_file(self):
         
-        if self.base_paths['hdf base path'] is None:
+        if self.paths_dict['hdf base path'] is None:
             self.hbp_acc.trigger()
-        hdf_bp = self.base_paths['hdf base path']
+        hdf_bp = self.paths_dict['hdf base path']
             
-        if self.base_paths['cine base path'] is not None:
-            cine_bp = self.base_paths['cine base path']
+        if self.paths_dict['cine base path'] is not None:
+            cine_bp = self.paths_dict['cine base path']
         else:
             cine_bp = hdf_bp
 
@@ -827,14 +828,14 @@ class LFReaderGui(QtGui.QMainWindow):
 
         while not hdf_bp == fname[:len(hdf_bp)]:
             print 'please set base_dir'
-            self.directory_actions[0].trigger()
-            hdf_bp = self.base_paths['hdf base path']
+            self.directory_actions['hdf base path'].trigger()
+            hdf_bp = self.paths_dict['hdf base path']
 
         path_, fname_ = os.path.split(fname[(len(hdf_bp) + 1):])
         new_hdf_fname = infra.FilePath(hdf_bp, path_, fname_)
 
-        tmp_dict = {'cine_cache_dir':self.cache_paths['cine cache path'],
-                    'hdf_cache_dir': self.cache_paths['hdf cache path']}
+        tmp_dict = {'cine_cache_dir':self.paths_dict['cine cache path'],
+                    'hdf_cache_dir': self.paths_dict['hdf cache path']}
 
         print new_hdf_fname
         print '/'.join(new_hdf_fname)
@@ -882,8 +883,19 @@ class LFReaderGui(QtGui.QMainWindow):
         self.set_all_fringes_acc.toggled.connect(rb_sync)
 
         diag_layout.addLayout(fs_form)
-        diag_layout.addWidget(self.fringe_grp_bx)        
 
+        diag_layout.addWidget(self.fringe_grp_bx)        
+        path_box = QtGui.QGroupBox("paths")
+        pb_layout = QtGui.QVBoxLayout()
+        path_box.setLayout(pb_layout)
+        for c in self.cap_lst:
+            ds = directory_selector(caption=c)
+            pb_layout.addWidget(ds)
+            self.directory_actions[c].triggered.connect(ds.select_path)
+            ds.selected.connect(lambda x,c=c : self.paths_dict.__setitem__(c,x))
+            
+        diag_layout.addWidget(path_box)
+        diag_layout.addStretch()
         pass
         
     def create_main_frame(self):
@@ -955,16 +967,14 @@ class LFReaderGui(QtGui.QMainWindow):
         self.show_cntrl_acc = QtGui.QAction(u'show controls', self)
         self.show_cntrl_acc.triggered.connect(self.show_cntrls)
 
-        cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
+        cap_lst = self.cap_lst
         cta_lst = ['Select ' + x for x in cap_lst]
-        d_lst = [self.base_paths,self.base_paths,self.cache_paths,self.cache_paths]
 
-        self.directory_actions = []
-        for cap,cta,d in zip(cap_lst,cta_lst,d_lst):
+
+        self.directory_actions = {}
+        for cap,cta in zip(cap_lst,cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
-            tmp_fun = lambda cap_=cap,d_=d:set_dir(cap_,d_)
-            tmp_acc.triggered.connect(tmp_fun)
-            self.directory_actions.append(tmp_acc)
+            self.directory_actions[cap] = tmp_acc
 
         self.hbp_acc, self.cpb_acc, self.ccp_acc,self.hcp = self.directory_actions
 
@@ -995,4 +1005,56 @@ class LFReaderGui(QtGui.QMainWindow):
         fringeMenu.addAction(self.set_fringes_acc)
         fringeMenu.addAction(self.set_all_fringes_acc)
         
+        
+
+class directory_selector(QtGui.QWidget):
+    '''
+    A widget class deal with selecting and displaying path names
+    '''
+
+    selected =  QtCore.Signal(str)
+    
+    def __init__(self,caption,path='',parent=None):
+        QtGui.QWidget.__init__(self, parent)
+        print caption
+        self.cap = caption
+
+        layout = QtGui.QVBoxLayout()
+        self.setLayout(layout)
+
+        layout.addWidget(QtGui.QLabel(caption))
+        
+        hlayout = QtGui.QHBoxLayout()
+        layout.addLayout(hlayout)
+        
+        self.label = QtGui.QLabel(path)
+        hlayout.addWidget(self.label)
+
+        button = QtGui.QPushButton('')
+        button.setIcon(QtGui.QIcon.fromTheme('folder'))
+        button.clicked.connect(self.select_path)
+        hlayout.addWidget(button)
+
+        
+
+        
+    @QtCore.Slot(str)
+    def set_path(self,path):
+        pass
+
+    @QtCore.Slot()
+    def select_path(self):
+        path = QtGui.QFileDialog.getExistingDirectory(self,
+                                                      caption=self.cap,
+                                                      dir=None)
+        
+        if len(path) > 0:
+            self.selected.emit(path)
+            self.label.setText(path)
+            self.selected.emit(path)
+            return path
+        else:
+            path = None
+        self.path = path
+        return path
         
