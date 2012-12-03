@@ -504,7 +504,7 @@ class LFGui(QtGui.QMainWindow):
         self.fig = Figure((24, 24))
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
-
+        self.axes = self.fig.add_subplot(111)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
         # configuration tool in the navigation toolbar wouldn't
