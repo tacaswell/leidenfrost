@@ -743,7 +743,8 @@ class MemBackendFrame(object):
             self.get_next_spline()
 
         new_curve = self.next_curve
-        ln = ax.plot(*new_curve.get_xy_samples(1000), color='m', lw=2)
+        ln = ax.plot(*new_curve.get_xy_samples(1000), color='m', 
+                     lw=2,linestyle='--')
 
         return lo + ln
 
