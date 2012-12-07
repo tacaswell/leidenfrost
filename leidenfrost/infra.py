@@ -184,7 +184,7 @@ class lf_Track(Track):
             return
 
         # if the track does not straddle the seed curve, probably junk
-        if np.min(q) > 1 or np.max(q) < 1:
+        if np.min(q) > 0 or np.max(q) < 0:
             self.charge = None
             self.q = None
             self.phi = None
