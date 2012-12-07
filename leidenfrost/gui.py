@@ -39,13 +39,12 @@ import cine
 
 class LFWorker(QtCore.QObject):
     frame_proced = QtCore.Signal(bool, bool)
+    file_loaded = QtCore.Signal(bool, bool)
 
-    def __init__(self, cine_fname, bck_img, params, parent=None):
+    def __init__(self, parent=None):
         QtCore.QObject.__init__(self, parent)
 
-        self.process_backend = infra.ProcessBackend.from_args(cine_fname,
-                                                              bck_img=bck_img,
-                                                              **params)
+        self.process_backend = None
 
         self.mbe = None
         self.next_curve = None
@@ -53,9 +52,10 @@ class LFWorker(QtCore.QObject):
     @QtCore.Slot(int, infra.SplineCurve)
     def proc_frame(self, ind, curve):
 
-        self.mbe, self.next_curve = self.process_backend.process_frame(ind,
-                                                                       curve)
-        self.frame_proced.emit(True, True)
+        if self.process_backend is not None:
+            self.mbe, self.next_curve = self.process_backend.process_frame(ind,
+                                                                           curve)
+            self.frame_proced.emit(True, True)
 
     def get_mbe(self):
         return self.mbe
@@ -64,18 +64,23 @@ class LFWorker(QtCore.QObject):
         return self.next_curve
 
     def update_param(self, key, val):
-        self.process_backend.update_param(key, val)
+        if self.process_backend is not None:
+            self.process_backend.update_param(key, val)
 
     def get_frame(self, ind):
-        tmp = self.process_backend.get_frame(ind)
-        return np.asarray(tmp, dtype=np.float)
+        if self.process_backend is not None:
+            tmp = self.process_backend.get_frame(ind)
+            return np.asarray(tmp, dtype=np.float)
+        return None
 
     def clear(self):
         self.mbe = None
         self.next_curve = None
 
     def __len__(self):
-        return len(self.process_backend)
+        if self.process_backend is not None:
+            return len(self.process_backend)
+        return 0
 
     @QtCore.Slot(infra.FilePath, dict)
     def set_new_fname(self, cine_fname, params):
@@ -84,7 +89,7 @@ class LFWorker(QtCore.QObject):
         self.process_backend = infra.ProcessBackend.from_args(cine_fname,
                                                               bck_img=None,
                                                               **params)
-        self.frame_proced.emit(True, True)
+        self.file_loaded.emit(True, True)
 
 
 class LFGui(QtGui.QMainWindow):
@@ -134,11 +139,17 @@ class LFGui(QtGui.QMainWindow):
          'default': 10}
          ]
 
-    def __init__(self, cine_fname, bck_img=None, parent=None):
+    cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
+    
+    def __init__(self, cine_fname=None, bck_img=None, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
-        self.cine_fname = cine_fname
-        self.base_dir = cine_fname[0]
+        if cine_fname is not None:
+            self.cine_fname = cine_fname
+            self.base_dir = cine_fname[0]
+        else:
+            self.cine_fname = None
+            self.base_dir = None
         self.cur_frame = 0
 
         self.draw_fringes = False
@@ -146,14 +157,11 @@ class LFGui(QtGui.QMainWindow):
         default_params = dict((d['name'], d['default']) for
                               d in LFGui.spinner_lst)
 
-        self.base_path = cine_fname[0]
+        
 
         self.thread = QtCore.QThread(parent=self)
 
-        self.worker = LFWorker(cine_fname,
-                               bck_img,
-                               default_params,
-                               parent=None)
+        self.worker = LFWorker(parent=None)
         self.worker.moveToThread(self.thread)
 
         self.cur_curve = None
@@ -162,7 +170,7 @@ class LFGui(QtGui.QMainWindow):
         self.fringe_lines = []
 
         self.all_fringes_flg = False
-
+        self.param_spin_dict = {}
         self.create_main_frame()
         self.create_actions()
         self.create_menu_bar()
@@ -171,6 +179,7 @@ class LFGui(QtGui.QMainWindow):
 
         self.on_draw(True, True)
         self.worker.frame_proced.connect(self.on_draw)
+        self.worker.file_loaded.connect(self.redraw)
         self.proc.connect(self.worker.proc_frame)
         self.open_file_sig.connect(self.worker.set_new_fname)
         self.redraw_sig.connect(self.on_draw)
@@ -195,8 +204,8 @@ class LFGui(QtGui.QMainWindow):
 
     def update_param(self, key, val):
         self.worker.update_param(key, val)
-
-        self._proc_this_frame()
+        if self.draw_fringes:
+            self._proc_this_frame()
 
     def _proc_this_frame(self):
 
@@ -231,9 +240,11 @@ class LFGui(QtGui.QMainWindow):
         self.fringe_grp_bx.setChecked(self.draw_fringes)
 
         # update the image
-        if refresh_img:
-            self.im.set_data(self.worker.get_frame(self.cur_frame))
-            self.refresh_img = False
+        if refresh_img and self.im is not None:
+            img = self.worker.get_frame(self.cur_frame)
+            if img is not None:
+                self.im.set_data(img)
+            
         # if we need to update the lines
         if refresh_lines:
             # clear the lines we have
@@ -271,7 +282,7 @@ class LFGui(QtGui.QMainWindow):
         self.save_param_acc.setEnabled(False)
         self.iterate_button.setEnabled(False)
         self.refresh_lines_flg = True
-        self.self.fringe_grp_bx.setChecked(False)
+        self.fringe_grp_bx.setChecked(False)
 
     def set_spline_fitter(self, i):
         if i:
@@ -331,13 +342,16 @@ class LFGui(QtGui.QMainWindow):
             self.base_dir = base_dir
 
     def open_file(self):
+
+        
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
                                                      caption='Save File',
                                                      dir=self.base_dir)
         if len(fname) == 0:
             return
-
-        while not self.base_dir == fname[:len(self.base_dir)]:
+        
+        self.fringe_grp_bx.setChecked(False)        
+        while self.base_dir is None or (not (self.base_dir == fname[:len(self.base_dir)])):
             print 'please set base_dir'
             self.set_base_dir()
 
@@ -350,6 +364,10 @@ class LFGui(QtGui.QMainWindow):
         self.clear_mbe()
         default_params = dict((d['name'], d['default']) for
                               d in LFGui.spinner_lst)
+
+        # reset spinners to default values
+        for p in self.spinner_lst:
+            self.param_spin_dict[p['name']].setValue(p['default'])
         self.open_file_sig.emit(new_cine_fname, default_params)
 
     def create_diag(self):
@@ -381,6 +399,7 @@ class LFGui(QtGui.QMainWindow):
         # vbox layout for this panel
         fc_vboxes = QtGui.QVBoxLayout()
         # set the widget layout
+        
         fringe_cntrls_w.setLayout(fc_vboxes)
         # add to the tool box
         diag_tool_box.addItem(fringe_cntrls_w, "Fringe Finding Settings")
@@ -412,7 +431,8 @@ class LFGui(QtGui.QMainWindow):
             spin_box.valueChanged.connect(self._gen_update_closure(name))
             fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
                                        spin_box)
-
+            self.param_spin_dict[name] = spin_box
+            
         # button to grab initial spline
         grab_button = QtGui.QPushButton('Grab Spline')
         grab_button.clicked.connect(self.grab_sf_curve)
@@ -475,7 +495,8 @@ class LFGui(QtGui.QMainWindow):
             lambda: save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
 
         fc_vboxes.addWidget(save_param_bttn)
-
+        fc_vboxes.addStretch()
+        
         # section for making spline fitting panel
         spline_cntrls = QtGui.QVBoxLayout()
         spline_cntrls_w = QtGui.QWidget()
@@ -492,7 +513,9 @@ class LFGui(QtGui.QMainWindow):
         clear_spline_button = QtGui.QPushButton('Clear Spline')
         clear_spline_button.clicked.connect(self.clear_spline)
         spline_cntrls.addWidget(clear_spline_button)
-
+        
+        spline_cntrls.addStretch()
+        
         diag_tool_box.addItem(spline_cntrls_w, "Manual Spline Fitting")
 
     def create_main_frame(self):
@@ -510,18 +533,19 @@ class LFGui(QtGui.QMainWindow):
         # configuration tool in the navigation toolbar wouldn't
         # work.
         #
+        self.im = None
 
-        tmp = self.worker.get_frame(self.cur_frame)
+        #        tmp = self.worker.get_frame(self.cur_frame)
 
-        self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
-        self.axes.set_aspect('equal')
-        self.im.set_clim([.5, 1.5])
+        #        self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
+        #        self.axes.set_aspect('equal')
+        #        self.im.set_clim([.5, 1.5])
 
         self.sf = infra.spline_fitter(self.axes)
         self.sf.disconnect_sf()
 
-        self.axes.set_xlim(left=0)
-        self.axes.set_ylim(top=0)         # this is because images are plotted upside down
+        #        self.axes.set_xlim(left=0)
+        #        self.axes.set_ylim(top=0)         # this is because images are plotted upside down
         # Create the navigation toolbar, tied to the canvas
         #
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
@@ -537,12 +561,64 @@ class LFGui(QtGui.QMainWindow):
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
+    @QtCore.Slot(bool,bool)
+    def redraw(self,draw_img,draw_tracks):
+        if self.im is not None:
+            self.im.remove()
+        self.im = None
+        print 'entered redraw'
+
+        # clear the lines we have
+        for ln in self.fringe_lines:
+            ln.remove()
+        self.fringe_lines = []
+
+
+        mbe = self.worker.get_mbe()
+        img = self.worker.get_frame(0)
+
+        if img is None:
+            img = 1.5 * np.ones((1,1))
+
+        extent = [0,img.shape[1],0,img.shape[0]]
+
+        self.im = self.axes.imshow(img,
+                                   cmap='gray',
+                                   extent=extent,
+                                   origin='lower',
+                                   interpolation='nearest')
+        self.im.set_clim([.5, 1.5])
+        self.axes.set_aspect('equal')
+
+
+        if self.draw_fringes and mbe is not None:
+            # if we should draw new ones, do so
+            # grab new mbe from thread object
+            # grab new next curve
+
+            if self.draw_fringes and mbe is not None:
+                self.fringe_lines.extend(
+                    mbe.ax_plot_tracks(self.axes,
+                                       min_len=0,
+                                       all_tracks=self.all_fringes_flg)
+                    )
+
+
+        #self.status_text.setText(label)
+
+        self.frame_spinner.setRange(0,len(self.worker)-1)
+        self.frame_spinner.setValue(0)
+
+        self.redraw_sig.emit(False,False)
+
+
     def _gen_update_closure(self, name):
         return lambda x: self.update_param(name, x)
 
     def create_status_bar(self):
         self.status_text = QtGui.QLabel(str(self.cur_frame))
-        self.fname_text = QtGui.QLabel('/'.join(self.cine_fname[1:]))
+        
+        self.fname_text = QtGui.QLabel('')
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
         self.prog_bar.setRange(0, 0)
@@ -740,7 +816,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         if refresh_img:
             img = mbe.img
-            if img is not None:
+            if img is not None and self.im is not None:
                 self.im.set_data(img)
 
 
