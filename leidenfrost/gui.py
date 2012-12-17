@@ -222,7 +222,7 @@ class LFGui(QtGui.QMainWindow):
 
         self.frame_spinner.setValue(self.cur_frame + 1)
         self.diag.setEnabled(False)
-        self._proc_this_frame()
+        #self._proc_this_frame()
 
     def set_fringes_visible(self, i):
         self.draw_fringes = bool(i)
