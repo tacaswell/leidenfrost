@@ -52,12 +52,9 @@ class hash_line_angular(object):
     '''1D hash table with linked ends for doing the ridge linking
     around a rim'''
     def __init__(self, dims, bin_width):
-eeu        '''The argument dims needs to be there to homogenize hash
-        interfaces
-
         '''
         :param dims: the maximum value of the parameritazation parameter 
-        :param bin_width: the width of each bin in radians
+        :param bin_width: the width of each bin in units of `dims`
         '''
         full_width = dims
         self.boxes = [[] for j
@@ -66,16 +63,23 @@ eeu        '''The argument dims needs to be there to homogenize hash
         self.bin_count = len(self.boxes)
 
     def add_point(self, point):
-        ''' Adds a point on the hash line
+        ''' 
+        :param point: the point object to add, assumed to be a :py:class:`~Point1D_circ`
+        
+        Adds a point on the hash line
 
-        Assumes that the point have been properly rationalized 0<phi<2pi
+        Assumes that the point have been properly rationalized 0<`point.phi`< max
         '''
         self.boxes[int(np.floor(point.phi / self.bin_width))].append(point)
 
     def get_region(self, point, bbuffer):
-        '''Gets the region around the point
+        '''
+        :param point: point to get the region of
+        :param bbuffer: the buffer around `point` in the local units
+        
+        Gets the region around the point
 
-        Assumes that the point have been properly rationalized 0<phi<2pi
+        Assumes that the point have been properly rationalized 0<`point.phi`< max
         '''
         bbuffer = int(np.ceil(bbuffer / self.bin_width))
 
@@ -90,26 +94,34 @@ class Point1D_circ(Point):
     '''
     Version of :py:class:`Point` for finding fringes
 
-    :py:attr:`Point1D_circ.q` is the parameter for the curve where the
-    point is (maps to time in standard tracking)
-    :py:attr:`Point1D_circ.phi` is the angle of the point along the
-    parametric curve
-    :py:attr:`Point1D_circ.v` any extra values that the point should carry
-    '''
+    :ivar q: the parameter for the curve where the
+       point is (maps to time in standard tracking)
+    :ivar phi: the angle of the point along the
+       parametric curve
+    :ivar v: any extra values that the point should carry
 
+
+    '''
+    #: the value at which :py:attr:`~Point1D_circ.phi` winds back on it's self
+    WINDING = 1
+    
     def __init__(self, q, phi, v=0):
         Point.__init__(self)                  # initialize base class
         self.q = q                            # parametric variable
-        self.phi = np.mod(phi, 2 * np.pi)     # longitudinal value
+        self.phi = np.mod(phi,self.WINDING)     # longitudinal value
         # the value at the extrema (can probably drop this)
-        self.v = v
+        self.v = v # any extra values that the point should carry
 
     def distance(self, point):
-        '''Returns the absolute value of the angular distance between
-        two points mod 2\pi'''
+        '''
+        :param point: point to give distance to
+        :type point: :py:class:`~Point1D_circ`
+        
+        Returns the absolute value of the angular distance between
+        two points mod :py:attr:`~Point1D_circ.WINDING`'''
         d = np.abs(self.phi - point.phi)
-        if d > np.pi:
-            d = np.abs(2 * np.pi - d)
+        if d > self.WINDING/2:
+            d = np.abs(self.WINDING - d)
         return d
 
     def __unicode__(self):
@@ -122,6 +134,18 @@ class Point1D_circ(Point):
 
 
 class lf_Track(Track):
+    '''
+    :param point: The first feature in the track if not  `None`.  
+    :type point: :py:class:`~trackpy.tracking.Point`
+
+    Derived class from :py:class:`~trackpy.tracking.Track` for working with
+    the chevrons that show up in Leidenfrost images.
+
+    :ivar charge: if the fringe is an 'up' or a 'down', set by direction of chevron
+    :ivar q: the `q` of the track.  See :py:attr:`Point1D_circ.q`
+    :ivar phi:  the `phi` of the track. See :py:attr:`Point1D_circ.phi`
+    '''
+    
     def __init__(self, point=None):
         Track.__init__(self, point)
         self.charge = None
@@ -129,9 +153,21 @@ class lf_Track(Track):
         self.phi = None
 
     def sort(self):
+        '''
+        Order the points in the track by :py:attr:`~Point1D_circ.q`
+        '''
         self.points.sort(key=lambda x: x.q)
 
     def plot_trk(self, ax, **kwargs):
+        '''
+        :param ax: the :py:class:`~matplotlib.axes.Axes` object to plot the track onto
+        :type ax: :py:class:`~matplotlib.axes.Axes`
+
+        Plots the track, in q-phi coordinates, onto `ax`.
+
+        `**kwargs` are passed on to `ax.plot`, color will be over-ridden
+        by this function.
+        '''
         if self.charge is None:
             kwargs['color'] = 'm'
         elif self.charge == 1:
@@ -144,6 +180,14 @@ class lf_Track(Track):
         ax.plot(*zip(*[(p.q, p.phi) for p in self.points]), **kwargs)
 
     def plot_trk_img(self, curve, ax, **kwargs):
+        '''
+        :param curve: the curve used to convert (q,phi) -> (x,y)
+        :type curve: :py:class:`~SplineCurve`
+        :param ax: the :py:class:`~matplotlib.axes.Axes` object to plot the track onto
+        :type ax: :py:class:`~matplotlib.axes.Axes`
+
+        Plots the track, in x-y  coordinates, onto `ax`
+        '''
         q, phi = zip(*[(p.q, p.phi) for p in self.points])
         x, y = curve.q_phi_to_xy(q, phi)
 
@@ -164,7 +208,14 @@ class lf_Track(Track):
         return ln
 
     def classify2(self, min_len=None, min_extent=None, **kwargs):
-        ''' second attempt at the classify function'''
+        ''' 
+        :param min_len: the minimum length a track must be to considered
+        :param min_extent: the minimum extent in :py:attr:`q` the of the track
+           for the track to be considered
+           
+        Classification function which sorts out the charge of the track.
+
+        '''
         phi, q = zip(*[(p.phi, p.q) for p in self.points])
         q = np.asarray(q)
         # if the track is less than 25, don't try to classify
@@ -215,20 +266,42 @@ class lf_Track(Track):
         self.phi = prop_phi - p_shift
 
     def mean_phi(self):
+        '''
+        Sets :py:attr:`phi` to be the average :py:attr:`phi` of the track
+
+        :deprecated: this is a stupid way of doing this.
+        '''
         self.phi = np.mean([p.phi for p in self.points])
+        raise PendingDeprecationWarning()
 
     def mean_q(self):
+        '''
+        Sets :py:attr:`q` to be the average :py:attr:`q` of the track
+        
+        :deprecated: this is a stupid way of doing this.
+        '''
         self.q = np.mean([p.q for p in self.points])
-
+        raise PendingDeprecationWarning()
+    
     def merge_track(self, to_merge_track):
+        '''
+        :param to_merge_track: track to merge with this one
+        :type to_merge_track: :py:class:`~lf_Track`
+
+        Merges `to_merge_track` into this one and re-classifies if needed.
+        '''
         pt.Track.merge_track(self, to_merge_track)
-        if self.phi is not None:
-            self.mean_phi()
+
+        
         if self.charge is not None:
             self.classify()
 
     def get_xy(self, curve):
-        """Returns the (x, y) coordinates of the points on the track
+        """
+        :param curve: curve to use for (q,phi) -> (x,y) conversion
+        :type curve: :py:class:`SplineCurve`
+
+        Returns the (x, y) coordinates of the points on the track
         based on the conversion using curve"""
 
         return curve.q_phi_to_xy(*zip(*[(p.q, p.phi) for p in self.points]))
