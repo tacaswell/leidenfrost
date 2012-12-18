@@ -52,11 +52,14 @@ class hash_line_angular(object):
     '''1D hash table with linked ends for doing the ridge linking
     around a rim'''
     def __init__(self, dims, bin_width):
-        '''The argument dims needs to be there to homogenize hash
+eeu        '''The argument dims needs to be there to homogenize hash
         interfaces
 
         '''
-        full_width = 2 * np.pi
+        :param dims: the maximum value of the parameritazation parameter 
+        :param bin_width: the width of each bin in radians
+        '''
+        full_width = dims
         self.boxes = [[] for j
                       in range(0, int(np.ceil(full_width / bin_width)))]
         self.bin_width = bin_width
