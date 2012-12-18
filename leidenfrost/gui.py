@@ -21,8 +21,8 @@ import os
 
 # do this to make me learn where stuff is and to make it easy to
 # switch to PyQt later
-import PySide.QtCore as QtCore
-import PySide.QtGui as QtGui
+import PyQt4.QtCore as QtCore
+import PyQt4.QtGui as QtGui
 
 import matplotlib
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
@@ -136,7 +136,13 @@ class LFGui(QtGui.QMainWindow):
          'max': 100,
          'step': 1,
          'type': np.int,
-         'default': 10}
+         'default': 10},
+         {'name':'min_tlen',
+          'min':0,
+          'max':999999,
+          'step':1,
+          'type':np.int,
+          'default':0}
          ]
 
     cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
