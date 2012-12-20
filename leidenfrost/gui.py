@@ -351,7 +351,7 @@ class LFGui(QtGui.QMainWindow):
 
         
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
-                                                     caption='Save File',
+                                                     caption='Select cine',
                                                      dir=self.base_dir)
         if len(fname) == 0:
             return
