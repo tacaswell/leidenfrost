@@ -145,17 +145,17 @@ class LFGui(QtGui.QMainWindow):
           'default':0}
          ]
 
-    cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
+    cap_lst = ['cine base path']
     
     def __init__(self, cine_fname=None, bck_img=None, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
         if cine_fname is not None:
             self.cine_fname = cine_fname
-            self.base_dir = cine_fname[0]
+            self.paths_dict['cine base path'] = cine_fname[0]
         else:
             self.cine_fname = None
-            self.base_dir = None
+
         self.cur_frame = 0
 
         self.draw_fringes = False
@@ -164,7 +164,9 @@ class LFGui(QtGui.QMainWindow):
                               d in LFGui.spinner_lst)
 
         
-
+        self.paths_dict = defaultdict(lambda :None)
+        self.directory_actions = {}
+        
         self.thread = QtCore.QThread(parent=self)
 
         self.worker = LFWorker(parent=None)
@@ -177,8 +179,8 @@ class LFGui(QtGui.QMainWindow):
 
         self.all_fringes_flg = False
         self.param_spin_dict = {}
-        self.create_main_frame()
         self.create_actions()
+        self.create_main_frame()
         self.create_menu_bar()
         self.create_diag()
         self.create_status_bar()
@@ -336,36 +338,31 @@ class LFGui(QtGui.QMainWindow):
     def save_config(self):
         fname, _ = QtGui.QFileDialog.getSaveFileName(self,
                                                      caption='Save File',
-                                                     dir=self.base_dir)
+                                                     dir=self.paths_dict['cine base path'])
         if len(fname) > 0:
                 self.worker.process_backend.gen_stub_h5(fname, self.cur_curve)
-
-    def set_base_dir(self):
-        base_dir = QtGui.QFileDialog.getExistingDirectory(self,
-                                                          caption='Base Directory',
-                                                          dir=self.base_dir)
-        if len(base_dir) > 0:
-            self.base_dir = base_dir
 
     def open_file(self):
 
         
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
                                                      caption='Select cine',
-                                                     dir=self.base_dir)
+                                                     dir=self.paths_dict['cine base path'])
         if len(fname) == 0:
             return
         
         self.fringe_grp_bx.setChecked(False)        
-        while self.base_dir is None or (not (self.base_dir == fname[:len(self.base_dir)])):
+        while (self.paths_dict['cine base path'] is None or 
+                (not (self.paths_dict['cine base path'] == 
+                      fname[:len(self.paths_dict['cine base path'])]))):
             print 'please set base_dir'
-            self.set_base_dir()
+            self.directory_actions['cine base path'].trigger()
 
         self.prog_bar.show()
         self.diag.setEnabled(False)
 
-        path_, fname_ = os.path.split(fname[(len(self.base_dir) + 1):])
-        new_cine_fname = infra.FilePath(self.base_dir, path_, fname_)
+        path_, fname_ = os.path.split(fname[(len(self.paths_dict['cine base path']) + 1):])
+        new_cine_fname = infra.FilePath(self.paths_dict['cine base path'], path_, fname_)
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
         default_params = dict((d['name'], d['default']) for
@@ -524,6 +521,21 @@ class LFGui(QtGui.QMainWindow):
         
         diag_tool_box.addItem(spline_cntrls_w, "Manual Spline Fitting")
 
+        
+        # section for making spline fitting panel
+        paths_layout = QtGui.QVBoxLayout()
+        path_w = QtGui.QWidget()
+        path_w.setLayout(paths_layout)
+
+        for c in self.cap_lst:
+            ds = directory_selector(caption=c)
+            paths_layout.addWidget(ds)
+            self.directory_actions[c].triggered.connect(ds.select_path)
+            ds.selected.connect(lambda x,c=c : self.paths_dict.__setitem__(c,x))
+
+        paths_layout.addStretch()
+        diag_tool_box.addItem(path_w, "Paths")
+
     def create_main_frame(self):
         self.main_frame = QtGui.QWidget()
         # create the mpl Figure and FigCanvas objects.
@@ -647,9 +659,6 @@ class LFGui(QtGui.QMainWindow):
         self.save_param_acc.setEnabled(False)
         self.save_param_acc.triggered.connect(self.save_config)
 
-        self.set_base_dir_acc = QtGui.QAction(u'Select base dir', self)
-        self.set_base_dir_acc.triggered.connect(self.set_base_dir)
-
         self.open_file_acc = QtGui.QAction(u'Open &File', self)
         self.open_file_acc.triggered.connect(self.open_file)
 
@@ -661,13 +670,22 @@ class LFGui(QtGui.QMainWindow):
         self.proc_next_frame_acc.setEnabled(False)
         self.proc_next_frame_acc.triggered.connect(self._proc_next_frame)
 
+        self.directory_actions = {}
+        cta_lst = ['Select ' + x for x in self.cap_lst]
+        for cap,cta in zip(self.cap_lst,cta_lst):
+            tmp_acc = QtGui.QAction(cta, self)
+            self.directory_actions[cap] = tmp_acc
+
     def create_menu_bar(self):
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
         fileMenu.addAction(self.show_cntrl_acc)
         fileMenu.addAction(self.save_param_acc)
-        fileMenu.addAction(self.set_base_dir_acc)
+
         fileMenu.addAction(self.open_file_acc)
+        pathMenu = menubar.addMenu('&Path')
+        for ac in self.directory_actions:
+            pathMenu.addAction(ac)
 
         procMenu = menubar.addMenu('&Process')
         procMenu.addAction(self.proc_this_frame_acc)
@@ -1067,6 +1085,13 @@ class LFReaderGui(QtGui.QMainWindow):
         self.set_all_fringes_acc.setCheckable(True)
         self.set_all_fringes_acc.setChecked(self.all_fringes_flg)
         self.set_all_fringes_acc.toggled.connect(self.set_all_friges)
+
+        
+
+        for cap,cta in zip(cap_lst,cta_lst):
+            tmp_acc = QtGui.QAction(cta, self)
+            self.directory_actions[cap] = tmp_acc
+
 
 
     def create_menu_bar(self):
