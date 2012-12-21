@@ -103,7 +103,7 @@ class Point1D_circ(Point):
 
     '''
     #: the value at which :py:attr:`~Point1D_circ.phi` winds back on it's self
-    WINDING = 1
+    WINDING = 2 * np.pi
     
     def __init__(self, q, phi, v=0):
         Point.__init__(self)                  # initialize base class
