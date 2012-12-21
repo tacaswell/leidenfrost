@@ -371,6 +371,7 @@ class LFGui(QtGui.QMainWindow):
         # reset spinners to default values
         for p in self.spinner_lst:
             self.param_spin_dict[p['name']].setValue(p['default'])
+        self.fname_text.setText(new_cine_fname[-1])
         self.open_file_sig.emit(new_cine_fname, default_params)
 
     def create_diag(self):
@@ -772,7 +773,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.paths_dict = defaultdict(lambda :None)
 
-
+        
         self.create_main_frame()
         self.create_actions()
         self.create_menu_bar()
