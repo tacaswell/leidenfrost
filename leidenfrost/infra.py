@@ -1179,6 +1179,32 @@ class SplineCurve(object):
 
         return data_out
 
+    def fft_filter(self,mode):
+
+        tmp_pts = si.splev(np.linspace(0,1,2 ** 12), self.tck)
+        center = np.mean(tmp_pts, axis=1).reshape(2, 1)
+        tmp_pts -= center
+        th = np.arctan2(*(tmp_pts[::-1]))
+        r = np.sqrt(np.sum(tmp_pts ** 2, axis=0))
+
+
+
+        rfft = fft.fft(r)
+        new_fft = np.zeros(rfft.shape,dtype='complex')
+        new_fft[0] = rfft[0]
+        new_fft[1:(mode+1)] = rfft[1:(mode+1)]
+        new_fft[-mode:] = rfft[-mode:]
+
+        new_r = np.real(fft.ifft(new_fft))
+
+        new_pts = np.vstack(((np.cos(th) * new_r), (np.sin(th) * new_r))) + self.center
+
+        print new_pts
+        _,tck,center = self._get_spline(new_pts,None,pix_err=0.05)
+
+        self.tck = tck
+        self.center = center
+        
     def q_phi_to_xy_old(self, q, phi):
         '''Converts q, phi pairs -> x, y pairs.  All other code that
         does this should move to using this so that there is minimal
