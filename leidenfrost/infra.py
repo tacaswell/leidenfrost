@@ -44,6 +44,7 @@ import trackpy.tracking as pt
 import matplotlib.animation as animation
 
 import shutil
+import copy
 
 FilePath = collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
@@ -729,7 +730,7 @@ class MemBackendFrame(object):
                  img=None,
                  *args,
                  **kwarg):
-        self.curve = curve
+        self.curve = copy.copy(curve)
         self.res = res
         self.trk_lst = trk_lst
         self.frame_number = frame_number
