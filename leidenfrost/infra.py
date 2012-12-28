@@ -25,6 +25,7 @@ import itertools
 
 import numpy as np
 import numpy.linalg as nl
+import numpy.fft as fft
 import matplotlib.pyplot as plt
 import scipy
 import scipy.ndimage
@@ -662,8 +663,9 @@ class ProcessBackend(object):
                               trk_lst=[tim, tam],
                               img=tmp_img)
         mbe.tm = tm
-
-        return mbe, mbe.get_next_spline(**self.params)
+        next_curve = mbe.get_next_spline(**self.params)
+        next_curve.fft_filter(10)
+        return mbe, next_curve
 
     def get_frame(self, frame_number):
         '''Simply return the (possibly normalized) image for the given frame'''
@@ -1199,7 +1201,7 @@ class SplineCurve(object):
 
         new_pts = np.vstack(((np.cos(th) * new_r), (np.sin(th) * new_r))) + self.center
 
-        print new_pts
+
         _,tck,center = self._get_spline(new_pts,None,pix_err=0.05)
 
         self.tck = tck
