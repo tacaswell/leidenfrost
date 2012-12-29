@@ -665,7 +665,7 @@ class ProcessBackend(object):
                               img=tmp_img)
         mbe.tm = tm
         next_curve = mbe.get_next_spline(**self.params)
-        next_curve.fft_filter(10)
+        next_curve.fft_filter(self.params['fft_filter'])
         return mbe, next_curve
 
     def get_frame(self, frame_number):
@@ -1016,7 +1016,7 @@ class SplineCurve(object):
     A class that wraps the scipy.interpolation objects
     '''
     @classmethod
-    def _get_spline(cls, points, point_count=None, pix_err=2, **kwargs):
+    def _get_spline(cls, points, point_count=None, pix_err=2,need_sort=True, **kwargs):
         '''
         Returns a closed spline for the points handed in.
         Input is assumed to be a (2xN) array
@@ -1061,8 +1061,9 @@ class SplineCurve(object):
         if len(pt_lst) < 5:
             raise Exception("not enough points")
 
-        # sort the list by angle around center
-        pt_lst.sort(key=lambda x: np.arctan2(x[1] - center[1],
+        if need_sort:
+            # sort the list by angle around center
+            pt_lst.sort(key=lambda x: np.arctan2(x[1] - center[1],
                                              x[0] - center[0]))
 
         # add first point to end because it is periodic (makes the
@@ -1183,7 +1184,8 @@ class SplineCurve(object):
         return data_out
 
     def fft_filter(self,mode):
-
+        if mode == 0:
+            return
         tmp_pts = si.splev(np.linspace(0,1,2 ** 12), self.tck)
         center = np.mean(tmp_pts, axis=1).reshape(2, 1)
         tmp_pts -= center
@@ -1203,7 +1205,7 @@ class SplineCurve(object):
         new_pts = np.vstack(((np.cos(th) * new_r), (np.sin(th) * new_r))) + self.center
 
 
-        _,tck,center = self._get_spline(new_pts,None,pix_err=0.05)
+        _,tck,center = self._get_spline(new_pts,None,pix_err=0.05,need_sort=False)
 
         self.tck = tck
         self.center = center
@@ -1228,6 +1230,8 @@ class SplineCurve(object):
 
         return r, th
 
+    def draw_to_axes(self,ax,N = 1024,**kwargs):
+        return ax.plot(*(self.q_phi_to_xy(0,linspace(0,2*np.pi,N))),**kwargs)  
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
                      smooth_rng=2, oversample=4, *args, **kwargs):
