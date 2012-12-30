@@ -1186,23 +1186,22 @@ class SplineCurve(object):
     def fft_filter(self,mode):
         if mode == 0:
             return
-        tmp_pts = si.splev(np.linspace(0,1,2 ** 12), self.tck)
-        center = np.mean(tmp_pts, axis=1).reshape(2, 1)
-        tmp_pts -= center
-        th = np.arctan2(*(tmp_pts[::-1]))
-        r = np.sqrt(np.sum(tmp_pts ** 2, axis=0))
+        sample_pow = 12
+        tmp_pts= si.splev(np.linspace(0,1,2 ** sample_pow), self.tck)
 
+        mask = np.zeros(2 ** sample_pow)
+        mask[0] = 1
+        mask[1:(mode+1)] = 1
+        mask[-mode:] = 1
 
+        new_pts = []
+        for w in tmp_pts:
+            wfft = fft.fft(w)
+            new_pts.append(np.real(fft.ifft(wfft * mask)))
 
-        rfft = fft.fft(r)
-        new_fft = np.zeros(rfft.shape,dtype='complex')
-        new_fft[0] = rfft[0]
-        new_fft[1:(mode+1)] = rfft[1:(mode+1)]
-        new_fft[-mode:] = rfft[-mode:]
+    
 
-        new_r = np.real(fft.ifft(new_fft))
-
-        new_pts = np.vstack(((np.cos(th) * new_r), (np.sin(th) * new_r))) + self.center
+        new_pts = np.vstack(new_pts)
 
 
         _,tck,center = self._get_spline(new_pts,None,pix_err=0.05,need_sort=False)
