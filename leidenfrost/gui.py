@@ -762,7 +762,7 @@ class LFReaderGui(QtGui.QMainWindow):
     redraw_sig = QtCore.Signal(bool, bool)
     cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
 
-    def __init__(self, parent=None):
+    def __init__(self,  picker_fun = None, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Display')
 
@@ -780,7 +780,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.paths_dict = defaultdict(lambda :None)
 
         
-        self.create_main_frame()
+        self.create_main_frame(picker_fun)
         self.create_actions()
         self.create_menu_bar()
         self.create_diag()
@@ -1006,7 +1006,7 @@ class LFReaderGui(QtGui.QMainWindow):
         diag_layout.addStretch()
         pass
 
-    def create_main_frame(self):
+    def create_main_frame(self, picker_fun):
         self.main_frame = QtGui.QWidget()
         # create the mpl Figure and FigCanvas objects.
         # 5x4 inches, 100 dots-per-inch
@@ -1015,6 +1015,9 @@ class LFReaderGui(QtGui.QMainWindow):
         self.fig = Figure((24, 24))
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
+
+        if picker_fun:
+            self.picker = PickerHandler(self.canvas, picker_fun)
 
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
@@ -1163,3 +1166,27 @@ class directory_selector(QtGui.QWidget):
             path = None
         self.path = path
         return path
+
+class PickerHandler(object):
+    def __init__(self,canv,fun = None):
+        canv.mpl_connect('pick_event',self.on_pick)
+        self.fun = fun
+        
+    def on_pick(self,event):
+        art = event.artist
+        # if not a Line2D, don't want to deal with it
+        if not isinstance(art,matplotlib.lines.Line2D):
+            return
+        try:
+            payload = art.payload()
+            if payload is not None:
+                self.fun(payload)
+            else:
+                print 'fail type 2'
+        
+        except:
+            print 'fail type 1'
+            pass
+        
+
+

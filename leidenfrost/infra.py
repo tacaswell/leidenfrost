@@ -45,6 +45,7 @@ import matplotlib.animation as animation
 
 import shutil
 import copy
+import weakref
 
 FilePath = collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
@@ -206,7 +207,10 @@ class lf_Track(Track):
         if 'markersize' not in kwargs:
             kwargs['markersize'] = 7.5
 
-        ln, = ax.plot(x, y, **kwargs)
+        if 'picker' not in kwargs:
+            kwargs['picker'] = 5
+        ln, = ax.plot(x+.5, y+.5, **kwargs)
+        ln.payload = weakref.ref(self)
         return ln
 
     def classify2(self, min_len=None, min_extent=None, **kwargs):
