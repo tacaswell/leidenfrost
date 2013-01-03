@@ -28,6 +28,7 @@ import matplotlib
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
+import matplotlib.gridspec as gridspec
 
 from collections import defaultdict
 
@@ -553,6 +554,7 @@ class LFGui(QtGui.QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
         self.axes = self.fig.add_subplot(111)
+        self.fig.tight_layout(.3,None,None,None)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
         # configuration tool in the navigation toolbar wouldn't
@@ -871,6 +873,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.axes = None
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)
+        self.fig.tight_layout(.3,None,None,None)
         # nuke all those objects
         self.fringe_lines = []
         self.im = None
@@ -1026,7 +1029,8 @@ class LFReaderGui(QtGui.QMainWindow):
         #
         self.axes = self.fig.add_subplot(111)
 
-
+        self.fig.tight_layout(.3,None,None,None)
+        
         self.im = None
 
         # Create the navigation toolbar, tied to the canvas
@@ -1190,3 +1194,25 @@ class PickerHandler(object):
         
 
 
+class GraphDialog(QtGui.QDialog):
+    def __init__(self, grid_size=(1, 1), parent=None):
+        QtGui.QDialog.__init__(self, parent)
+        
+        self.fig = Figure((10, 10))
+        self.canvas = FigureCanvas(self.fig)
+        self.canvas.setParent(self)
+        self.canvas.setSizePolicy(QtGui.QSizePolicy.Expanding,
+                                  QtGui. QSizePolicy.Expanding)
+        self.gs = gridspec.GridSpec(*grid_size)
+        self.axes_list = [self.fig.add_subplot(s) for s in self.gs]
+        self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1])
+        
+    def update_axes(self, fun, args):
+        fun(self.axes_list, args)
+        self.gs.tight_layout(self.fig)
+        self.canvas.draw()
+
+    def resizeEvent(self, re):
+        QtGui.QDialog.resizeEvent(self, re)
+        self.canvas.resize(re.size().width(), re.size().height())
+        self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1],pad=0)
