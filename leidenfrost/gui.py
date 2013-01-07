@@ -554,7 +554,7 @@ class LFGui(QtGui.QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
         self.axes = self.fig.add_subplot(111)
-        self.fig.tight_layout(.3,None,None,None)
+        #      self.fig.tight_layout(.3,None,None,None)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
         # configuration tool in the navigation toolbar wouldn't
@@ -764,7 +764,7 @@ class LFReaderGui(QtGui.QMainWindow):
     redraw_sig = QtCore.Signal(bool, bool)
     cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
 
-    def __init__(self,  picker_fun = None, parent=None):
+    def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Display')
 
@@ -782,7 +782,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.paths_dict = defaultdict(lambda :None)
 
         
-        self.create_main_frame(picker_fun)
+        self.create_main_frame()
         self.create_actions()
         self.create_menu_bar()
         self.create_diag()
@@ -873,7 +873,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.axes = None
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)
-        self.fig.tight_layout(.3,None,None,None)
+        #       self.fig.tight_layout(.3,None,None,None)
         # nuke all those objects
         self.fringe_lines = []
         self.im = None
@@ -1007,9 +1007,14 @@ class LFReaderGui(QtGui.QMainWindow):
 
         diag_layout.addWidget(path_box)
         diag_layout.addStretch()
+
+        self.graphs_window = GraphDialog((2,1))
+        self.show_track_graphs.toggled.connect(self.graphs_window.setVisible)
+
+        
         pass
 
-    def create_main_frame(self, picker_fun):
+    def create_main_frame(self):
         self.main_frame = QtGui.QWidget()
         # create the mpl Figure and FigCanvas objects.
         # 5x4 inches, 100 dots-per-inch
@@ -1019,8 +1024,27 @@ class LFReaderGui(QtGui.QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
 
-        if picker_fun:
-            self.picker = PickerHandler(self.canvas, picker_fun)
+
+        def track_plot(axes_lst,trk):
+            q, phi,v = zip(*[(p.q, p.phi,p.v) for p in trk.points])
+            
+            axes_lst[0].cla()
+            axes_lst[0].plot(q,phi)
+
+            axes_lst[1].cla()
+            axes_lst[1].plot(v)
+
+        def picker_fun(trk):
+            if  isinstance(trk,infra.lf_Track):
+                if self.graphs_window:
+                    self.graphs_window.update_axes(track_plot,trk)
+                    
+            else:
+                print type(trk)
+    
+            
+        self.picker = PickerHandler(self.canvas, picker_fun)
+
 
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
@@ -1029,7 +1053,7 @@ class LFReaderGui(QtGui.QMainWindow):
         #
         self.axes = self.fig.add_subplot(111)
 
-        self.fig.tight_layout(.3,None,None,None)
+        #        self.fig.tight_layout(.3,None,None,None)
         
         self.im = None
 
@@ -1100,8 +1124,11 @@ class LFReaderGui(QtGui.QMainWindow):
         self.set_all_fringes_acc.setChecked(self.all_fringes_flg)
         self.set_all_fringes_acc.toggled.connect(self.set_all_friges)
 
-        
+        self.show_track_graphs = QtGui.QAction(u'Display &Track graph', self)
+        self.show_track_graphs.setCheckable(True)
+        self.show_track_graphs.setChecked(False)
 
+        
         for cap,cta in zip(cap_lst,cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
@@ -1119,6 +1146,8 @@ class LFReaderGui(QtGui.QMainWindow):
         fringeMenu.addAction(self.set_fringes_acc)
         fringeMenu.addAction(self.set_all_fringes_acc)
 
+        graphMenu = menubar.addMenu('Graphs')
+        graphMenu.addAction(self.show_track_graphs)
 
 class directory_selector(QtGui.QWidget):
     '''
@@ -1181,17 +1210,13 @@ class PickerHandler(object):
         # if not a Line2D, don't want to deal with it
         if not isinstance(art,matplotlib.lines.Line2D):
             return
-        try:
-            payload = art.payload()
-            if payload is not None:
-                self.fun(payload)
-            else:
-                print 'fail type 2'
         
-        except:
-            print 'fail type 1'
-            pass
-        
+        payload = art.payload()
+        if payload is not None:
+            self.fun(payload)
+        else:
+            print 'fail type 2'
+                
 
 
 class GraphDialog(QtGui.QDialog):
