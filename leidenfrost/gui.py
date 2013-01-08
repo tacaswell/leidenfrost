@@ -438,7 +438,7 @@ class LFGui(QtGui.QMainWindow):
             spin_box.setSingleStep(spin_prams['step'])
             spin_box.setValue(spin_prams['default'])
             name = spin_prams['name']
-
+            spin_box.setKeyboardTracking(False)
             spin_box.valueChanged.connect(self._gen_update_closure(name))
             fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
                                        spin_box)
