@@ -47,6 +47,9 @@ import shutil
 import copy
 import weakref
 
+
+import leidenfrost.db as db
+
 FilePath = collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
@@ -193,19 +196,23 @@ class lf_Track(Track):
         '''
         q, phi = zip(*[(p.q, p.phi) for p in self.points])
         x, y = curve.q_phi_to_xy(q, phi)
-
-        if self.charge is None:
-            kwargs['marker'] = 's'
-        elif self.charge == 1:
-            kwargs['marker'] = '^'
-        elif self.charge == -1:
-            kwargs['marker'] = 'v'
+        mark_charge = False
+        if mark_charge:
+            if self.charge is None:
+                kwargs['marker'] = 's'
+            elif self.charge == 1:
+                kwargs['marker'] = '^'
+            elif self.charge == -1:
+                kwargs['marker'] = 'v'
+            else:
+                kwargs['marker'] = 'o'
+            if 'markevery' not in kwargs:
+                kwargs['markevery'] = 10
+            if 'markersize' not in kwargs:
+                kwargs['markersize'] = 7.5
         else:
-            kwargs['marker'] = 'o'
-        if 'markevery' not in kwargs:
-            kwargs['markevery'] = 10
-        if 'markersize' not in kwargs:
-            kwargs['markersize'] = 7.5
+            if 'marker' not in kwargs:
+                kwargs['marker'] = ''
 
         if 'picker' not in kwargs:
             kwargs['picker'] = 5
@@ -594,6 +601,7 @@ class ProcessBackend(object):
         self.cine_ = None                    # the cine object
 
         self.bck_img = None      # back ground image for normalization
+        self.db = db.LFmongodb() # hard code the mongodb 
 
     @classmethod
     def from_hdf_file(cls, cine_base_path, h5_fname):
@@ -651,7 +659,15 @@ class ProcessBackend(object):
         self.cine_ = cine.Cine('/'.join(self.cine_fname))
 
         if self.bck_img is None:
-            self.bck_img = gen_bck_img('/'.join(self.cine_fname))
+            # not passed in, try the data base
+            if self.db is not None:
+                self.bck_img = self.db.get_background_img(self.cine_.hash)
+            # if that fails too, run it
+            if self.bck_img is None:
+                self.bck_img = gen_bck_img('/'.join(self.cine_fname))
+                # if we have a data base, shove in the data
+                if self.db is not None:
+                    self.db.store_background_img(self.cine_.hash,bck_img)
 
         return self
 
