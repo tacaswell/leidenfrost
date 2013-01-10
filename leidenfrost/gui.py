@@ -704,7 +704,7 @@ class LFGui(QtGui.QMainWindow):
 class LFReader(QtCore.QObject):
     frame_loaded = QtCore.Signal(bool, bool)
     file_loaded = QtCore.Signal(bool,bool)
-
+    file_params = QtCore.Signal(dict)
     def __init__(self, parent=None):
         QtCore.QObject.__init__(self, parent)
 
@@ -753,7 +753,7 @@ class LFReader(QtCore.QObject):
         self.cur_frame = 0
 
         self.file_loaded.emit(True,True)
-
+        self.file_params.emit(self.backend.proc_prams)
 
 
 
@@ -795,11 +795,13 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.reader.frame_loaded.connect(self.on_draw)
         self.reader.file_loaded.connect(self.redraw)
-
+        self.reader.file_params.connect(self.update_param_labels)
         self.show()
 
         self.thread.start()
 
+        self.label_block = None
+        
         QtGui.qApp.exec_()
 
     def set_fringes_visible(self, i):
@@ -951,6 +953,24 @@ class LFReaderGui(QtGui.QMainWindow):
         print new_hdf_fname
         print '/'.join(new_hdf_fname)
         self.open_file_sig.emit(new_hdf_fname,cine_bp,tmp_dict)
+
+    @QtCore.Slot(dict)
+    def update_param_labels(self,prams):
+        diag_layout = self.diag.widget().layout()
+        if self.label_block is not None:
+            diag_layout.removeWidget(self.label_block)
+
+        self.label_block = QtGui.QGroupBox("Parameters")
+
+        param_form_layout = QtGui.QFormLayout()
+        ignore_lst = ['tck0', 'tck1', 'tck2', 'center', 'cine_path', 'cine_fname']
+        for k,v in prams.iteritems():
+            if k in ignore_lst:
+                continue
+            param_form_layout.addRow(QtGui.QLabel(k + ':'),QtGui.QLabel(str(v)))
+        
+        self.label_block.setLayout(param_form_layout)
+        diag_layout.addWidget(self.label_block)
 
     def create_diag(self):
 

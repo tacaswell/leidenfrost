@@ -960,7 +960,7 @@ class HdfBackend(object):
         self.file = h5py.File('/'.join(fname), 'r')
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
         self.prams = HdfBEPram(True, True)
-
+        self.proc_prams = dict(self.file.attrs)
         if 'bck_img' in self.file.keys():
             try:
                 self.bck_img = self.file['bck_img'][:]
