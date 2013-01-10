@@ -719,8 +719,8 @@ class ProcessBackend(object):
             except Exception as e:
                 print "FAILURE WITH HDF: " + e.__str__()
 
-        file_out.attrs['cine_path'] = self.cine_fname.path
-        file_out.attrs['cine_fname'] = self.cine_fname.fname
+        file_out.attrs['cine_path'] = str(self.cine_fname.path)
+        file_out.attrs['cine_fname'] = str(self.cine_fname.fname)
 
         if seed_curve is not None:
             seed_curve.write_to_hdf(file_out)
