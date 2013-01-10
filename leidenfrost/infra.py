@@ -214,6 +214,11 @@ class lf_Track(Track):
             if 'marker' not in kwargs:
                 kwargs['marker'] = ''
 
+        if bool(self.charge):
+            kwargs['lw'] = 3
+        else:
+            kwargs['lw'] = 1
+                
         if 'picker' not in kwargs:
             kwargs['picker'] = 5
         ln, = ax.plot(x+.5, y+.5, **kwargs)
