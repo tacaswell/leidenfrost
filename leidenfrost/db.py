@@ -24,6 +24,7 @@ from pymongo import MongoClient
 import bson
 
 
+
 class BackImgClash(RuntimeError):
     pass
 
@@ -161,7 +162,7 @@ class LFmongodb(LFDbWrapper):
         record = self.bck_img_coll.find_one({'cine':cine_hash})
         if record is None:
             return None
-        return numpy.loads(record['bck_img'])
+        return cPickle.loads(record['bck_img'])
 
     def store_background_img(self, cine_hash, bck_img, overwrite=False):
         # test if it exists, add that logic
