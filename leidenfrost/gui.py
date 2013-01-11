@@ -64,9 +64,10 @@ class LFWorker(QtCore.QObject):
     def get_next_curve(self):
         return self.next_curve
 
-    def update_param(self, key, val):
+    @QtCore.Slot(dict)
+    def update_all_params(self, params):
         if self.process_backend is not None:
-            self.process_backend.update_param(key, val)
+            self.process_backend.update_all_params(params)
 
     def get_frame(self, ind):
         if self.process_backend is not None:
@@ -105,52 +106,72 @@ class LFGui(QtGui.QMainWindow):
          'step': .5,
          'prec': 1,
          'type': np.float,
-         'default': 10},
+         'default': 10,
+         'togglable':False},
         {'name': 's_num',
          'min': 1,
          'max': 9999,
          'step': 1,
          'type': np.int,
-         'default': 100},
+         'default': 100,
+         'togglable':False},
         {'name': 'search_range',
          'min': .001,
          'max': 2 * np.pi,
          'step': .005,
          'prec': 3,
          'type': np.float,
-         'default': .01},
+         'default': .01,
+         'togglable':False},
         {'name': 'memory',
          'min': 0,
          'max': 999,
          'step': 1,
          'type': np.int,
-         'default': 0},
+         'default': 0,
+         'togglable':False},
         {'name': 'pix_err',
          'min': 0,
          'max': 9,
          'step': .1,
          'prec': 1,
          'type': np.float,
-         'default': 0.5},
+         'default': 0.5,
+         'togglable':False},
         {'name': 'mix_in_count',
          'min': 0,
          'max': 100,
          'step': 1,
          'type': np.int,
-         'default': 0},
+         'default': 0,
+         'togglable':False},
         {'name':'min_tlen',
          'min':0,
          'max':999999,
          'step':1,
          'type':np.int,
-         'default':15},
+         'default':15,
+         'togglable':True},
         {'name':'fft_filter',
          'min':0,
          'max':999,
          'step':1,
          'type':np.int,
-         'default':10}
+         'default':10,
+         'togglable':True},
+         {'name':'min_extent',
+         'min':0,
+         'max':999,
+         'step':1,
+         'type':np.int,
+         'default':10,
+         'togglable':True}
          ]
+        
+    toggle_lst = [
+            {'name':'straddle',
+             'default':True},
+             ]
 
     cap_lst = ['cine base path']
     
@@ -217,10 +238,9 @@ class LFGui(QtGui.QMainWindow):
             print 'spline fitter not ready'
             self.cur_curve = None
 
-    def update_param(self, key, val):
-        self.worker.update_param(key, val)
-        if self.draw_fringes:
-            self._proc_this_frame()
+    # def update_param(self, key, val):
+    #     self.worker.update_param(key, val)
+
 
     def _proc_this_frame(self):
 
@@ -381,6 +401,22 @@ class LFGui(QtGui.QMainWindow):
         self.fname_text.setText(new_cine_fname[-1])
         self.open_file_sig.emit(new_cine_fname, default_params)
 
+    def update_all_params(self):
+        tmp_dict = {}
+        # get parameters out of spin boxes
+        for key,sb in self.param_spin_dict.iter_items():
+            if sb.enabled():
+                tmp_dict[key] = sb.getValue()
+            else:
+                tmp_dict[key] = None
+
+        # shove them into the worker
+        self.worker.update_all_params(tmp_dict)
+
+        # re-draw
+        if self.draw_fringes:
+            self._proc_this_frame()
+
     def create_diag(self):
         # make top level stuff
         self.diag = QtGui.QDockWidget('controls', parent=self)
@@ -434,14 +470,33 @@ class LFGui(QtGui.QMainWindow):
                 print s_type
                 continue
 
+            # properties of spin box
             spin_box.setRange(spin_prams['min'], spin_prams['max'])
             spin_box.setSingleStep(spin_prams['step'])
             spin_box.setValue(spin_prams['default'])
             name = spin_prams['name']
             spin_box.setKeyboardTracking(False)
-            spin_box.valueChanged.connect(self._gen_update_closure(name))
-            fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
+
+            # connect it to an action 
+            spin_box.valueChanged.connect(self.update_params_acc.trigger)
+
+            # if it can be turned on or off
+            if spin_prams['togglable']:
+                l_checkbox = QtGui.QCheckBox('enable')
+                l_checkbox.stateChanged.connect(spin_box.setEnabled)
+                l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
+                l_h_layout = QtGui.QHBoxLayout()
+                l_h_layout.addWidget(spin_box)
+                l_h_layout.addWidget(l_checkbox)
+                fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
+                                       l_h_layout)
+
+
+            # if it can't
+            else:
+                fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
                                        spin_box)
+            # add the spin box 
             self.param_spin_dict[name] = spin_box
             
         # button to grab initial spline
@@ -639,9 +694,6 @@ class LFGui(QtGui.QMainWindow):
         self.redraw_sig.emit(False,False)
 
 
-    def _gen_update_closure(self, name):
-        return lambda x: self.update_param(name, x)
-
     def create_status_bar(self):
         self.status_text = QtGui.QLabel(str(self.cur_frame))
         
@@ -684,6 +736,9 @@ class LFGui(QtGui.QMainWindow):
         for cap,cta in zip(self.cap_lst,cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
+
+        self.update_params_acc = QtGui.QAction('Update Parameters', self)
+        self.update_params_acc.triggered.connect(self.update_all_params)
 
     def create_menu_bar(self):
         menubar = self.menuBar()

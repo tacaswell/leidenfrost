@@ -609,6 +609,16 @@ class ProcessBackend(object):
         self.db = db.LFmongodb() # hard code the mongodb 
 
     @classmethod
+    def _verify_params(cls,param,extra_req=None):
+        if extra_req is None:
+            extra_req = []
+        for s in cls.req_args_lst + extra_req:
+            if s not in kwargs:
+                raise Exception("missing required argument %s" % s)
+
+        
+        
+    @classmethod
     def from_hdf_file(cls, cine_base_path, h5_fname):
         ''' Sets up object to process data based on MD in an hdf file.
         '''
@@ -617,10 +627,7 @@ class ProcessBackend(object):
         keys_lst = tmp_file.attrs.keys()
         lc_req_args = ['tck0', 'tck1', 'tck2', 'center']
         h5_req_args = ['cine_path', 'cine_fname']
-        for s in cls.req_args_lst + lc_req_args + h5_req_args:
-            if s not in keys_lst:
-                tmp_file.close()
-                raise Exception("missing required argument %s" % s)
+        cls._verify_params(keys_lst,extra_req = lc_req_args + h5_req_args)
 
         self.params = dict(tmp_file.attrs)
 
@@ -649,10 +656,8 @@ class ProcessBackend(object):
         '''Sets up the object based on arguments
         '''
 
-        for s in cls.req_args_lst:
-            if s not in kwargs:
-                raise Exception("missing required argument %s" % s)
-
+        cls._verify_params(kwargs)
+        
         self.params = kwargs
         try:
             self.bck_img = self.params.pop('bck_img')
@@ -707,6 +712,11 @@ class ProcessBackend(object):
     def update_param(self, key, val):
         '''Updates the parameters'''
         self.params[key] = val
+
+    def update_all_params(self,params):
+        self._verify_params(params)
+        self.params = params
+
 
     def gen_stub_h5(self, h5_fname, seed_curve):
         '''Generates a h5 file that can be read back in for later
