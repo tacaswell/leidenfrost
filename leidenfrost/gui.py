@@ -165,12 +165,14 @@ class LFGui(QtGui.QMainWindow):
          'step':1,
          'type':np.int,
          'default':10,
-         'togglable':True}
+         'togglable':True,
+         'tooltip':'The minimum extent in q[pixel] of a track to be valid'}
          ]
         
     toggle_lst = [
             {'name':'straddle',
-             'default':True},
+             'default':True,
+             'tooltip':'If checked, then tracks must cross the seed line to be valid'},
              ]
 
     cap_lst = ['cine base path']
@@ -404,12 +406,14 @@ class LFGui(QtGui.QMainWindow):
     def update_all_params(self):
         tmp_dict = {}
         # get parameters out of spin boxes
-        for key,sb in self.param_spin_dict.iter_items():
-            if sb.enabled():
+        for key,sb in self.param_spin_dict.iteritems():
+            if sb.isEnabled():
                 tmp_dict[key] = sb.getValue()
             else:
                 tmp_dict[key] = None
 
+        for key,cb in self.param_checkbox_dict.iteritem():
+            tmp_dict[key] = sb.getValue()
         # shove them into the worker
         self.worker.update_all_params(tmp_dict)
 
@@ -480,6 +484,9 @@ class LFGui(QtGui.QMainWindow):
             # connect it to an action 
             spin_box.valueChanged.connect(self.update_params_acc.trigger)
 
+            l_label = QtGui.QLabel(spin_prams['name'])
+            if 'tooltip' in spin_prams:
+                l_label.setToolTip(spin_prams['tooltip'])
             # if it can be turned on or off
             if spin_prams['togglable']:
                 l_checkbox = QtGui.QCheckBox('enable')
@@ -488,16 +495,26 @@ class LFGui(QtGui.QMainWindow):
                 l_h_layout = QtGui.QHBoxLayout()
                 l_h_layout.addWidget(spin_box)
                 l_h_layout.addWidget(l_checkbox)
-                fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
-                                       l_h_layout)
-
+                fringe_cntrls_spins.addRow(l_label, l_h_layout)
+                
 
             # if it can't
             else:
-                fringe_cntrls_spins.addRow(QtGui.QLabel(spin_prams['name']),
+                fringe_cntrls_spins.addRow(l_label,
                                        spin_box)
             # add the spin box 
             self.param_spin_dict[name] = spin_box
+
+        for cb_param in self.toggle_lst:
+            l_label = QtGui.QLabel(cb_param['name'])
+            if 'tooltip' in cb_param:
+                l_label.setToolTip(cb_param['tooltip'])
+
+            l_checkbox = QtGui.QCheckBox('enable')
+            l_checkbox.stateChanged.connect(spin_box.setEnabled)
+            l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
+            fringe_cntrls_spins.addRow(l_label, l_checkbox)
+        
             
         # button to grab initial spline
         grab_button = QtGui.QPushButton('Grab Spline')
