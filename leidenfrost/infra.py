@@ -613,7 +613,7 @@ class ProcessBackend(object):
         if extra_req is None:
             extra_req = []
         for s in cls.req_args_lst + extra_req:
-            if s not in kwargs:
+            if s not in param:
                 raise Exception("missing required argument %s" % s)
 
         
