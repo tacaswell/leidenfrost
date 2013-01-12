@@ -66,6 +66,7 @@ class LFWorker(QtCore.QObject):
 
     @QtCore.Slot(dict)
     def update_all_params(self, params):
+        print params
         if self.process_backend is not None:
             self.process_backend.update_all_params(params)
 
@@ -151,14 +152,16 @@ class LFGui(QtGui.QMainWindow):
          'step':1,
          'type':np.int,
          'default':15,
-         'togglable':True},
+         'togglable':True,
+         'default_state':True},
         {'name':'fft_filter',
          'min':0,
          'max':999,
          'step':1,
          'type':np.int,
          'default':10,
-         'togglable':True},
+         'togglable':True,
+         'default_state':True},
          {'name':'min_extent',
          'min':0,
          'max':999,
@@ -166,6 +169,7 @@ class LFGui(QtGui.QMainWindow):
          'type':np.int,
          'default':10,
          'togglable':True,
+         'default_state':False,
          'tooltip':'The minimum extent in q[pixel] of a track to be valid'}
          ]
         
@@ -177,25 +181,23 @@ class LFGui(QtGui.QMainWindow):
 
     cap_lst = ['cine base path']
     
-    def __init__(self, cine_fname=None, bck_img=None, parent=None):
+    def __init__(self,  parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
-        if cine_fname is not None:
-            self.cine_fname = cine_fname
-            self.paths_dict['cine base path'] = cine_fname[0]
-        else:
-            self.cine_fname = None
+
+        self.cine_fname = None
 
         self.cur_frame = 0
 
         self.draw_fringes = False
 
         default_params = dict((d['name'], d['default']) for
-                              d in LFGui.spinner_lst)
+                              d in self.spinner_lst if 'default_state' not in d or d['default_state'])
+        for tog in self.toggle_lst:
+            default_params[tog['name']] = tog['default']
+            
 
-        
-        self.paths_dict = defaultdict(lambda :None)
-        self.directory_actions = {}
+                
         
         self.thread = QtCore.QThread(parent=self)
 
@@ -208,7 +210,13 @@ class LFGui(QtGui.QMainWindow):
         self.fringe_lines = []
 
         self.all_fringes_flg = False
+        
+        self.paths_dict = defaultdict(lambda :None)        
+        self.directory_actions = {}
         self.param_spin_dict = {}
+        self.param_checkbox_dict = {}
+
+        
         self.create_actions()
         self.create_main_frame()
         self.create_menu_bar()
@@ -376,7 +384,8 @@ class LFGui(QtGui.QMainWindow):
         
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
                                                      caption='Select cine',
-                                                     dir=self.paths_dict['cine base path'])
+                                                     dir=self.paths_dict['cine base path'],
+                                                     filter="cine (*.cine)")
         if len(fname) == 0:
             return
         
@@ -388,32 +397,42 @@ class LFGui(QtGui.QMainWindow):
             self.directory_actions['cine base path'].trigger()
 
         self.prog_bar.show()
+
+        tmp_params = self._get_cur_parametrs()
         self.diag.setEnabled(False)
 
         path_, fname_ = os.path.split(fname[(len(self.paths_dict['cine base path']) + 1):])
         new_cine_fname = infra.FilePath(self.paths_dict['cine base path'], path_, fname_)
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
-        default_params = dict((d['name'], d['default']) for
-                              d in LFGui.spinner_lst)
+
+        
 
         # reset spinners to default values
-        for p in self.spinner_lst:
-            self.param_spin_dict[p['name']].setValue(p['default'])
-        self.fname_text.setText(new_cine_fname[-1])
-        self.open_file_sig.emit(new_cine_fname, default_params)
+        # for p in self.spinner_lst:
+        #     self.param_spin_dict[p['name']].setValue(p['default'])
 
-    def update_all_params(self):
+        self.fname_text.setText(new_cine_fname[-1])
+        self.open_file_sig.emit(new_cine_fname, tmp_params)
+        
+    def _get_cur_parametrs(self):
         tmp_dict = {}
         # get parameters out of spin boxes
         for key,sb in self.param_spin_dict.iteritems():
+            print key,sb.isEnabled()
             if sb.isEnabled():
-                tmp_dict[key] = sb.getValue()
-            else:
-                tmp_dict[key] = None
 
-        for key,cb in self.param_checkbox_dict.iteritem():
-            tmp_dict[key] = sb.getValue()
+                tmp_dict[key] = sb.value()
+
+        # get toggle switch values
+        for key,cb in self.param_checkbox_dict.iteritems():
+            print key
+            tmp_dict[key] = bool(cb.checkState())
+            
+        return tmp_dict
+        
+    def update_all_params(self):
+        tmp_dict = self._get_cur_parametrs()
         # shove them into the worker
         self.worker.update_all_params(tmp_dict)
 
@@ -491,6 +510,8 @@ class LFGui(QtGui.QMainWindow):
             if spin_prams['togglable']:
                 l_checkbox = QtGui.QCheckBox('enable')
                 l_checkbox.stateChanged.connect(spin_box.setEnabled)
+                l_checkbox.setChecked(spin_prams['default_state'])
+                spin_box.setEnabled(spin_prams['default_state'])
                 l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
                 l_h_layout = QtGui.QHBoxLayout()
                 l_h_layout.addWidget(spin_box)
@@ -511,7 +532,8 @@ class LFGui(QtGui.QMainWindow):
                 l_label.setToolTip(cb_param['tooltip'])
 
             l_checkbox = QtGui.QCheckBox('enable')
-            l_checkbox.stateChanged.connect(spin_box.setEnabled)
+            l_checkbox.setChecked(cb_param['default'])
+            self.param_checkbox_dict[cb_param['name']] = l_checkbox            
             l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
             fringe_cntrls_spins.addRow(l_label, l_checkbox)
         

@@ -225,7 +225,7 @@ class lf_Track(Track):
         ln.payload = weakref.ref(self)
         return ln
 
-    def classify2(self, min_len=None, min_extent=None, **kwargs):
+    def classify2(self, min_len=None, min_extent=None, straddle=True,  **kwargs):
         ''' 
         :param min_len: the minimum length a track must be to considered
         :param min_extent: the minimum extent in :py:attr:`q` the of the track
@@ -256,11 +256,12 @@ class lf_Track(Track):
             return
 
         # if the track does not straddle the seed curve, probably junk
-        if np.min(q) > 0 or np.max(q) < 0:
-            self.charge = None
-            self.q = None
-            self.phi = None
-            return
+        if straddle:
+            if np.min(q) > 0 or np.max(q) < 0:
+                self.charge = None
+                self.q = None
+                self.phi = None
+                return
 
         a = np.vstack([q ** 2, q, np.ones(np.size(q))]).T
         X, res, rnk, s = nl.lstsq(a, phi)
@@ -684,6 +685,7 @@ class ProcessBackend(object):
     def process_frame(self, frame_number, curve):
         # get the raw data, and convert to float
         tmp_img = self.get_frame(frame_number)
+        print self.params
         tm, trk_res, tim, tam, miv, mav = proc_frame(curve,
                                                      tmp_img,
                                                      **self.params)
@@ -695,7 +697,9 @@ class ProcessBackend(object):
                               img=tmp_img)
         mbe.tm = tm
         next_curve = mbe.get_next_spline(**self.params)
-        next_curve.fft_filter(self.params['fft_filter'])
+        if 'fft_filter' in self.params:
+            next_curve = copy.copy(next_curve) # to not screw up the orignal
+            next_curve.fft_filter(self.params['fft_filter'])
         return mbe, next_curve
 
     def get_frame(self, frame_number):
@@ -775,6 +779,9 @@ class MemBackendFrame(object):
         self.pix_err = None
         new_res = []
         for t_ in self.res:
+            if len(t_) == 0:
+                print t_
+                continue
             tmp = ~np.isnan(t_[0])
             tmp_lst = [np.array(r)[tmp] for r in t_]
             new_res.append(tuple(tmp_lst))
@@ -1339,6 +1346,7 @@ def find_rim_fringes(curve, lfimg, s_width, s_num,
 
 def proc_frame(curve, img, s_width, s_num, search_range, min_tlen=5, **kwargs):
     '''new version with different returns'''
+    
     _t0 = time.time()
 
     miv, mav = find_rim_fringes(curve,
