@@ -381,7 +381,7 @@ class spline_fitter(object):
         if len(self.pt_lst) > 5:
             SC = SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
             new_pts = SC.get_xy_samples(1000)
-            center = SC.center
+            center = np.mean(new_pts,1).ravel()
             self.sp_plot.set_xdata(new_pts[0])
             self.sp_plot.set_ydata(new_pts[1])
             self.pt_lst.sort(key=lambda x:
@@ -572,7 +572,7 @@ def _read_frame_tracks_from_file_res(parent_group):
     Only reads out the charge and location of the tracks, not all of
     their points '''
 
-    center = parent_group.attrs['center']
+
     tck = [parent_group.attrs['tck0'],
            parent_group.attrs['tck1'],
            parent_group.attrs['tck2']]
@@ -626,7 +626,7 @@ class ProcessBackend(object):
         self = cls()
         tmp_file = h5py.File('/'.join(h5_fname), 'r')
         keys_lst = tmp_file.attrs.keys()
-        lc_req_args = ['tck0', 'tck1', 'tck2', 'center']
+        lc_req_args = ['tck0', 'tck1', 'tck2']
         h5_req_args = ['cine_path', 'cine_fname']
         cls._verify_params(keys_lst,extra_req = lc_req_args + h5_req_args)
 
@@ -728,7 +728,7 @@ class ProcessBackend(object):
         valid'''
 
         file_out = h5py.File(h5_fname, 'w-')   # open file
-        file_out.attrs['ver'] = '0.1.2'       # set meta-data
+        file_out.attrs['ver'] = '0.1.3'       # set meta-data
         for key, val in self.params.items():
             try:
                 file_out.attrs[key] = val
@@ -740,7 +740,7 @@ class ProcessBackend(object):
 
         file_out.attrs['cine_path'] = str(self.cine_fname.path)
         file_out.attrs['cine_fname'] = str(self.cine_fname.fname)
-
+        
         if seed_curve is not None:
             seed_curve.write_to_hdf(file_out)
         if self.bck_img is not None:
@@ -1058,7 +1058,7 @@ class SplineCurve(object):
     A class that wraps the scipy.interpolation objects
     '''
     @classmethod
-    def _get_spline(cls, points, point_count=None, pix_err=2,need_sort=True, **kwargs):
+    def _get_spline(cls, points,  pix_err=2,need_sort=True, **kwargs):
         '''
         Returns a closed spline for the points handed in.
         Input is assumed to be a (2xN) array
@@ -1066,25 +1066,18 @@ class SplineCurve(object):
         =====
         input
         =====
+ 
+        :param points: the points to fit the spline to
+        :type points: a 2xN ndarray or a list of len =2 tuples
 
-        points
-            a 2xN array
+        :param pix_err: the error is finding the spline in pixels
+        :param need_sort: if the points need to be sorted or should be processed as-is
 
-        point_count (optional)
-            the number of new places to sample
-
-        center
-            The center of the point for converting to a
-            shifted radial coordinate system
         =====
         output
         =====
-        new_points
-            a 2x{N, point_count} array with evenly sampled points
         tck
            The return data from the spline fitting
-        center
-           The center of mass the initial points
         '''
 
         if type(points) is np.ndarray:
@@ -1117,20 +1110,14 @@ class SplineCurve(object):
         # do spline fitting
 
         tck, u = si.splprep(pt_array, s=len(pt_lst) * (pix_err ** 2), per=True)
-        if point_count is not None:
-            new_pts = si.splev(np.linspace(0, 1, point_count), tck)
-            center = np.mean(new_pts, axis=1).reshape(2, 1)
-        else:
-            new_pts = si.splev(np.linspace(0, 1, 1000), tck)
-            center = np.mean(new_pts, axis=1).reshape(2, 1)
-            new_pts = []
-        pt_lst.pop(-1)
-        return new_pts, tck, center
+        
+        
+        return  tck
 
     @classmethod
     def from_pts(cls, new_pts, **kwargs):
-        _, tck, center = cls._get_spline(new_pts, **kwargs)
-        this = cls(tck, center)
+        tck  = cls._get_spline(new_pts, **kwargs)
+        this = cls(tck)
         this.raw_pts = new_pts
         return this
 
@@ -1141,14 +1128,12 @@ class SplineCurve(object):
                parent_group.attrs['tck1'],
                parent_group.attrs['tck2']]
         new_pts = si.splev(np.linspace(0, 1, 1000), tck)
-        center = np.mean(new_pts, axis=1).reshape(2, 1)
-        return cls(tck, center)
+        return cls(tck)
 
-    def __init__(self, tck, center):
+    def __init__(self, tck):
         '''A really hacky way of doing different
         '''
         self.tck = tck
-        self.center = center
 
     def get_xy_samples(self, sample_count):
         '''
@@ -1166,7 +1151,6 @@ class SplineCurve(object):
         parent_group.attrs['tck0'] = self.tck[0]
         parent_group.attrs['tck1'] = np.vstack(self.tck[1])
         parent_group.attrs['tck2'] = self.tck[2]
-        parent_group.attrs['center'] = self.center
 
     def circumference(self):
         '''returns a rough estimate of the circumference'''
@@ -1246,30 +1230,10 @@ class SplineCurve(object):
         new_pts = np.vstack(new_pts)
 
 
-        _,tck,center = self._get_spline(new_pts,None,pix_err=0.05,need_sort=False)
+        tck = self._get_spline(new_pts,pix_err=0.05,need_sort=False)
 
         self.tck = tck
-        self.center = center
-        
-    def q_phi_to_xy_old(self, q, phi):
-        '''Converts q, phi pairs -> x, y pairs.  All other code that
-        does this should move to using this so that there is minimal
-        breakage when we change over to using additive q instead of
-        multiplicative'''
-        r, th = self._sample_rt(np.mod(phi, 2 * np.pi) / (2 * np.pi))
-        r *= q
-        return np.vstack(((np.cos(th) * r), (np.sin(th) * r))) + self.center
 
-    def _sample_rt(self, points):
-        '''Samples at the given points and returns the locations in (r, t)
-
-        This is here for compatibility with old code DON"T USE THIS'''
-        tmp_pts = si.splev(points, self.tck)
-        tmp_pts -= self.center
-        th = np.arctan2(*(tmp_pts[::-1]))
-        r = np.sqrt(np.sum(tmp_pts ** 2, axis=0))
-
-        return r, th
 
     def draw_to_axes(self,ax,N = 1024,**kwargs):
         return ax.plot(*(self.q_phi_to_xy(0,linspace(0,2*np.pi,N))),**kwargs)  
@@ -1287,7 +1251,9 @@ def find_rim_fringes(curve, lfimg, s_width, s_num,
     sample_count = int(np.ceil(C * int(oversample)))
 
     # get center of curve
-    x0, y0 = curve.center[:, 0]
+    new_pts = curve.get_xy_samples(1000)
+    x0, y0 = np.mean(new_pts,1).ravel()
+
 
     q_vec = np.linspace(-s_width, s_width, s_num).reshape(-1, 1)   # q sampling
     phi_vec = np.linspace(0, 2 * np.pi, sample_count)   # angular sampling
