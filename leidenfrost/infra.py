@@ -728,7 +728,7 @@ class ProcessBackend(object):
         valid'''
 
         file_out = h5py.File(h5_fname, 'w-')   # open file
-        file_out.attrs['ver'] = '0.1.3'       # set meta-data
+        file_out.attrs['ver'] = '0.1.4'       # set meta-data
         for key, val in self.params.items():
             try:
                 file_out.attrs[key] = val
@@ -740,6 +740,8 @@ class ProcessBackend(object):
 
         file_out.attrs['cine_path'] = str(self.cine_fname.path)
         file_out.attrs['cine_fname'] = str(self.cine_fname.fname)
+
+        file_out.attrs['cine_hash'] = self.cine_.hash
         
         if seed_curve is not None:
             seed_curve.write_to_hdf(file_out)
