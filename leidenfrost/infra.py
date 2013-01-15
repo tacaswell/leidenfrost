@@ -687,7 +687,7 @@ class ProcessBackend(object):
     def process_frame(self, frame_number, curve):
         # get the raw data, and convert to float
         tmp_img = self.get_frame(frame_number)
-        print self.params
+
         tm, trk_res, tim, tam, miv, mav = proc_frame(curve,
                                                      tmp_img,
                                                      **self.params)
