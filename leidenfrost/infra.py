@@ -404,7 +404,9 @@ class spline_fitter(object):
         return np.vstack(self.pt_lst).T
 
     def return_SplineCurve(self):
-        return SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
+        curve = SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
+        print curve.circumference()
+        return curve
 
 
 def gen_bck_img(fname):
