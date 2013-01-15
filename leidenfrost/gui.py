@@ -66,7 +66,7 @@ class LFWorker(QtCore.QObject):
 
     @QtCore.Slot(dict)
     def update_all_params(self, params):
-        print params
+
         if self.process_backend is not None:
             self.process_backend.update_all_params(params)
 
@@ -87,7 +87,7 @@ class LFWorker(QtCore.QObject):
 
     @QtCore.Slot(infra.FilePath, dict)
     def set_new_fname(self, cine_fname, params):
-        print cine_fname, params
+
         self.clear()
         self.process_backend = infra.ProcessBackend.from_args(cine_fname,
                                                               bck_img=None,
@@ -180,7 +180,7 @@ class LFGui(QtGui.QMainWindow):
              ]
 
     cap_lst = ['cine base path']
-    
+
     def __init__(self,  parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
@@ -419,14 +419,14 @@ class LFGui(QtGui.QMainWindow):
         tmp_dict = {}
         # get parameters out of spin boxes
         for key,sb in self.param_spin_dict.iteritems():
-            print key,sb.isEnabled()
+
             if sb.isEnabled():
 
                 tmp_dict[key] = sb.value()
 
         # get toggle switch values
         for key,cb in self.param_checkbox_dict.iteritems():
-            print key
+
             tmp_dict[key] = bool(cb.checkState())
             
         return tmp_dict
