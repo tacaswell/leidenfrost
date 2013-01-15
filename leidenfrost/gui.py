@@ -869,7 +869,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.thread = QtCore.QThread(parent=self)
         self.reader.moveToThread(self.thread)
 
-
+        self.bin_search = None
 
         self.fringe_lines = []
 
@@ -1010,7 +1010,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.max_frame_label.setText(str(len(self.reader)-1))
         self.redraw_sig.emit(False,False)
 
-
+    @QtCore.Slot(int)
     def set_cur_frame(self, i):
         self.read_request_sig.emit(i)
 
@@ -1248,6 +1248,8 @@ class LFReaderGui(QtGui.QMainWindow):
         self.show_track_graphs.setCheckable(True)
         self.show_track_graphs.setChecked(False)
 
+        self.bin_search_acc = QtGui.QAction(u'Binary Search', self)
+        self.bin_search_acc.triggered.connect(self.create_binary_search)
         
         for cap,cta in zip(cap_lst,cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
@@ -1265,9 +1267,17 @@ class LFReaderGui(QtGui.QMainWindow):
         fringeMenu = menubar.addMenu('Fringes')
         fringeMenu.addAction(self.set_fringes_acc)
         fringeMenu.addAction(self.set_all_fringes_acc)
+        fringeMenu.addAction(self.bin_search_acc)
 
         graphMenu = menubar.addMenu('Graphs')
         graphMenu.addAction(self.show_track_graphs)
+
+    def create_binary_search(self):
+        self.bin_search = BinaryFrameSearch(len(self.reader)-1)
+        self.bin_search.change_frame.connect(self.frame_spinner.setValue)
+        self.bin_search.reset()
+        self.bin_search.show()
+        
 
 class directory_selector(QtGui.QWidget):
     '''
@@ -1361,3 +1371,83 @@ class GraphDialog(QtGui.QDialog):
         QtGui.QDialog.resizeEvent(self, re)
         self.canvas.resize(re.size().width(), re.size().height())
         self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1],pad=0)
+
+
+class BinaryFrameSearch(QtGui.QDialog):
+    change_frame = QtCore.Signal(int)
+
+
+    def __init__(self, max_number, min_number=0, parent=None):
+        QtGui.QDialog.__init__(self, parent)
+        main_layout = QtGui.QVBoxLayout()
+
+        info_layout = QtGui.QHBoxLayout()
+        
+        info_layout.addWidget(QtGui.QLabel('cur frame: '))
+        self.cur_frame_label = QtGui.QLabel('')
+        info_layout.addWidget(self.cur_frame_label)
+        info_layout.addStretch()
+
+        info_layout.addWidget(QtGui.QLabel('bottom: '))
+        self.bottom_label = QtGui.QLabel(str(min_number))
+        info_layout.addWidget(self.bottom_label)
+        info_layout.addStretch()
+
+        info_layout.addWidget(QtGui.QLabel('top: '))
+        self.top_label = QtGui.QLabel(str(max_number))
+        info_layout.addWidget(self.top_label)
+
+        button_layout = QtGui.QHBoxLayout()
+
+        self.good_button = QtGui.QPushButton('good')
+        self.good_button.clicked.connect(self.good_jump)
+        button_layout.addWidget(self.good_button)
+
+        self.bad_button = QtGui.QPushButton('bad')
+        self.bad_button.clicked.connect(self.bad_jump)
+        button_layout.addWidget(self.bad_button)
+        
+        self.reset_button = QtGui.QPushButton('reset')
+        self.reset_button.clicked.connect(self.reset)
+        button_layout.addWidget(self.reset_button)
+
+        main_layout.addLayout(info_layout)
+        main_layout.addLayout(button_layout)
+        self.setLayout(main_layout)
+
+        self._min = min_number
+        self._max = max_number
+        
+        self.bottom = min_number
+        self.top = max_number
+        self.cur = 0
+
+
+    @QtCore.Slot()
+    def good_jump(self):
+        self.bottom = self.cur
+        self.cur = self.cur + int((self.top - self.cur)//2)
+
+        self._update()
+
+
+    @QtCore.Slot()
+    def bad_jump(self):
+        self.top = self.cur
+        self.cur =  self.cur + int((self.bottom - self.cur)//2)
+        self._update()
+
+
+    @QtCore.Slot()
+    def reset(self):
+        self.cur = self.bottom
+        self.top = self._max
+        self.bottom = self._min
+        self._update()
+
+
+    def _update(self):
+        self.change_frame.emit(self.cur)
+        self.cur_frame_label.setText(str(self.cur))
+        self.top_label.setText(str(self.top))
+        self.bottom_label.setText(str(self.bottom))
