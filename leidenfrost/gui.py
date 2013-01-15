@@ -737,6 +737,7 @@ class LFGui(QtGui.QMainWindow):
         self.status_text = QtGui.QLabel(str(self.cur_frame))
 
         self.fname_text = QtGui.QLabel('')
+        self.fname_text.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
         self.prog_bar.setRange(0, 0)
@@ -1058,7 +1059,8 @@ class LFReaderGui(QtGui.QMainWindow):
         self.label_block = QtGui.QGroupBox("Parameters")
 
         param_form_layout = QtGui.QFormLayout()
-        ignore_lst = ['tck0', 'tck1', 'tck2', 'center', 'cine_path', 'cine_fname']
+        ignore_lst = ['tck0', 'tck1', 'tck2', 'center', 
+                      'cine_path', 'cine_fname', 'cine_hash']
         for k, v in prams.iteritems():
             if k in ignore_lst:
                 continue
@@ -1196,6 +1198,7 @@ class LFReaderGui(QtGui.QMainWindow):
     def create_status_bar(self):
         self.status_text = QtGui.QLabel('')
         self.fname_text = QtGui.QLabel('')
+        self.fname_text.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
         self.prog_bar.setRange(0, 0)
