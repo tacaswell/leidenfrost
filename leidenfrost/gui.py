@@ -172,7 +172,7 @@ class LFGui(QtGui.QMainWindow):
          'default_state':False,
          'tooltip':'The minimum extent in q[pixel] of a track to be valid'}
          ]
-        
+
     toggle_lst = [
             {'name':'straddle',
              'default':True,
@@ -195,10 +195,10 @@ class LFGui(QtGui.QMainWindow):
                               d in self.spinner_lst if 'default_state' not in d or d['default_state'])
         for tog in self.toggle_lst:
             default_params[tog['name']] = tog['default']
-            
 
-                
-        
+
+
+
         self.thread = QtCore.QThread(parent=self)
 
         self.worker = LFWorker(parent=None)
@@ -210,13 +210,13 @@ class LFGui(QtGui.QMainWindow):
         self.fringe_lines = []
 
         self.all_fringes_flg = False
-        
-        self.paths_dict = defaultdict(lambda :None)        
+
+        self.paths_dict = defaultdict(lambda :None)
         self.directory_actions = {}
         self.param_spin_dict = {}
         self.param_checkbox_dict = {}
 
-        
+
         self.create_actions()
         self.create_main_frame()
         self.create_menu_bar()
@@ -289,7 +289,7 @@ class LFGui(QtGui.QMainWindow):
             img = self.worker.get_frame(self.cur_frame)
             if img is not None:
                 self.im.set_data(img)
-            
+
         # if we need to update the lines
         if refresh_lines:
             # clear the lines we have
@@ -381,17 +381,17 @@ class LFGui(QtGui.QMainWindow):
 
     def open_file(self):
 
-        
+
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
                                                      caption='Select cine',
                                                      dir=self.paths_dict['cine base path'],
                                                      filter="cine (*.cine)")
         if len(fname) == 0:
             return
-        
-        self.fringe_grp_bx.setChecked(False)        
-        while (self.paths_dict['cine base path'] is None or 
-                (not (self.paths_dict['cine base path'] == 
+
+        self.fringe_grp_bx.setChecked(False)
+        while (self.paths_dict['cine base path'] is None or
+                (not (self.paths_dict['cine base path'] ==
                       fname[:len(self.paths_dict['cine base path'])]))):
             print 'please set base_dir'
             self.directory_actions['cine base path'].trigger()
@@ -406,7 +406,7 @@ class LFGui(QtGui.QMainWindow):
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
 
-        
+
 
         # reset spinners to default values
         # for p in self.spinner_lst:
@@ -414,7 +414,7 @@ class LFGui(QtGui.QMainWindow):
 
         self.fname_text.setText(new_cine_fname[-1])
         self.open_file_sig.emit(new_cine_fname, tmp_params)
-        
+
     def _get_cur_parametrs(self):
         tmp_dict = {}
         # get parameters out of spin boxes
@@ -425,12 +425,12 @@ class LFGui(QtGui.QMainWindow):
                 tmp_dict[key] = sb.value()
 
         # get toggle switch values
-        for key,cb in self.param_checkbox_dict.iteritems():
+        for key, cb in self.param_checkbox_dict.iteritems():
 
             tmp_dict[key] = bool(cb.checkState())
-            
+
         return tmp_dict
-        
+
     def update_all_params(self):
         tmp_dict = self._get_cur_parametrs()
         # shove them into the worker
@@ -469,7 +469,7 @@ class LFGui(QtGui.QMainWindow):
         # vbox layout for this panel
         fc_vboxes = QtGui.QVBoxLayout()
         # set the widget layout
-        
+
         fringe_cntrls_w.setLayout(fc_vboxes)
         # add to the tool box
         diag_tool_box.addItem(fringe_cntrls_w, "Fringe Finding Settings")
@@ -500,7 +500,7 @@ class LFGui(QtGui.QMainWindow):
             name = spin_prams['name']
             spin_box.setKeyboardTracking(False)
 
-            # connect it to an action 
+            # connect it to an action
             spin_box.valueChanged.connect(self.update_params_acc.trigger)
 
             l_label = QtGui.QLabel(spin_prams['name'])
@@ -517,13 +517,13 @@ class LFGui(QtGui.QMainWindow):
                 l_h_layout.addWidget(spin_box)
                 l_h_layout.addWidget(l_checkbox)
                 fringe_cntrls_spins.addRow(l_label, l_h_layout)
-                
+
 
             # if it can't
             else:
                 fringe_cntrls_spins.addRow(l_label,
                                        spin_box)
-            # add the spin box 
+            # add the spin box
             self.param_spin_dict[name] = spin_box
 
         for cb_param in self.toggle_lst:
@@ -533,11 +533,11 @@ class LFGui(QtGui.QMainWindow):
 
             l_checkbox = QtGui.QCheckBox('enable')
             l_checkbox.setChecked(cb_param['default'])
-            self.param_checkbox_dict[cb_param['name']] = l_checkbox            
+            self.param_checkbox_dict[cb_param['name']] = l_checkbox
             l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
             fringe_cntrls_spins.addRow(l_label, l_checkbox)
-        
-            
+
+
         # button to grab initial spline
         grab_button = QtGui.QPushButton('Grab Spline')
         grab_button.clicked.connect(self.grab_sf_curve)
@@ -601,7 +601,7 @@ class LFGui(QtGui.QMainWindow):
 
         fc_vboxes.addWidget(save_param_bttn)
         fc_vboxes.addStretch()
-        
+
         # section for making spline fitting panel
         spline_cntrls = QtGui.QVBoxLayout()
         spline_cntrls_w = QtGui.QWidget()
@@ -618,12 +618,12 @@ class LFGui(QtGui.QMainWindow):
         clear_spline_button = QtGui.QPushButton('Clear Spline')
         clear_spline_button.clicked.connect(self.clear_spline)
         spline_cntrls.addWidget(clear_spline_button)
-        
+
         spline_cntrls.addStretch()
-        
+
         diag_tool_box.addItem(spline_cntrls_w, "Manual Spline Fitting")
 
-        
+
         # section for making spline fitting panel
         paths_layout = QtGui.QVBoxLayout()
         path_w = QtGui.QWidget()
@@ -633,7 +633,7 @@ class LFGui(QtGui.QMainWindow):
             ds = directory_selector(caption=c)
             paths_layout.addWidget(ds)
             self.directory_actions[c].triggered.connect(ds.select_path)
-            ds.selected.connect(lambda x,c=c : self.paths_dict.__setitem__(c,x))
+            ds.selected.connect(lambda x, c=c : self.paths_dict.__setitem__(c, x))
 
         paths_layout.addStretch()
         diag_tool_box.addItem(path_w, "Paths")
@@ -648,7 +648,7 @@ class LFGui(QtGui.QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
         self.axes = self.fig.add_subplot(111)
-        #      self.fig.tight_layout(.3,None,None,None)
+        #      self.fig.tight_layout(.3, None, None, None)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
         # configuration tool in the navigation toolbar wouldn't
@@ -682,8 +682,8 @@ class LFGui(QtGui.QMainWindow):
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
-    @QtCore.Slot(bool,bool)
-    def redraw(self,draw_img,draw_tracks):
+    @QtCore.Slot(bool, bool)
+    def redraw(self, draw_img, draw_tracks):
         if self.im is not None:
             self.im.remove()
         self.im = None
@@ -699,9 +699,9 @@ class LFGui(QtGui.QMainWindow):
         img = self.worker.get_frame(0)
 
         if img is None:
-            img = 1.5 * np.ones((1,1))
+            img = 1.5 * np.ones((1, 1))
 
-        extent = [0,img.shape[1],0,img.shape[0]]
+        extent = [0, img.shape[1], 0, img.shape[0]]
 
         self.im = self.axes.imshow(img,
                                    cmap='gray',
@@ -727,15 +727,15 @@ class LFGui(QtGui.QMainWindow):
 
         #self.status_text.setText(label)
 
-        self.frame_spinner.setRange(0,len(self.worker)-1)
+        self.frame_spinner.setRange(0, len(self.worker)-1)
         self.frame_spinner.setValue(0)
 
-        self.redraw_sig.emit(False,False)
+        self.redraw_sig.emit(False, False)
 
 
     def create_status_bar(self):
         self.status_text = QtGui.QLabel(str(self.cur_frame))
-        
+
         self.fname_text = QtGui.QLabel('')
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
@@ -772,7 +772,7 @@ class LFGui(QtGui.QMainWindow):
 
         self.directory_actions = {}
         cta_lst = ['Select ' + x for x in self.cap_lst]
-        for cap,cta in zip(self.cap_lst,cta_lst):
+        for cap, cta in zip(self.cap_lst, cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
 
@@ -797,7 +797,7 @@ class LFGui(QtGui.QMainWindow):
 
 class LFReader(QtCore.QObject):
     frame_loaded = QtCore.Signal(bool, bool)
-    file_loaded = QtCore.Signal(bool,bool)
+    file_loaded = QtCore.Signal(bool, bool)
     file_params = QtCore.Signal(dict)
     def __init__(self, parent=None):
         QtCore.QObject.__init__(self, parent)
@@ -815,7 +815,7 @@ class LFReader(QtCore.QObject):
                                                   get_img=True)
                 self.cur_frame = ind
 
-            self.frame_loaded.emit(True,True)
+            self.frame_loaded.emit(True, True)
 
 
 
@@ -832,12 +832,12 @@ class LFReader(QtCore.QObject):
         else:
             return 0
 
-    @QtCore.Slot(infra.FilePath,str,dict)
-    def set_fname(self, fname,cbp,kwargs):
+    @QtCore.Slot(infra.FilePath, str, dict)
+    def set_fname(self, fname, cbp, kwargs):
         print 'entered set_fname'
         self.clear()
 
-        print fname,cbp,kwargs
+        print fname, cbp, kwargs
         self.backend = infra.HdfBackend(fname,
                                                 cine_base_path=cbp,
                                                 **kwargs)
@@ -846,14 +846,14 @@ class LFReader(QtCore.QObject):
                                           get_img=True)
         self.cur_frame = 0
 
-        self.file_loaded.emit(True,True)
+        self.file_loaded.emit(True, True)
         self.file_params.emit(self.backend.proc_prams)
 
 
 
 class LFReaderGui(QtGui.QMainWindow):
     read_request_sig = QtCore.Signal(int)
-    open_file_sig = QtCore.Signal(infra.FilePath,str, dict)
+    open_file_sig = QtCore.Signal(infra.FilePath, str, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
     cap_lst = ['hdf base path','cine base directory','cine cache path','hdf cache path']
@@ -875,7 +875,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.paths_dict = defaultdict(lambda :None)
 
-        
+
         self.create_main_frame()
         self.create_actions()
         self.create_menu_bar()
@@ -895,7 +895,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.thread.start()
 
         self.label_block = None
-        
+
         QtGui.qApp.exec_()
 
     def set_fringes_visible(self, i):
@@ -955,8 +955,8 @@ class LFReaderGui(QtGui.QMainWindow):
         pass
 
 
-    @QtCore.Slot(bool,bool)
-    def redraw(self,draw_img,draw_tracks):
+    @QtCore.Slot(bool, bool)
+    def redraw(self, draw_img, draw_tracks):
         if self.im is not None:
             self.im.remove()
 
@@ -969,7 +969,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.axes = None
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)
-        #       self.fig.tight_layout(.3,None,None,None)
+        #       self.fig.tight_layout(.3, None, None, None)
         # nuke all those objects
         self.fringe_lines = []
         self.im = None
@@ -977,7 +977,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         img = mbe.img
         if img is None:
-            img = 1.5 * np.ones((1,1))
+            img = 1.5 * np.ones((1, 1))
 
         extent = mbe.get_extent()
 
@@ -1005,10 +1005,10 @@ class LFReaderGui(QtGui.QMainWindow):
 
         #self.status_text.setText(label)
 
-        self.frame_spinner.setRange(0,len(self.reader)-1)
+        self.frame_spinner.setRange(0, len(self.reader)-1)
         self.frame_spinner.setValue(0)
         self.max_frame_label.setText(str(len(self.reader)-1))
-        self.redraw_sig.emit(False,False)
+        self.redraw_sig.emit(False, False)
 
     @QtCore.Slot(int)
     def set_cur_frame(self, i):
@@ -1047,10 +1047,10 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.fname_text.setText(fname_)
 
-        self.open_file_sig.emit(new_hdf_fname,cine_bp,tmp_dict)
+        self.open_file_sig.emit(new_hdf_fname, cine_bp, tmp_dict)
 
     @QtCore.Slot(dict)
-    def update_param_labels(self,prams):
+    def update_param_labels(self, prams):
         diag_layout = self.diag.widget().layout()
         if self.label_block is not None:
             diag_layout.removeWidget(self.label_block)
@@ -1059,19 +1059,19 @@ class LFReaderGui(QtGui.QMainWindow):
 
         param_form_layout = QtGui.QFormLayout()
         ignore_lst = ['tck0', 'tck1', 'tck2', 'center', 'cine_path', 'cine_fname']
-        for k,v in prams.iteritems():
+        for k, v in prams.iteritems():
             if k in ignore_lst:
                 continue
-            param_form_layout.addRow(QtGui.QLabel(k + ':'),QtGui.QLabel(str(v)))
-        
+            param_form_layout.addRow(QtGui.QLabel(k + ':'), QtGui.QLabel(str(v)))
+
         self.label_block.setLayout(param_form_layout)
         diag_layout.addWidget(self.label_block)
 
     def create_diag(self):
 
 
-        self.diag = QtGui.QDockWidget('controls',parent=self)
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea,self.diag)
+        self.diag = QtGui.QDockWidget('controls', parent=self)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
         diag_widget = QtGui.QWidget(self.diag)
         self.diag.setWidget(diag_widget)
         diag_layout = QtGui.QVBoxLayout()
@@ -1080,7 +1080,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         # frame number lives on top
         self.frame_spinner = QtGui.QSpinBox()
-        self.frame_spinner.setRange(0,len(self.reader)-1)
+        self.frame_spinner.setRange(0, len(self.reader)-1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
         self.frame_spinner.setWrapping(True)
         fs_form = QtGui.QHBoxLayout()
@@ -1123,15 +1123,15 @@ class LFReaderGui(QtGui.QMainWindow):
             ds = directory_selector(caption=c)
             pb_layout.addWidget(ds)
             self.directory_actions[c].triggered.connect(ds.select_path)
-            ds.selected.connect(lambda x,c=c : self.paths_dict.__setitem__(c,x))
+            ds.selected.connect(lambda x, c=c : self.paths_dict.__setitem__(c, x))
 
         diag_layout.addWidget(path_box)
         diag_layout.addStretch()
 
-        self.graphs_window = GraphDialog((2,1))
+        self.graphs_window = GraphDialog((2, 1))
         self.show_track_graphs.toggled.connect(self.graphs_window.setVisible)
 
-        
+
         pass
 
     def create_main_frame(self):
@@ -1145,24 +1145,24 @@ class LFReaderGui(QtGui.QMainWindow):
         self.canvas.setParent(self.main_frame)
 
 
-        def track_plot(axes_lst,trk):
-            q, phi,v = zip(*[(p.q, p.phi,p.v) for p in trk.points])
-            
+        def track_plot(axes_lst, trk):
+            q, phi, v = zip(*[(p.q, p.phi, p.v) for p in trk.points])
+
             axes_lst[0].cla()
-            axes_lst[0].plot(q,phi)
+            axes_lst[0].plot(q, phi)
 
             axes_lst[1].cla()
             axes_lst[1].plot(v)
 
         def picker_fun(trk):
-            if  isinstance(trk,infra.lf_Track):
+            if  isinstance(trk, infra.lf_Track):
                 if self.graphs_window:
-                    self.graphs_window.update_axes(track_plot,trk)
-                    
+                    self.graphs_window.update_axes(track_plot, trk)
+
             else:
                 print type(trk)
-    
-            
+
+
         self.picker = PickerHandler(self.canvas, picker_fun)
 
 
@@ -1173,8 +1173,8 @@ class LFReaderGui(QtGui.QMainWindow):
         #
         self.axes = self.fig.add_subplot(111)
 
-        #        self.fig.tight_layout(.3,None,None,None)
-        
+        #        self.fig.tight_layout(.3, None, None, None)
+
         self.im = None
 
         # Create the navigation toolbar, tied to the canvas
@@ -1212,7 +1212,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
     def create_actions(self):
 
-        def set_dir(cap,d):
+        def set_dir(cap, d):
             print cap
             base_dir = QtGui.QFileDialog.getExistingDirectory(self,
                                                               caption=cap,
@@ -1227,7 +1227,7 @@ class LFReaderGui(QtGui.QMainWindow):
         cta_lst = ['Select ' + x for x in cap_lst]
 
         self.directory_actions = {}
-        for cap,cta in zip(cap_lst,cta_lst):
+        for cap, cta in zip(cap_lst, cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
 
@@ -1250,11 +1250,10 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.bin_search_acc = QtGui.QAction(u'Binary Search', self)
         self.bin_search_acc.triggered.connect(self.create_binary_search)
-        
-        for cap,cta in zip(cap_lst,cta_lst):
+
+        for cap, cta in zip(cap_lst, cta_lst):
             tmp_acc = QtGui.QAction(cta, self)
             self.directory_actions[cap] = tmp_acc
-
 
 
     def create_menu_bar(self):
@@ -1277,7 +1276,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.bin_search.change_frame.connect(self.frame_spinner.setValue)
         self.bin_search.reset()
         self.bin_search.show()
-        
+
 
 class directory_selector(QtGui.QWidget):
     '''
@@ -1286,7 +1285,7 @@ class directory_selector(QtGui.QWidget):
 
     selected =  QtCore.Signal(str)
 
-    def __init__(self,caption,path='',parent=None):
+    def __init__(self, caption, path='', parent=None):
         QtGui.QWidget.__init__(self, parent)
         print caption
         self.cap = caption
@@ -1311,7 +1310,7 @@ class directory_selector(QtGui.QWidget):
 
 
     @QtCore.Slot(str)
-    def set_path(self,path):
+    def set_path(self, path):
         pass
 
     @QtCore.Slot()
@@ -1331,28 +1330,28 @@ class directory_selector(QtGui.QWidget):
         return path
 
 class PickerHandler(object):
-    def __init__(self,canv,fun = None):
-        canv.mpl_connect('pick_event',self.on_pick)
+    def __init__(self, canv, fun=None):
+        canv.mpl_connect('pick_event', self.on_pick)
         self.fun = fun
-        
-    def on_pick(self,event):
+
+    def on_pick(self, event):
         art = event.artist
         # if not a Line2D, don't want to deal with it
-        if not isinstance(art,matplotlib.lines.Line2D):
+        if not isinstance(art, matplotlib.lines.Line2D):
             return
-        
+
         payload = art.payload()
         if payload is not None:
             self.fun(payload)
         else:
             print 'fail type 2'
-                
+
 
 
 class GraphDialog(QtGui.QDialog):
     def __init__(self, grid_size=(1, 1), parent=None):
         QtGui.QDialog.__init__(self, parent)
-        
+
         self.fig = Figure((10, 10))
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self)
@@ -1361,7 +1360,7 @@ class GraphDialog(QtGui.QDialog):
         self.gs = gridspec.GridSpec(*grid_size)
         self.axes_list = [self.fig.add_subplot(s) for s in self.gs]
         self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1])
-        
+
     def update_axes(self, fun, args):
         fun(self.axes_list, args)
         self.gs.tight_layout(self.fig)
@@ -1370,7 +1369,7 @@ class GraphDialog(QtGui.QDialog):
     def resizeEvent(self, re):
         QtGui.QDialog.resizeEvent(self, re)
         self.canvas.resize(re.size().width(), re.size().height())
-        self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1],pad=0)
+        self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1], pad=0)
 
 
 class BinaryFrameSearch(QtGui.QDialog):
@@ -1382,7 +1381,7 @@ class BinaryFrameSearch(QtGui.QDialog):
         main_layout = QtGui.QVBoxLayout()
 
         info_layout = QtGui.QHBoxLayout()
-        
+
         info_layout.addWidget(QtGui.QLabel('cur frame: '))
         self.cur_frame_label = QtGui.QLabel('')
         info_layout.addWidget(self.cur_frame_label)
@@ -1406,7 +1405,7 @@ class BinaryFrameSearch(QtGui.QDialog):
         self.bad_button = QtGui.QPushButton('bad')
         self.bad_button.clicked.connect(self.bad_jump)
         button_layout.addWidget(self.bad_button)
-        
+
         self.reset_button = QtGui.QPushButton('reset')
         self.reset_button.clicked.connect(self.reset)
         button_layout.addWidget(self.reset_button)
@@ -1417,7 +1416,7 @@ class BinaryFrameSearch(QtGui.QDialog):
 
         self._min = min_number
         self._max = max_number
-        
+
         self.bottom = min_number
         self.top = max_number
         self.cur = 0
