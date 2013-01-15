@@ -1442,9 +1442,9 @@ class BinaryFrameSearch(QtGui.QDialog):
 
     @QtCore.Slot()
     def reset(self):
-        self.cur = self.bottom
         self.top = self._max
         self.bottom = self._min
+        self.cur = self.bottom
         self._update()
 
 
