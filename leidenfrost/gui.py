@@ -1007,7 +1007,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.frame_spinner.setRange(0,len(self.reader)-1)
         self.frame_spinner.setValue(0)
-
+        self.max_frame_label.setText(str(len(self.reader)-1))
         self.redraw_sig.emit(False,False)
 
 
@@ -1029,7 +1029,7 @@ class LFReaderGui(QtGui.QMainWindow):
             cine_bp = hdf_bp
 
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
-                                                     caption='Save File')
+                                                     caption='Select File')
         if len(fname) == 0:
             return
 
@@ -1044,8 +1044,9 @@ class LFReaderGui(QtGui.QMainWindow):
         tmp_dict = {'cine_cache_dir':self.paths_dict['cine cache path'],
                     'hdf_cache_dir': self.paths_dict['hdf cache path']}
 
-        print new_hdf_fname
-        print '/'.join(new_hdf_fname)
+
+        self.fname_text.setText(fname_)
+
         self.open_file_sig.emit(new_hdf_fname,cine_bp,tmp_dict)
 
     @QtCore.Slot(dict)
@@ -1053,7 +1054,7 @@ class LFReaderGui(QtGui.QMainWindow):
         diag_layout = self.diag.widget().layout()
         if self.label_block is not None:
             diag_layout.removeWidget(self.label_block)
-
+            self.label_block.setVisible(False)
         self.label_block = QtGui.QGroupBox("Parameters")
 
         param_form_layout = QtGui.QFormLayout()
@@ -1081,8 +1082,13 @@ class LFReaderGui(QtGui.QMainWindow):
         self.frame_spinner = QtGui.QSpinBox()
         self.frame_spinner.setRange(0,len(self.reader)-1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
-        fs_form = QtGui.QFormLayout()
-        fs_form.addRow(QtGui.QLabel('frame #'),self.frame_spinner)
+        self.frame_spinner.setWrapping(True)
+        fs_form = QtGui.QHBoxLayout()
+        fs_form.addWidget(QtGui.QLabel('frame #'))
+        fs_form.addWidget(self.frame_spinner)
+        fs_form.addWidget(QtGui.QLabel(' of '))
+        self.max_frame_label = QtGui.QLabel(str(len(self.reader) - 1))
+        fs_form.addWidget(self.max_frame_label)
 
 
 
@@ -1285,7 +1291,7 @@ class directory_selector(QtGui.QWidget):
 
         self.label = QtGui.QLabel(path)
         hlayout.addWidget(self.label)
-
+        hlayout.addStretch()
         button = QtGui.QPushButton('')
         button.setIcon(QtGui.QIcon.fromTheme('folder'))
         button.clicked.connect(self.select_path)
