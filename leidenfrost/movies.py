@@ -32,7 +32,7 @@ import leidenfrost.db as db
 import leidenfrost.infra as infra
 
 
-class AnimateHdf(object): 
+class AnimateHdf(object):
     '''A class to wrap up all the infrastructure
     needed to make nice movies out of processed hdf files '''
     def __init__(self,hdf_backend,max_frame=None,min_frame=0,step=1):
@@ -40,54 +40,57 @@ class AnimateHdf(object):
         # backend
         self.backend = hdf_backend
         self._update_funs = []
-        
-        # animation limits 
+
+        # animation limits
         if max_frame is None or max_frame > len(self.backend) or max_frame < min_frame:
             max_frame = len(self.backend)
 
         self.max_frame = max_frame
         self.min_frame = min_frame
         self.step = step
-        
+
+        limits = self._prep_img_limits()
+
+
         # figure setup
         fig = plt.figure()
         gs = gridspec.GridSpec(2, 2)
 
         img_ax = fig.add_subplot(gs[:, 0])
         mi = MarkedupImage(img_ax,
-                           self._prep_img_limits(),
+                           limits,
                            draw_fringes=False)
-        
+
 
         zprof_ax = fig.add_subplot(gs[0, 1])
         zp = ZProfile(zprof_ax)
 
         rp_ax = fig.add_subplot(gs[1, 1])
         rp = RProfile(rp_ax)
-        
+
         self._update_funs.append(mi.update)
         self._update_funs.append(zp.update)
         self._update_funs.append(rp.update)
-        
+
         fig.text(0, 1, '/'.join(self.backend.cine_fname[1:]).replace('_','\_'), va='top')
         self.frame_label = fig.text(0,0,'')
-                
+
         gs.tight_layout(fig)
 
         fig.set_size_inches(9.6,5.4,forward=True)
-        # do the animation 
+        # do the animation
         self.ani =  animation.FuncAnimation(fig,
                                             self._update_figure,
-                                            max_frame,
-                                            interval=10)
+                                            range(min_frame,max_frame,step),
+                                            interval=25)
 
     def save(self,fpath):
-        
+
         writer = animation.writers['ffmpeg'](fps=20,bitrate=30000)
         self.ani.save(fpath,writer=writer,dpi=200)
 
-                 
-    def _prep_img_limits(self): 
+
+    def _prep_img_limits(self):
         '''Figures out what the extent of the
         image should be so the drop does not walk out of image '''
         frame_step = 100
@@ -95,10 +98,10 @@ class AnimateHdf(object):
         max_y = -np.inf
         min_x = np.inf
         min_y = np.inf
-        
+        imgY,imgX = self.backend.get_frame(0,raw=False,img=True).img.shape
         for j in range(self.min_frame,self.max_frame,frame_step):
             x,y = self.backend.get_frame(j, False, False).curve.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, 1000))
-            
+
 
             if np.max(x) > max_x:
                 max_x = np.max(x)
@@ -110,8 +113,17 @@ class AnimateHdf(object):
             if np.min(y) < min_y:
                 min_y = np.min(y)
 
-        return [min_x * .9, max_x * 1.1, min_y * .9, max_y * 1.1]
-        
+        min_x *= 0.9
+        min_y *= 0.9
+        max_x *= 1.1
+        max_y *= 1.1
+        if max_y > imgY:
+            max_y = imgY
+        if max_x > imgX:
+            max_x = imgX
+
+        return [min_x, max_x, min_y, max_y]
+
     def _update_figure(self,j):
         '''Updates the figure, wraps up all of the axes '''
         res = ()
@@ -126,13 +138,13 @@ def format_frac(fr):
         return sp[0]
     else:
         return r'$\frac{%s}{%s}$' % tuple(sp)
-            
+
 class ZProfile(object):
     def __init__(self, ax):
         self.ax = ax
         self.prof_ln, = self.ax.plot([], [],'.k')
         self.ax.set_xlim([0,2 * np.pi])
-        self.ax.set_ylim([-10,10])
+        self.ax.set_ylim([0, 20])
         ax.set_xlabel(r'$\theta$')
         ax.set_ylabel('$\Delta h$ [um]')
         frac_size = 4
@@ -140,15 +152,25 @@ class ZProfile(object):
         ax.set_xticks([np.pi * j * step for j in range(2 * frac_size + 1)])
         ax.set_xticklabels([format_frac(j * step) + '$\pi$' for j in range(2 * frac_size + 1)])
 
+        ax.axvline(.5 * np.pi, color='k', linestyle='--')
+        ax.axvline(np.pi, color='k', linestyle='--')
+        ax.axvline(1.5 * np.pi, color='k', linestyle='--')
 
-    
     def update(self, backend, j, delta_h = 0):
         mbe = backend.get_frame(j, False, False)
 
-        th = np.hstack([mbe.res[0][1], mbe.res[1][1]]) 
-        ch = np.hstack([mbe.res[0][0], mbe.res[1][0]]) 
-        dh,th_new = infra.construct_corrected_profile((th,ch)) 
-        dh -= np.mean(dh)
+        th = np.hstack([mbe.res[0][1], mbe.res[1][1]])
+        ch = np.hstack([mbe.res[0][0], mbe.res[1][0]])
+
+        XY = np.vstack(mbe.curve.q_phi_to_xy(0,np.linspace(0,2 * np.pi,2**10)))
+        center = np.mean(XY, 1)
+        first_pt = center - XY[:,0]
+
+        th_offset = np.arctan2(first_pt[1],first_pt[0])
+
+
+        dh,th_new = infra.construct_corrected_profile((th,ch),th_offset)
+        dh -= np.min(dh)
         dh += delta_h
         dh *= (.543 / 4)
 
@@ -161,16 +183,25 @@ class RProfile(object):
         self.ax = ax
         ax.cla()
         ax.set_xlim([0,2 * np.pi])
-        ax.set_ylim(-50,50)
+        ax.set_ylim(-50, 50)
         self.th = np.linspace(0, 2 * np.pi,1000)
         th = self.th
         self.line, = ax.plot(th, np.zeros(th.shape), 'b-')
+
 
         ax.set_xlabel(r'$\theta$')
         ax.set_ylabel(r'$R - \langle R \rangle$ [pix]')
         step = fractions.Fraction(1,4)
         ax.set_xticks([np.pi * j * step for j in range(9)])
         ax.set_xticklabels([format_frac(j * step) + '$\pi$' for j in range(9)])
+
+
+        ax.axhline(0, color='k', linestyle='--')
+
+        ax.axvline(.5 * np.pi, color='k', linestyle='--')
+        ax.axvline(np.pi, color='k', linestyle='--')
+        ax.axvline(1.5 * np.pi, color='k', linestyle='--')
+
 
     def update(self, backend, j):
         mbe = backend.get_frame(j + 1, False, False)
@@ -188,13 +219,27 @@ class RProfile(object):
 
         R -= np.mean(R)
 
+        th = np.arctan2(-XY[1,:],-XY[0,:])
+
+
+
+
+        th_offset = np.arctan2(-XY[1,0],-XY[0,0])
+
         self.line.set_ydata(R)
+        x_data = np.mod(self.th + th_offset, 2 * np.pi)
+        abs_d_data = np.abs(np.diff(x_data))
+        mask = np.hstack([ abs_d_data > 1.5 * np.pi , [False]])
+        masked_data = np.ma.MaskedArray(x_data, mask)
+        self.line.set_xdata(masked_data)
+
 
         return (self.line, )
-        
-        
-        
-    
+
+
+
+
+
 class MarkedupImage(object):
     '''Class to encapsulate drawing the image the shape + (maybe) fringes on it'''
     def __init__(self, ax, limits, draw_fringes=False, draw_curve=True, clims=(.5, 1.5)):
@@ -211,8 +256,9 @@ class MarkedupImage(object):
         # # set up for the image + fringe lines
         self.img = self.ax.imshow(np.zeros((limits[1] - limits[0],
                                             limits[3] - limits[2])),
-                                            extent=limits, cmap='gray',
-                                            origin='lower')
+                                            extent=limits, cmap='gray_r',
+                                            origin='lower',
+                                            interpolation='nearest')
         self.img.set_clim(clims)
         self.ax.set_xlim(limits[:2])
         self.ax.set_ylim(limits[2:])
@@ -227,9 +273,11 @@ class MarkedupImage(object):
         self.fringe_lines = []
 
         self.center_line = None
+        self.seed_curve = None
         if self.draw_curve:
-            self.center_line, = ax.plot([],[])
-    
+            self.center_line, = ax.plot([],[],'r')
+            self.seed_curve, = ax.plot([],[],'g')
+
     def update(self,backend,j):
         '''Updates the axes with the image'''
 
@@ -237,10 +285,10 @@ class MarkedupImage(object):
         mbe = backend.get_frame(j, raw=self.draw_finges, get_img=True)
         xmn, xmx, ymn, ymx = self.limits
         self.img.set_data(mbe.img[ymn:ymx, xmn:xmx])
+#        print self.limits
 
-        
         # deal with fringes
-        
+
         for l in self.fringe_lines:
             l.remove()
         self.fringe_lines = []
@@ -252,25 +300,33 @@ class MarkedupImage(object):
                                    )
 
         center_line_lst = []
+
+        q = np.hstack([mbe.res[0][2], mbe.res[1][2]])
+        phi = np.hstack([mbe.res[0][1], mbe.res[1][1]])
+        q,phi = mbe.res[0][2], mbe.res[0][1]
+        new_curve = infra.SplineCurve.from_pts(np.vstack(mbe.curve.q_phi_to_xy(q, phi)),
+                                               **mbe.params)
+        new_curve.fft_filter(mbe.params['fft_filter'])
+
         if self.draw_curve:
-            q = np.hstack([mbe.res[0][2], mbe.res[1][2]]) 
-            phi = np.hstack([mbe.res[0][1], mbe.res[1][1]]) 
-            q,phi = mbe.res[0][2], mbe.res[0][1]
-            new_curve = infra.SplineCurve.from_pts(np.vstack(mbe.curve.q_phi_to_xy(q, phi)),
-                                                   **mbe.params)
-            new_curve.fft_filter(mbe.params['fft_filter'])            
             x,y = new_curve.q_phi_to_xy(0,np.linspace(0, 2 * np.pi, 1000))
             if self.center_line:
                 self.center_line.set_xdata(x + .5)
                 self.center_line.set_ydata(y + .5)
             else:
                 self.center_line = ax.plot(x,y)
-
             center_line_lst.append(self.center_line)
-        
+
+            x,y = mbe.curve.q_phi_to_xy(0,np.linspace(0, 2 * np.pi, 1000))
+            if self.seed_curve:
+                self.seed_curve.set_xdata(x + .5)
+                self.seed_curve.set_ydata(y + .5)
+            center_line_lst.append(self.seed_curve)
+
+
         return tuple(self.fringe_lines) + (self.img, ) + tuple(center_line_lst)
 
-        
+
 def animate_profile(data_iter):
     def ln_helper(data, line, yscale=1, xscale=1):
         ch, th = data
@@ -340,6 +396,3 @@ def animate_profile(data_iter):
                                               fr_num, miss_txt),
                                        interval=100)
     return prof_ani
-
-
-
