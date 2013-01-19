@@ -19,7 +19,7 @@ from __future__ import division
 
 import time
 import collections
-import warnings
+
 import os
 import itertools
 
@@ -27,12 +27,11 @@ import numpy as np
 import numpy.linalg as nl
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-import scipy
-import scipy.ndimage
+
+
 from scipy.ndimage.interpolation import map_coordinates
 import scipy.interpolate as sint
 import scipy.interpolate as si
-import scipy.odr as sodr
 
 import h5py
 import cine
@@ -40,8 +39,6 @@ from trackpy.tracking import Point
 from trackpy.tracking import Track
 import find_peaks.peakdetect as pd
 import trackpy.tracking as pt
-
-
 
 import shutil
 import copy
@@ -114,9 +111,9 @@ class Point1D_circ(Point):
     def __init__(self, q, phi, v=0):
         Point.__init__(self)                  # initialize base class
         self.q = q                            # parametric variable
-        self.phi = np.mod(phi,self.WINDING)     # longitudinal value
+        self.phi = np.mod(phi, self.WINDING)     # longitudinal value
         # the value at the extrema (can probably drop this)
-        self.v = v # any extra values that the point should carry
+        self.v = v      # any extra values that the point should carry
 
     def distance(self, point):
         '''
@@ -126,7 +123,7 @@ class Point1D_circ(Point):
         Returns the absolute value of the angular distance between
         two points mod :py:attr:`~Point1D_circ.WINDING`'''
         d = np.abs(self.phi - point.phi)
-        if d > self.WINDING/2:
+        if d > self.WINDING / 2:
             d = np.abs(self.WINDING - d)
         return d
 
@@ -221,11 +218,11 @@ class lf_Track(Track):
 
         if 'picker' not in kwargs:
             kwargs['picker'] = 5
-        ln, = ax.plot(x+.5, y+.5, **kwargs)
+        ln, = ax.plot(x + .5, y + .5, **kwargs)
         ln.payload = weakref.ref(self)
         return ln
 
-    def classify2(self, min_len=None, min_extent=None, straddle=True,  **kwargs):
+    def classify2(self, min_len=None, min_extent=None, straddle=True, **kwargs):
         '''
         :param min_len: the minimum length a track must be to considered
         :param min_extent: the minimum extent in :py:attr:`q` the of the track
@@ -265,7 +262,7 @@ class lf_Track(Track):
 
         a = np.vstack([q ** 2, q, np.ones(np.size(q))]).T
         X, res, rnk, s = nl.lstsq(a, phi)
-        phif = a.dot(X)
+        #        phif = a.dot(X)
         #        p = 1- ss.chi2.cdf(np.sum(((phif - phi)**2)/phif), len(q)-3)
 
         prop_c = -np.sign(X[0])
@@ -310,7 +307,6 @@ class lf_Track(Track):
         Merges `to_merge_track` into this one and re-classifies if needed.
         '''
         pt.Track.merge_track(self, to_merge_track)
-
 
         if self.charge is not None:
             self.classify()
@@ -375,13 +371,13 @@ class spline_fitter(object):
             self.pt_lst.pop(np.argmin(map(lambda x:
                                           np.sqrt((x[0] - loc[0]) ** 2 +
                                                   (x[1] - loc[1]) ** 2),
-                                            self.pt_lst)))
+                                          self.pt_lst)))
 
     def redraw(self):
         if len(self.pt_lst) > 5:
             SC = SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
             new_pts = SC.get_xy_samples(1000)
-            center = np.mean(new_pts,1).ravel()
+            center = np.mean(new_pts, 1).ravel()
             self.sp_plot.set_xdata(new_pts[0])
             self.sp_plot.set_ydata(new_pts[1])
             self.pt_lst.sort(key=lambda x:
@@ -574,11 +570,6 @@ def _read_frame_tracks_from_file_res(parent_group):
     Only reads out the charge and location of the tracks, not all of
     their points '''
 
-
-    tck = [parent_group.attrs['tck0'],
-           parent_group.attrs['tck1'],
-           parent_group.attrs['tck2']]
-
     # names
     trk_res_name = 'trk_res_'
     name_mod = ('min', 'max')
@@ -608,18 +599,16 @@ class ProcessBackend(object):
         self.cine_fname = None               # file name
         self.cine_ = None                    # the cine object
 
-        self.bck_img = None      # back ground image for normalization
-        self.db = db.LFmongodb() # hard code the mongodb
+        self.bck_img = None       # back ground image for normalization
+        self.db = db.LFmongodb()  # hard code the mongodb
 
     @classmethod
-    def _verify_params(cls,param,extra_req=None):
+    def _verify_params(cls, param, extra_req=None):
         if extra_req is None:
             extra_req = []
         for s in cls.req_args_lst + extra_req:
             if s not in param:
                 raise Exception("missing required argument %s" % s)
-
-
 
     @classmethod
     def from_hdf_file(cls, cine_base_path, h5_fname):
@@ -630,7 +619,7 @@ class ProcessBackend(object):
         keys_lst = tmp_file.attrs.keys()
         lc_req_args = ['tck0', 'tck1', 'tck2']
         h5_req_args = ['cine_path', 'cine_fname']
-        cls._verify_params(keys_lst,extra_req = lc_req_args + h5_req_args)
+        cls._verify_params(keys_lst, extra_req=(lc_req_args + h5_req_args))
 
         self.params = dict(tmp_file.attrs)
 
@@ -680,7 +669,7 @@ class ProcessBackend(object):
                 self.bck_img = gen_bck_img('/'.join(self.cine_fname))
                 # if we have a data base, shove in the data
                 if self.db is not None:
-                    self.db.store_background_img(self.cine_.hash,bck_img)
+                    self.db.store_background_img(self.cine_.hash, self.bck_img)
 
         return self
 
@@ -700,7 +689,7 @@ class ProcessBackend(object):
         mbe.tm = tm
         next_curve = mbe.get_next_spline(**self.params)
         if 'fft_filter' in self.params:
-            next_curve = copy.copy(next_curve) # to not screw up the orignal
+            next_curve = copy.copy(next_curve)  # to not screw up the original
             next_curve.fft_filter(self.params['fft_filter'])
         return mbe, next_curve
 
@@ -719,10 +708,9 @@ class ProcessBackend(object):
         '''Updates the parameters'''
         self.params[key] = val
 
-    def update_all_params(self,params):
+    def update_all_params(self, params):
         self._verify_params(params)
         self.params = params
-
 
     def gen_stub_h5(self, h5_fname, seed_curve):
         '''Generates a h5 file that can be read back in for later
@@ -798,12 +786,11 @@ class MemBackendFrame(object):
 
     def get_extent(self):
         if self.img is not None:
-            return [0,self.img.shape[1],0,self.img.shape[0]]
+            return [0, self.img.shape[1], 0, self.img.shape[0]]
         else:
-            x,y = self.curve.q_phi_to_xy(1,np.linspace(0,2*np.pi,100) )
-            return [.9 * np.min(y),1.1 * np.max(y),
-                    .9 * np.min(x),1.1 * np.max(x)]
-
+            x, y = self.curve.q_phi_to_xy(1, np.linspace(0, 2 * np.pi, 100))
+            return [.9 * np.min(y), 1.1 * np.max(y),
+                    .9 * np.min(x), 1.1 * np.max(x)]
 
     def get_next_spline(self, mix_in_count=0, pix_err=0, **kwargs):
         if self.next_curve is not None and self.mix_in_count == mix_in_count:
@@ -818,16 +805,13 @@ class MemBackendFrame(object):
                         t.q is not None
                         and t.phi is not None
                         and bool(t.charge)] +
-                        [0] * int(mix_in_count))
+                       [0] * int(mix_in_count))
 
         t_phi = np.array([t.phi for t in tim + tam if
-                        t.q is not None
-                        and t.phi is not None
-                        and bool(t.charge)] +
-                        list(np.linspace(0,
-                                         2 * np.pi,
-                                         mix_in_count,
-                                         endpoint=False)))
+                          t.q is not None
+                          and t.phi is not None
+                          and bool(t.charge)] +
+                         list(np.linspace(0, 2 * np.pi, mix_in_count, endpoint=False)))
 
         indx = t_phi.argsort()
         t_q = t_q[indx]
@@ -862,7 +846,7 @@ class MemBackendFrame(object):
                                          linestyle='-')
                           for t in tk_l
                           if len(t) > min_len and
-                            (all_tracks or bool(t.charge))])
+                          (all_tracks or bool(t.charge))])
         return lines
 
     def ax_draw_center_curves(self, ax):
@@ -872,7 +856,7 @@ class MemBackendFrame(object):
 
         new_curve = self.next_curve
         ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
-                     lw=2,linestyle='--')
+                     lw=2, linestyle='--')
 
         return lo + ln
 
@@ -897,8 +881,8 @@ class MemBackendFrame(object):
     def get_profile(self):
         ch, th = zip(*sorted([(t.charge, t.phi) for
                               t in itertools.chain(*self.trk_lst) if
-                                t.charge and len(t) > 15],
-                              key=lambda x: x[-1]))
+                              t.charge and len(t) > 15],
+                            key=lambda x: x[-1]))
 
         dh, th_new = construct_corrected_profile((th, ch))
 
@@ -915,7 +899,7 @@ class MemBackendFrame(object):
             *sorted([tuple(t.get_xy(self.curve)) + (t.charge, t.phi) for
                      t in itertools.chain(*self.trk_lst) if
                      t.charge and len(t) > 15],
-                     key=lambda x: x[-1]))
+                    key=lambda x: x[-1]))
 
         dh, th_new = construct_corrected_profile((th, ch))
         Z = [z * np.ones(x.shape) for z, x in zip(dh, X)]
@@ -926,7 +910,7 @@ class MemBackendFrame(object):
         q, ch, th = zip(*sorted([(t.q, t.charge, t.phi) for
                                  t in itertools.chain(*self.trk_lst) if
                                  t.charge and len(t) > min_track_length],
-                                 key=lambda x: x[-1]))
+                                key=lambda x: x[-1]))
 
         # scale the radius
         x, y = self.curve.q_phi_to_xy(q, th)
@@ -1005,7 +989,7 @@ class HdfBackend(object):
             self.cine_fname = None
             self.cine = None
 
-        self.db = db.LFmongodb() # hard code the mongodb
+        self.db = db.LFmongodb()  # hard code the mongodb
 
         if self.bck_img is None:
             # not passed in, try the data base
@@ -1016,7 +1000,7 @@ class HdfBackend(object):
                 self.gen_back_img()
                 # if we have a data base, shove in the data
                 if self.db is not None and self.bck_img is not None:
-                    self.db.store_background_img(self.cine.hash,self.bck_img)
+                    self.db.store_background_img(self.cine.hash, self.bck_img)
 
         pass
 
@@ -1082,7 +1066,7 @@ class SplineCurve(object):
     A class that wraps the scipy.interpolation objects
     '''
     @classmethod
-    def _get_spline(cls, points,  pix_err=2,need_sort=True, **kwargs):
+    def _get_spline(cls, points, pix_err=2, need_sort=True, **kwargs):
         '''
         Returns a closed spline for the points handed in.
         Input is assumed to be a (2xN) array
@@ -1123,7 +1107,7 @@ class SplineCurve(object):
         if need_sort:
             # sort the list by angle around center
             pt_lst.sort(key=lambda x: np.arctan2(x[1] - center[1],
-                                             x[0] - center[0]))
+                                                 x[0] - center[0]))
 
         # add first point to end because it is periodic (makes the
         # interpolation code happy)
@@ -1135,12 +1119,11 @@ class SplineCurve(object):
 
         tck, u = si.splprep(pt_array, s=len(pt_lst) * (pix_err ** 2), per=True)
 
-
-        return  tck
+        return tck
 
     @classmethod
     def from_pts(cls, new_pts, **kwargs):
-        tck  = cls._get_spline(new_pts, **kwargs)
+        tck = cls._get_spline(new_pts, **kwargs)
         this = cls(tck)
         this.raw_pts = new_pts
         return this
@@ -1151,7 +1134,6 @@ class SplineCurve(object):
         tck = [parent_group.attrs['tck0'],
                parent_group.attrs['tck1'],
                parent_group.attrs['tck2']]
-        new_pts = si.splev(np.linspace(0, 1, 1000), tck)
         return cls(tck)
 
     def __init__(self, tck):
@@ -1204,9 +1186,7 @@ class SplineCurve(object):
                 raise ValueError("q and phi must have same" +
                                  " dimensions to broadcast")
         if cross is None:
-            if ((phi_shape is not None) and
-                (q_shape is not None) and
-                (phi_shape == q_shape)):
+            if ((phi_shape is not None) and (q_shape is not None) and (phi_shape == q_shape)):
                 cross = False
             elif q_shape is None:
                 cross = False
@@ -1224,8 +1204,8 @@ class SplineCurve(object):
             data_out = zip(
                 *map(lambda q_: ((x + q_ * nx).reshape(phi_shape),
                                  (y + q_ * ny).reshape(phi_shape)),
-                                 q)
-                )
+                q)
+            )
         else:
 
             data_out = [(x + q * nx).reshape(phi_shape),
@@ -1233,15 +1213,15 @@ class SplineCurve(object):
 
         return data_out
 
-    def fft_filter(self,mode):
+    def fft_filter(self, mode):
         if mode == 0:
             return
         sample_pow = 12
-        tmp_pts= si.splev(np.linspace(0,1,2 ** sample_pow), self.tck)
+        tmp_pts = si.splev(np.linspace(0, 1, 2 ** sample_pow), self.tck)
 
         mask = np.zeros(2 ** sample_pow)
         mask[0] = 1
-        mask[1:(mode+1)] = 1
+        mask[1:(mode + 1)] = 1
         mask[-mode:] = 1
 
         new_pts = []
@@ -1249,18 +1229,15 @@ class SplineCurve(object):
             wfft = fft.fft(w)
             new_pts.append(np.real(fft.ifft(wfft * mask)))
 
-
-
         new_pts = np.vstack(new_pts)
 
-
-        tck = self._get_spline(new_pts,pix_err=0.05,need_sort=False)
+        tck = self._get_spline(new_pts, pix_err=0.05, need_sort=False)
 
         self.tck = tck
 
+    def draw_to_axes(self, ax, N=1024, **kwargs):
+        return ax.plot(*(self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, N))), **kwargs)
 
-    def draw_to_axes(self,ax,N = 1024,**kwargs):
-        return ax.plot(*(self.q_phi_to_xy(0,linspace(0,2*np.pi,N))),**kwargs)
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
                      smooth_rng=2, oversample=4, *args, **kwargs):
@@ -1276,8 +1253,7 @@ def find_rim_fringes(curve, lfimg, s_width, s_num,
 
     # get center of curve
     new_pts = curve.get_xy_samples(1000)
-    x0, y0 = np.mean(new_pts,1).ravel()
-
+    x0, y0 = np.mean(new_pts, 1).ravel()
 
     q_vec = np.linspace(-s_width, s_width, s_num).reshape(-1, 1)   # q sampling
     phi_vec = np.linspace(0, 2 * np.pi, sample_count)   # angular sampling
