@@ -59,7 +59,7 @@ class hash_line_angular(object):
     around a rim'''
     def __init__(self, dims, bin_width):
         '''
-        :param dims: the maximum value of the parameritazation parameter 
+        :param dims: the maximum value of the parameritazation parameter
         :param bin_width: the width of each bin in units of `dims`
         '''
         full_width = dims
@@ -69,9 +69,9 @@ class hash_line_angular(object):
         self.bin_count = len(self.boxes)
 
     def add_point(self, point):
-        ''' 
+        '''
         :param point: the point object to add, assumed to be a :py:class:`~Point1D_circ`
-        
+
         Adds a point on the hash line
 
         Assumes that the point have been properly rationalized 0<`point.phi`< max
@@ -82,7 +82,7 @@ class hash_line_angular(object):
         '''
         :param point: point to get the region of
         :param bbuffer: the buffer around `point` in the local units
-        
+
         Gets the region around the point
 
         Assumes that the point have been properly rationalized 0<`point.phi`< max
@@ -110,7 +110,7 @@ class Point1D_circ(Point):
     '''
     #: the value at which :py:attr:`~Point1D_circ.phi` winds back on it's self
     WINDING = 2 * np.pi
-    
+
     def __init__(self, q, phi, v=0):
         Point.__init__(self)                  # initialize base class
         self.q = q                            # parametric variable
@@ -122,7 +122,7 @@ class Point1D_circ(Point):
         '''
         :param point: point to give distance to
         :type point: :py:class:`~Point1D_circ`
-        
+
         Returns the absolute value of the angular distance between
         two points mod :py:attr:`~Point1D_circ.WINDING`'''
         d = np.abs(self.phi - point.phi)
@@ -141,7 +141,7 @@ class Point1D_circ(Point):
 
 class lf_Track(Track):
     '''
-    :param point: The first feature in the track if not  `None`.  
+    :param point: The first feature in the track if not  `None`.
     :type point: :py:class:`~trackpy.tracking.Point`
 
     Derived class from :py:class:`~trackpy.tracking.Track` for working with
@@ -151,7 +151,7 @@ class lf_Track(Track):
     :ivar q: the `q` of the track.  See :py:attr:`Point1D_circ.q`
     :ivar phi:  the `phi` of the track. See :py:attr:`Point1D_circ.phi`
     '''
-    
+
     def __init__(self, point=None):
         Track.__init__(self, point)
         self.charge = None
@@ -218,7 +218,7 @@ class lf_Track(Track):
             kwargs['lw'] = 3
         else:
             kwargs['lw'] = 1
-                
+
         if 'picker' not in kwargs:
             kwargs['picker'] = 5
         ln, = ax.plot(x+.5, y+.5, **kwargs)
@@ -226,11 +226,11 @@ class lf_Track(Track):
         return ln
 
     def classify2(self, min_len=None, min_extent=None, straddle=True,  **kwargs):
-        ''' 
+        '''
         :param min_len: the minimum length a track must be to considered
         :param min_extent: the minimum extent in :py:attr:`q` the of the track
            for the track to be considered
-           
+
         Classification function which sorts out the charge of the track.
 
         '''
@@ -296,12 +296,12 @@ class lf_Track(Track):
     def mean_q(self):
         '''
         Sets :py:attr:`q` to be the average :py:attr:`q` of the track
-        
+
         :deprecated: this is a stupid way of doing this.
         '''
         self.q = np.mean([p.q for p in self.points])
         raise PendingDeprecationWarning()
-    
+
     def merge_track(self, to_merge_track):
         '''
         :param to_merge_track: track to merge with this one
@@ -311,7 +311,7 @@ class lf_Track(Track):
         '''
         pt.Track.merge_track(self, to_merge_track)
 
-        
+
         if self.charge is not None:
             self.classify()
 
@@ -609,7 +609,7 @@ class ProcessBackend(object):
         self.cine_ = None                    # the cine object
 
         self.bck_img = None      # back ground image for normalization
-        self.db = db.LFmongodb() # hard code the mongodb 
+        self.db = db.LFmongodb() # hard code the mongodb
 
     @classmethod
     def _verify_params(cls,param,extra_req=None):
@@ -619,8 +619,8 @@ class ProcessBackend(object):
             if s not in param:
                 raise Exception("missing required argument %s" % s)
 
-        
-        
+
+
     @classmethod
     def from_hdf_file(cls, cine_base_path, h5_fname):
         ''' Sets up object to process data based on MD in an hdf file.
@@ -660,7 +660,7 @@ class ProcessBackend(object):
         '''
 
         cls._verify_params(kwargs)
-        
+
         self.params = kwargs
         try:
             self.bck_img = self.params.pop('bck_img')
@@ -744,7 +744,7 @@ class ProcessBackend(object):
         file_out.attrs['cine_fname'] = str(self.cine_fname.fname)
 
         file_out.attrs['cine_hash'] = self.cine_.hash
-        
+
         if seed_curve is not None:
             seed_curve.write_to_hdf(file_out)
         if self.bck_img is not None:
@@ -783,7 +783,7 @@ class MemBackendFrame(object):
         self.img = img
         self.mix_in_count = None
         self.pix_err = None
-        
+
         new_res = []
         for t_ in self.res:
             if len(t_) == 0:
@@ -801,10 +801,10 @@ class MemBackendFrame(object):
             return [0,self.img.shape[1],0,self.img.shape[0]]
         else:
             x,y = self.curve.q_phi_to_xy(1,np.linspace(0,2*np.pi,100) )
-            return [.9 * np.min(y),1.1 * np.max(y), 
+            return [.9 * np.min(y),1.1 * np.max(y),
                     .9 * np.min(x),1.1 * np.max(x)]
-                                         
-        
+
+
     def get_next_spline(self, mix_in_count=0, pix_err=0, **kwargs):
         if self.next_curve is not None and self.mix_in_count == mix_in_count:
             return self.next_curve
@@ -871,7 +871,7 @@ class MemBackendFrame(object):
             self.get_next_spline()
 
         new_curve = self.next_curve
-        ln = ax.plot(*new_curve.get_xy_samples(1000), color='m', 
+        ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
                      lw=2,linestyle='--')
 
         return lo + ln
@@ -1005,7 +1005,7 @@ class HdfBackend(object):
             self.cine_fname = None
             self.cine = None
 
-        self.db = db.LFmongodb() # hard code the mongodb 
+        self.db = db.LFmongodb() # hard code the mongodb
 
         if self.bck_img is None:
             # not passed in, try the data base
@@ -1048,11 +1048,11 @@ class HdfBackend(object):
 
         res = _read_frame_tracks_from_file_res(g)
         curve = SplineCurve.from_hdf(g)
-        return MemBackendFrame(curve, 
-                               frame_num, 
-                               res, 
-                               trk_lst=trk_lst, 
-                               img=img, 
+        return MemBackendFrame(curve,
+                               frame_num,
+                               res,
+                               trk_lst=trk_lst,
+                               img=img,
                                params=self.proc_prams)
 
     def gen_back_img(self):
@@ -1090,7 +1090,7 @@ class SplineCurve(object):
         =====
         input
         =====
- 
+
         :param points: the points to fit the spline to
         :type points: a 2xN ndarray or a list of len =2 tuples
 
@@ -1134,8 +1134,8 @@ class SplineCurve(object):
         # do spline fitting
 
         tck, u = si.splprep(pt_array, s=len(pt_lst) * (pix_err ** 2), per=True)
-        
-        
+
+
         return  tck
 
     @classmethod
@@ -1249,7 +1249,7 @@ class SplineCurve(object):
             wfft = fft.fft(w)
             new_pts.append(np.real(fft.ifft(wfft * mask)))
 
-    
+
 
         new_pts = np.vstack(new_pts)
 
@@ -1260,7 +1260,7 @@ class SplineCurve(object):
 
 
     def draw_to_axes(self,ax,N = 1024,**kwargs):
-        return ax.plot(*(self.q_phi_to_xy(0,linspace(0,2*np.pi,N))),**kwargs)  
+        return ax.plot(*(self.q_phi_to_xy(0,linspace(0,2*np.pi,N))),**kwargs)
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
                      smooth_rng=2, oversample=4, *args, **kwargs):
@@ -1336,7 +1336,7 @@ def find_rim_fringes(curve, lfimg, s_width, s_num,
 
 def proc_frame(curve, img, s_width, s_num, search_range, min_tlen=5, **kwargs):
     '''new version with different returns'''
-    
+
     _t0 = time.time()
 
     miv, mav = find_rim_fringes(curve,
@@ -1489,3 +1489,70 @@ def setup_spline_fitter(fname, bck_img=None):
     plt.draw()
 
     return ef
+
+
+def link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_search_range):
+    # base cases
+    if len(source) == 0:
+        tmp_accum = cur_order + len(dest) * max_search_range
+        if tmp_accum < best_accum:
+            # we have a winner
+            cur_order = cur_order[:]      # get a copy
+            cur_order.extend([-1] * len(dest))
+            return cur_order, tmp_accum
+        else:
+            # old way is still best
+            return best_order, best_accum
+
+    if len(dest) == 0:
+        tmp_accum = cur_order + len(source) * max_search_range
+        if tmp_accum < best_accum:
+            cur_order = cur_order[:]      # get a copy
+            cur_order.extend([1] * len(dest))
+            return cur_order, tmp_accum
+        else:
+            # old way is still best
+            return best_order, best_accum
+
+    # try by linking the first two entries of the lists together, recurse on the rest
+    source_head = source.pop(0)
+    dest_head = dest.pop(0)
+    dist = np.abs(source_head - dest_head)
+    if dist < max_search_range:  # if the distance is less than the maximum
+        tmp_accum = cur_accum + dist      # get new trial accum
+        if tmp_accum < best_accum:
+            cur_order.append(0)
+            best_order, best_accum = link_run(best_accum, best_order,
+                                              tmp_accum, cur_order,
+                                              source, dest,
+                                              max_search_range)
+
+            cur_order.pop()
+
+    # try dropping just the first entry in source
+    dest.insert(0, dest_head)
+    tmp_accum = cur_order + max_search_range
+    if tmp_accum < best_order:
+            cur_order.append(-1)
+            best_order, best_accum = link_run(best_accum, best_order,
+                                              tmp_accum, cur_order,
+                                              source, dest,
+                                              max_search_range)
+
+            cur_order.pop()
+
+    # try dropping the first entry of the dest
+    dest_head = dest.pop(0)
+    source.insert(0, source.head)
+    if tmp_accum < best_order:
+            cur_order.append(1)
+            best_order, best_accum = link_run(best_accum, best_order,
+                                              tmp_accum, cur_order,
+                                              source, dest,
+                                              max_search_range)
+
+            cur_order.pop()
+
+    dest.insert(0, dest_head)             # make sure list is unchanged by pass through function
+
+    return best_order, best_accum
