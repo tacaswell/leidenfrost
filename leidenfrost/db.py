@@ -14,7 +14,7 @@
 #
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
-from __future__ import division,print_function
+from __future__ import division, print_function
 
 import cine.cine
 import cPickle
@@ -27,6 +27,7 @@ import bson
 
 class BackImgClash(RuntimeError):
     pass
+
 
 class ParamWrapper(object):
     '''
@@ -45,9 +46,10 @@ class ParamWrapper(object):
         self.date = date
         self.processed = processed
 
+
 class LFDbWrapper(object):
     '''
-    An ABC for dealing with talking to a data base. 
+    An ABC for dealing with talking to a data base.
 
     For abstracting away mongo vs sqlite as I can not make up my mind.
     '''
@@ -55,7 +57,7 @@ class LFDbWrapper(object):
         pass
 
     def get_background_img(self, cine_hash):
-        ''' 
+        '''
         Returns the background image for this cine if it exists, or `None` if
         one does not exist.
 
@@ -66,7 +68,7 @@ class LFDbWrapper(object):
 
     def store_background_img(self, cine_hash, bck_img, overwrite=False):
         '''
-        Store the background image for this cine in the database.  
+        Store the background image for this cine in the database.
 
         If an entry already exists for this file and overwrite is
         true, replace the entry, if overwrite is false, raise `BackImgClash`.
@@ -79,10 +81,10 @@ class LFDbWrapper(object):
 
         '''
         raise NotImplementedError('you must define this is a sub class')
-    
+
     def rm_background_img(self, cine_hash):
-        ''' 
-        Deletes the background image for the data set of interest.  Does nothing if 
+        '''
+        Deletes the background image for the data set of interest.  Does nothing if
         entry does not exist.
 
         :param cine_hash: A unique identifier for the data set of interest.
@@ -98,11 +100,11 @@ class LFDbWrapper(object):
         :rtype: a list of dictionaries, one per configuration, empty if none
         '''
         raise NotImplementedError('you must define this is a sub class')
-    
+
     def get_proced_configs(self, cine_hash):
         '''
         Returns all configurations associated with the data file of interest
-        that have been processed at least once 
+        that have been processed at least once
 
         :param cine_hash: A unique identifier for the data set of interest.
         :rtype: a list of dictionaries, one per configuration, empty if none
@@ -112,7 +114,7 @@ class LFDbWrapper(object):
     def get_unproced_configs(self, cine_hash):
         '''
         Returns all configurations associated with the data file of interest
-        that have not been processed at least once 
+        that have not been processed at least once
 
         :param cine_hash: A unique identifier for the data set of interest.
         :rtype: a list of dictionaries, one per configuration, empty if none
@@ -122,7 +124,7 @@ class LFDbWrapper(object):
     def get_config_by_key(self, key):
         '''
         Returns all configurations associated with the data file of interest
-        that have not been processed at least once 
+        that have not been processed at least once
 
         :param key: A unique identifier for configuration of interest
         :rtype: a `dict`, `None` if key is invalid
@@ -147,46 +149,42 @@ class LFDbWrapper(object):
         raise NotImplementedError('you must define this is a sub class')
 
 
-
 class LFmongodb(LFDbWrapper):
-
-    def __init__(self, host='localhost', port=27017,*args, **kwargs):
-        LFDbWrapper.__init__(self,*args,**kwargs)
-        self.connection = MongoClient(host,port)
+    def __init__(self, host='localhost', port=27017, *args, **kwargs):
+        LFDbWrapper.__init__(self, *args, **kwargs)
+        self.connection = MongoClient(host, port)
         self.db = self.connection.LF
         self.bck_img_coll = self.db.backimg_collection
-        self.bck_img_coll.ensure_index('cine',unique=True)
+        self.bck_img_coll.ensure_index('cine', unique=True)
         pass
 
     def get_background_img(self, cine_hash):
-        record = self.bck_img_coll.find_one({'cine':cine_hash})
+        record = self.bck_img_coll.find_one({'cine': cine_hash})
         if record is None:
             return None
         return cPickle.loads(record['bck_img'])
 
     def store_background_img(self, cine_hash, bck_img, overwrite=False):
         # test if it exists, add that logic
-        record = {'cine':cine_hash}
+        record = {'cine': cine_hash}
         record['bck_img'] = bson.binary.Binary(bck_img.dumps())
         try:
             self.bck_img_coll.insert(record)
         except pymongo.errors.DuplicateKeyError as e:
             if overwrite:
                 self.rm_background_img(cine_hash)
-                # recurse with out chance of hitting this again to 
-                self.store_background_img(cine_hash,bck_img,overwrite=False)
+                # recurse with out chance of hitting this again to
+                self.store_background_img(cine_hash, bck_img, overwrite=False)
             else:
                 raise BackImgClash(e.message)
-        
-    
-    def rm_background_img(self, cine_hash):
-        self.bck_img_coll.remove({'cine':cine_hash})
 
+    def rm_background_img(self, cine_hash):
+        self.bck_img_coll.remove({'cine': cine_hash})
 
     def get_all_configs(self, cine_hash):
 
         raise NotImplementedError('you must define this is a sub class')
-    
+
     def get_proced_configs(self, cine_hash):
 
         raise NotImplementedError('you must define this is a sub class')
@@ -206,4 +204,3 @@ class LFmongodb(LFDbWrapper):
     def add_proc(self, cine_hash, data, **kwargs):
 
         raise NotImplementedError('you must define this is a sub class')
-
