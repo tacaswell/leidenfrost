@@ -24,7 +24,6 @@ from pymongo import MongoClient
 import bson
 
 
-
 class BackImgClash(RuntimeError):
     pass
 
