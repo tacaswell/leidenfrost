@@ -89,7 +89,9 @@ class hash_line_angular(object):
         box_indx = int(np.floor(point.phi / self.bin_width))
         tmp_box = []
         for j in range(box_indx - bbuffer, box_indx + bbuffer + 1):
-            tmp_box.extend(self.boxes[np.mod(j, self.bin_count)])
+            j = j + self.bin_count if j < 0 else j
+            j = j - self.bin_count if j > self.bin_count else j
+            tmp_box.extend(self.boxes[j])
         return tmp_box
 
 
