@@ -86,7 +86,7 @@ class AnimateHdf(object):
 
     def save(self, fpath):
 
-        writer = animation.writers['ffmpeg'](fps=20, bitrate=30000)
+        writer = animation.writers['ffmpeg'](fps=20, bitrate=30000, codec='libx264')
         self.ani.save(fpath, writer=writer, dpi=200)
 
     def _prep_img_limits(self):
