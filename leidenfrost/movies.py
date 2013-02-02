@@ -86,7 +86,7 @@ class AnimateHdf(object):
 
     def save(self, fpath):
 
-        writer = animation.writers['ffmpeg'](fps=20, bitrate=30000)
+        writer = animation.writers['ffmpeg'](fps=20, bitrate=30000, codec='libx264')
         self.ani.save(fpath, writer=writer, dpi=200)
 
     def _prep_img_limits(self):
@@ -174,7 +174,7 @@ class ZProfile(object):
         dh, th_new = infra.construct_corrected_profile((th, ch), th_offset)
         dh -= np.min(dh)
         dh += delta_h
-        dh *= (.543 / 4)
+        dh *= (.632 / 4)
 
         self.prof_ln.set_xdata(th_new)
         self.prof_ln.set_ydata(dh)
