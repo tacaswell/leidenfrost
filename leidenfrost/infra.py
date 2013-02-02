@@ -28,7 +28,6 @@ import numpy.linalg as nl
 import numpy.fft as fft
 import matplotlib.pyplot as plt
 
-
 from scipy.ndimage.interpolation import map_coordinates
 import scipy.interpolate as sint
 import scipy.interpolate as si
@@ -1381,32 +1380,6 @@ def resample_track(data, pt_num=250, interp_type='linear'):
     return ch_new, th_new
 
 
-class FringeRing(object):
-    '''
-    A class to carry around and work with the location of fringes for
-    the purpose of tracking a fixed height faring from frame to frame.
-    '''
-    def __init__(self, theta, charge, th_offset=0, ringID=None):
-
-        rel_height, th_new = construct_corrected_profile((theta, charge),
-                                                         th_offset)
-
-        self.fringes = []
-
-        for th, h in zip(th_new, rel_height):
-
-            self.fringes.append(Point1D_circ(ringID, th, h))
-
-    def __iter__(self):
-        return self.fringes.__iter__()
-
-    def plot_fringe_flat(self, ax, **kwargs):
-        q, phi = zip(*sorted([(f.q, f.phi) for f in self.fringes],
-                             key=lambda x: x[1]))
-        ax.plot(phi, q, **kwargs)
-        plt.draw()
-
-
 def construct_corrected_profile(data, th_offset=0):
     '''Takes in [ch, th] and return [delta_h, th].  Flattens '''
     th, ch = data
@@ -1439,16 +1412,6 @@ def construct_corrected_profile(data, th_offset=0):
     return delta_h[rindx], th[rindx]
 
 
-def get_rf(hf, j):
-    mbe = hf[j]
-    th_offset = mbe.get_theta_offset()
-    rf = FringeRing(mbe.res[0][1],
-                    mbe.res[0][0],
-                    th_offset=th_offset,
-                    ringID=j)
-    return rf
-
-
 def setup_spline_fitter(fname, bck_img=None):
     ''' gets the initial path '''
     clims = [.5, 1.5]
@@ -1469,24 +1432,59 @@ def setup_spline_fitter(fname, bck_img=None):
     return ef
 
 
-def link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_search_range):
+def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_search_range):
+    '''
+
+    A function to link 'runs' together.  A run is an ordered 1D
+    sequence.  This will link together two subsequent runs, allowing
+    there to be gaps and overhang at both ends, but does not allow
+    crossing.  That is, if a1 < b1 -> a2 < b2.
+
+    The algorithm is a modified version of the Crocker-Grier
+    algorithm.  Given two lists, there are three possible options, the
+    first item in each list are linked [0], the first item in the
+    source list is not linked to anything (skipped) [1] or the first
+    item in the second list is not linked to anything (skipped) [-1].
+    The remainder of the lists are then dealt with recursively.  If
+    one list is exhausted first, the remainder of the other list is
+    marked as skipped.
+
+    This function runs recursively, with a maximum depth the length of
+    the longest input.
+
+    This is an internal function and probably shouldn't be directly
+    used
+
+    :param best_accum: the current minimum penalty
+    :param best_order: the current best linkange
+    :param cur_accum: the accumulated penalty of the current candidate
+    linkage
+    :param cur_order: the current proposed linkage
+    :param source: a list of objects to link from.  Objects must
+    implement `distance`
+    :param dest: a list of objects to link to.  Objects must implement
+    `dist`
+    :param max_search_range: the maximum distance away to consider a link.
+    Also sets penalty for skipping a link
+    '''
+
     # base cases
     if len(source) == 0:
-        tmp_accum = cur_order + len(dest) * max_search_range
+        tmp_accum = cur_accum + len(dest) * max_search_range
         if tmp_accum < best_accum:
             # we have a winner
             cur_order = cur_order[:]      # get a copy
-            cur_order.extend([-1] * len(dest))
+            cur_order.extend([1] * len(dest))
             return cur_order, tmp_accum
         else:
             # old way is still best
             return best_order, best_accum
 
     if len(dest) == 0:
-        tmp_accum = cur_order + len(source) * max_search_range
+        tmp_accum = cur_accum + len(source) * max_search_range
         if tmp_accum < best_accum:
             cur_order = cur_order[:]      # get a copy
-            cur_order.extend([1] * len(dest))
+            cur_order.extend([-1] * len(dest))
             return cur_order, tmp_accum
         else:
             # old way is still best
@@ -1495,42 +1493,120 @@ def link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_sea
     # try by linking the first two entries of the lists together, recurse on the rest
     source_head = source.pop(0)
     dest_head = dest.pop(0)
-    dist = np.abs(source_head - dest_head)
+    dist = source_head.distance(dest_head)
     if dist < max_search_range:  # if the distance is less than the maximum
         tmp_accum = cur_accum + dist      # get new trial accum
         if tmp_accum < best_accum:
             cur_order.append(0)
-            best_order, best_accum = link_run(best_accum, best_order,
-                                              tmp_accum, cur_order,
-                                              source, dest,
-                                              max_search_range)
+            best_order, best_accum = _link_run(best_accum, best_order,
+                                               tmp_accum, cur_order,
+                                               source, dest,
+                                               max_search_range)
 
             cur_order.pop()
 
+    # only need to do this once for both of the next two checks
+    tmp_accum = cur_accum + max_search_range
     # try dropping just the first entry in source
     dest.insert(0, dest_head)
-    tmp_accum = cur_order + max_search_range
-    if tmp_accum < best_order:
+
+    if tmp_accum < best_accum:
             cur_order.append(-1)
-            best_order, best_accum = link_run(best_accum, best_order,
-                                              tmp_accum, cur_order,
-                                              source, dest,
-                                              max_search_range)
+            best_order, best_accum = _link_run(best_accum, best_order,
+                                               tmp_accum, cur_order,
+                                               source, dest,
+                                               max_search_range)
 
             cur_order.pop()
 
     # try dropping the first entry of the dest
+    source.insert(0, source_head)
     dest_head = dest.pop(0)
-    source.insert(0, source.head)
-    if tmp_accum < best_order:
+
+    if tmp_accum < best_accum:
             cur_order.append(1)
-            best_order, best_accum = link_run(best_accum, best_order,
-                                              tmp_accum, cur_order,
-                                              source, dest,
-                                              max_search_range)
+            best_order, best_accum = _link_run(best_accum, best_order,
+                                               tmp_accum, cur_order,
+                                               source, dest,
+                                               max_search_range)
 
             cur_order.pop()
 
     dest.insert(0, dest_head)             # make sure list is unchanged by pass through function
 
     return best_order, best_accum
+
+
+class FringeRing(object):
+    '''
+    A class to carry around and work with the location of fringes for
+    the purpose of tracking a fixed height faring from frame to frame.
+    '''
+    def __init__(self, theta, charge, th_offset=0, ringID=None):
+
+        rel_height, th_new = construct_corrected_profile((theta, charge),
+                                                         th_offset)
+
+        self.fringes = []
+
+        for th, h in zip(th_new, rel_height):
+
+            self.fringes.append(Point1D_circ(ringID, th, h))
+
+    def __iter__(self):
+        return self.fringes.__iter__()
+
+    def plot_fringe_flat(self, ax, **kwargs):
+        q, phi = zip(*sorted([(f.q, f.phi) for f in self.fringes],
+                             key=lambda x: x[1]))
+        ax.plot(phi, q, **kwargs)
+        plt.draw()
+
+
+class FringeRun(object):
+    '''
+    A class to carry around 'runs' of fringes, that is fringes of the same charge in a row.
+    '''
+    def __init__(self, thetas, run_charge):
+        self.theta = np.mean(thetas)
+        self.thetas = thetas
+        self.charge = run_charge
+
+
+class Fringe(Point1D_circ):
+    '''
+    Version of :py:class:`Point1D_circ` for representing fringes
+
+    '''
+
+    def __init__(self, q, phi, charge, dh=0):
+        Point1D_circ.__init__(self, q=q, phi=phi)                  # initialize base class
+        # the value at the extrema (can probably drop this)
+        self.charge = charge
+        self.dh = dh
+
+    def __unicode__(self):
+        return 'q: %0.2f, phi: %0.2f, charge: %d, dh: %0.2f' % (self.q, self.phi, self.charge, self.dh)
+
+    def __str__(self):
+        return unicode(self).encode('utf-8')
+
+    def __repr__(self):
+        return 'Fringe(%f, %f, %d, %f)' % (self.q, self.phi, self.charge, self.dh)
+
+
+class FringeTrack(Track):
+    ''' '''
+    def __init__(self, height=0):
+        Track.__init__(self, None)
+        self.height = height
+
+
+def get_rf(hf, j):
+    mbe = hf[j]
+    th_offset = mbe.get_theta_offset()
+    rf = FringeRing(mbe.res[0][1],
+                    mbe.res[0][0],
+                    th_offset=th_offset,
+                    ringID=j)
+    return rf
