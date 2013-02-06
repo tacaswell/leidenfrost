@@ -1581,30 +1581,30 @@ class Fringe(Point1D_circ, Track):
 
     def __init__(self, q, phi):
         Point1D_circ.__init__(self, q=q, phi=phi)                  # initialize first base class
-        Tracke.__init__(self)                                      # initialize second base class
+        Track.__init__(self)                                      # initialize second base class
         # linked list for time
-        self.next_T = None   # next fringe in time
-        self.prev_T = None   # prev fringe in time
+        self.next_T = None   #: next fringe in time
+        self.prev_T = None   #: prev fringe in time
         # linked list for space
-        self.next_P = None   # next fringe in angle
-        self.prev_P = None   # prev fringe in angle
+        self.next_P = None   #: next fringe in angle
+        self.prev_P = None   #: prev fringe in angle
         # properties of fringe shape
-        self.charge = None   # up or down [-1, 0, 1]
+        self.charge = None   #: up or down [-1, 0, 1]
         self.R2 = None       # how well shape in described by quadratic
         # self.q and self, phi are set by Point1D_circ __init__
-        self.color = None    # if this is a light or dark fringe [-1, 1]
+        self.color = None    #: if this is a light or dark fringe [-1, 1]
         # properties of fringe height
 
-        self.f_dh = None     # dh figured going forward
-        self.r_dh = None     # dh figured going backwards
-        self.f_cumh = None   # the cumulative shift counting forward
-        self.r_cumh = None   # the cumulative shift counting forward
+        self.f_dh = None     #: dh figured going forward
+        self.r_dh = None     #: dh figured going backwards
+        self.f_cumh = None   #: the cumulative shift counting forward
+        self.r_cumh = None   #: the cumulative shift counting forward
 
-        self.height = None   # the height of this fringe as given by tracking in time
+        self.height = None   #: the height of this fringe as given by tracking in time
 
-        self.slope_f = None  # the slope going forward
-        self.slope_r = None  # the slope going backward
-        self.slope = None    # the 'average' slope at this point
+        self.slope_f = None  #: the slope going forward
+        self.slope_r = None  #: the slope going backward
+        self.slope = None    #: the 'average' slope at this point
 
     def add_to_track(self, track):
         if self.prev_T is not None:
@@ -1625,7 +1625,7 @@ class Fringe(Point1D_circ, Track):
             self.next_T.prev_T = self.prev_T
         Point1D_circ.remove_from_track(self, track)
 
-    def instert_ahead(self, other):
+    def insert_ahead(self, other):
         '''
         Inserts `other` ahead of this Fringe in the spatial linked-list
         '''
@@ -1664,7 +1664,48 @@ class Fringe(Point1D_circ, Track):
 
         Raises an exception of there is an invalid sequence
         '''
-        pass
+
+        prev = self.prev_P
+        cur = self
+        if prev is None:
+            raise RuntimeError("should not have called this function with out a valid angular linkage")
+        if prev.color is None or prev.charge is None:
+            self.f_dh = None
+            raise RuntimeError("The previous fringe in invalid")
+        if cur.charge is None or cur.color is None:
+            self.f_dh = None
+            raise RuntimeError("The current fringe in invalid")
+        if prev.color == cur.color:
+            # the fringes are the same color (light-light or dark-dark)
+            # then they must have opposite charge.
+            if prev.charge == -cur.charge:
+                # they have opposite charge
+                # no height change between these two fringes (inner fringes on extrema
+                self.f_dh = 0
+            else:
+                self.f_dh = None
+                # they do not have opposite charge, this is a problem
+                if cur.charge == 0:
+                    raise InvalidSequence([(-prev.color, prev.charge)])
+                elif prev.charge == 0:
+                    raise InvalidSequence([(-cur.color, cur.charge)])
+                else:
+                    raise InvalidSequence([(-prev.color, prev.charge)])
+        else:
+            # they have different color
+            if prev.charge == 0:
+                self.f_dh = np.sign(cur.charge)
+            elif cur.charge == 0:
+                self.f_dh = np.sign(prev.charge)
+            elif prev.charge == cur.charge:
+                self.f_dh = np.sign(cur.charge)
+            else:
+                # they have different charges, both are non-zero, and
+                # different colors, this is a problem
+                self.f_dh = None
+                raise InvalidSequence([(prev.color, -prev.charge),
+                                       (cur.color, -cur.charge)
+                                       ])
 
     def determine_reverse_dh(self):
         '''
@@ -1672,12 +1713,6 @@ class Fringe(Point1D_circ, Track):
         from that fringe to this one should be
 
         Raises an exception of there is an invalid sequence
-        '''
-        pass
-
-    def determine_valid_configs(self):
-        '''
-        returns the valid configurations of this fringe as a list of (color, charge) tuples
         '''
         pass
 
@@ -1691,8 +1726,9 @@ class Fringe(Point1D_circ, Track):
         return 'Fringe(%f, %f, %d, %f)' % (self.q, self.phi, self.charge, self.dh)
 
 
-class InvalidSequnce(Exception):
-    pass
+class InvalidSequence(Exception):
+    def __init__(self, valid_configs):
+        self.valid_configs = valid_configs
 
 
 class FringRing(object):
@@ -1718,7 +1754,7 @@ class FringRing(object):
                 pre_f = f.prev_P
                 invalid_fringe = Fringe(0, (f.phi - pre_f.phi) / 2)
                 f.insert_behind(invalid_fringe)
-                self.invalid_fringe.append(invalid_fringe)
+                self.invalid_fringe.append((invalid_fringe, e.valid_configs))
 
     def set_reverse_deltas(self):
         for f in self.fringes:
@@ -1728,7 +1764,7 @@ class FringRing(object):
                 pre_f = f.next_P
                 invalid_fringe = Fringe(0, (f.phi - pre_f.phi) / 2)
                 f.insert_ahead(invalid_fringe)
-                self.invalid_fringe.append(invalid_fringe)
+                self.invalid_fringe.append((invalid_fringe, e.valid_configs))
 
     def compute_cumulative_forward(self):
         pass
