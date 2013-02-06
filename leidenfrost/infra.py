@@ -601,7 +601,11 @@ class ProcessBackend(object):
         self.cine_ = None                    # the cine object
 
         self.bck_img = None       # back ground image for normalization
-        self.db = db.LFmongodb()  # hard code the mongodb
+        try:
+            self.db = db.LFmongodb()  # hard code the mongodb
+        except:
+            # this eats _ALL_ exceptions
+            self.db = None
 
     @classmethod
     def _verify_params(cls, param, extra_req=None):
@@ -989,8 +993,11 @@ class HdfBackend(object):
         else:
             self.cine_fname = None
             self.cine = None
-
-        self.db = db.LFmongodb()  # hard code the mongodb
+        try:
+            self.db = db.LFmongodb()  # hard code the mongodb
+        except:
+            # this eats _ALL_ exceptions
+            self.db = None
 
         if self.bck_img is None:
             # not passed in, try the data base
@@ -1537,30 +1544,30 @@ def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_se
     return best_order, best_accum
 
 
-class FringeRing(object):
-    '''
-    A class to carry around and work with the location of fringes for
-    the purpose of tracking a fixed height faring from frame to frame.
-    '''
-    def __init__(self, theta, charge, th_offset=0, ringID=None):
+# class FringeRing(object):
+#     '''
+#     A class to carry around and work with the location of fringes for
+#     the purpose of tracking a fixed height faring from frame to frame.
+#     '''
+#     def __init__(self, theta, charge, th_offset=0, ringID=None):
 
-        rel_height, th_new = construct_corrected_profile((theta, charge),
-                                                         th_offset)
+#         rel_height, th_new = construct_corrected_profile((theta, charge),
+#                                                          th_offset)
 
-        self.fringes = []
+#         self.fringes = []
 
-        for th, h in zip(th_new, rel_height):
+#         for th, h in zip(th_new, rel_height):
 
-            self.fringes.append(Point1D_circ(ringID, th, h))
+#             self.fringes.append(Point1D_circ(ringID, th, h))
 
-    def __iter__(self):
-        return self.fringes.__iter__()
+#     def __iter__(self):
+#         return self.fringes.__iter__()
 
-    def plot_fringe_flat(self, ax, **kwargs):
-        q, phi = zip(*sorted([(f.q, f.phi) for f in self.fringes],
-                             key=lambda x: x[1]))
-        ax.plot(phi, q, **kwargs)
-        plt.draw()
+#     def plot_fringe_flat(self, ax, **kwargs):
+#         q, phi = zip(*sorted([(f.q, f.phi) for f in self.fringes],
+#                              key=lambda x: x[1]))
+#         ax.plot(phi, q, **kwargs)
+#         plt.draw()
 
 
 class FringeRun(object):
@@ -1631,8 +1638,7 @@ class Fringe(Point1D_circ, Track):
         '''
         if self.next_P is not None:
             self.next_P.prev_P = other
-
-        other.next_P = self.next_P
+            other.next_P = self.next_P
 
         self.next_P = other
         other.prev_P = self
@@ -1643,8 +1649,8 @@ class Fringe(Point1D_circ, Track):
         '''
         if self.prev_P is not None:
             self.prev_P.next_P = other
+            other.prev_P = self.prev_P
 
-        other.prev_P = self.prev_P
         self.prev_P = other
         other.next_P = self
 
@@ -1716,14 +1722,22 @@ class Fringe(Point1D_circ, Track):
         '''
         pass
 
+    def set_color_charge(self, color, charge):
+        self.color = color
+        self.charge = charge
+
+    def clear_color_charge(self):
+        self.color = None
+        self.charge = None
+
     def __unicode__(self):
-        return 'q: %0.2f, phi: %0.2f, charge: %d, dh: %0.2f' % (self.q, self.phi, self.charge, self.dh)
+        return 'q: %0.2f, phi: %0.2f, charge: %s, color: %s' % (self.q, self.phi, str(self.charge), str(self.color))
 
     def __str__(self):
         return unicode(self).encode('utf-8')
 
     def __repr__(self):
-        return 'Fringe(%f, %f, %d, %f)' % (self.q, self.phi, self.charge, self.dh)
+        return 'Fringe(%f, %f, %s, %s)' % (self.q, self.phi, str(self.charge), str(self.color))
 
 
 class InvalidSequence(Exception):
@@ -1731,7 +1745,7 @@ class InvalidSequence(Exception):
         self.valid_configs = valid_configs
 
 
-class FringRing(object):
+class FringeRing(object):
     '''
     A class to carry around Fringe data
     '''
@@ -1750,21 +1764,21 @@ class FringRing(object):
         for f in self.fringes:
             try:
                 f.determine_forward_dh()
-            except InvalidSequnce as e:
+            except InvalidSequence as e:
                 pre_f = f.prev_P
-                invalid_fringe = Fringe(0, (f.phi - pre_f.phi) / 2)
+                invalid_fringe = Fringe(0, pre_f.phi + pre_f.distance(f) / 2)
                 f.insert_behind(invalid_fringe)
-                self.invalid_fringe.append((invalid_fringe, e.valid_configs))
+                self.invalid_fringes.append((invalid_fringe, e.valid_configs))
 
     def set_reverse_deltas(self):
         for f in self.fringes:
             try:
                 f.determine_reverse_dh()
-            except InvalidSequnce as e:
+            except InvalidSequence as e:
                 pre_f = f.next_P
-                invalid_fringe = Fringe(0, (f.phi - pre_f.phi) / 2)
+                invalid_fringe = Fringe(0, pre_f.phi + pre_f.distance(f) / 2)
                 f.insert_ahead(invalid_fringe)
-                self.invalid_fringe.append((invalid_fringe, e.valid_configs))
+                self.invalid_fringes.append((invalid_fringe, e.valid_configs))
 
     def compute_cumulative_forward(self):
         pass
