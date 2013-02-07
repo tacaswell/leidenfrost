@@ -35,6 +35,7 @@ from collections import defaultdict
 import numpy as np
 
 import leidenfrost.infra as infra
+import leidenfrost.backends as backends
 
 
 class LFWorker(QtCore.QObject):
@@ -69,9 +70,9 @@ class LFWorker(QtCore.QObject):
         if self.process_backend is not None:
             self.process_backend.update_all_params(params)
 
-    def get_frame(self, ind):
+    def get_frame(self, ind, *args, **kwargs):
         if self.process_backend is not None:
-            tmp = self.process_backend.get_frame(ind)
+            tmp = self.process_backend.get_frame(ind, *args, **kwargs)
             return np.asarray(tmp, dtype=np.float)
         return None
 
@@ -84,11 +85,11 @@ class LFWorker(QtCore.QObject):
             return len(self.process_backend)
         return 0
 
-    @QtCore.Slot(infra.FilePath, dict)
+    @QtCore.Slot(backends.FilePath, dict)
     def set_new_fname(self, cine_fname, params):
 
         self.clear()
-        self.process_backend = infra.ProcessBackend.from_args(cine_fname,
+        self.process_backend = backends.ProcessBackend.from_args(cine_fname,
                                                               bck_img=None,
                                                               **params)
         self.file_loaded.emit(True, True)
@@ -96,7 +97,7 @@ class LFWorker(QtCore.QObject):
 
 class LFGui(QtGui.QMainWindow):
     proc = QtCore.Signal(int, infra.SplineCurve)
-    open_file_sig = QtCore.Signal(infra.FilePath, dict)
+    open_file_sig = QtCore.Signal(backends.FilePath, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
     spinner_lst = [
@@ -393,7 +394,7 @@ class LFGui(QtGui.QMainWindow):
         self.diag.setEnabled(False)
 
         path_, fname_ = os.path.split(fname[(len(self.paths_dict['cine base path']) + 1):])
-        new_cine_fname = infra.FilePath(self.paths_dict['cine base path'], path_, fname_)
+        new_cine_fname = backends.FilePath(self.paths_dict['cine base path'], path_, fname_)
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
         # reset spinners to default values
@@ -811,13 +812,13 @@ class LFReader(QtCore.QObject):
         else:
             return 0
 
-    @QtCore.Slot(infra.FilePath, str, dict)
+    @QtCore.Slot(backends.FilePath, str, dict)
     def set_fname(self, fname, cbp, kwargs):
         print 'entered set_fname'
         self.clear()
 
         print fname, cbp, kwargs
-        self.backend = infra.HdfBackend(fname,
+        self.backend = backends.HdfBackend(fname,
                                         cine_base_path=cbp,
                                         **kwargs)
         self.mbe = self.backend.get_frame(0,
@@ -831,7 +832,7 @@ class LFReader(QtCore.QObject):
 
 class LFReaderGui(QtGui.QMainWindow):
     read_request_sig = QtCore.Signal(int)
-    open_file_sig = QtCore.Signal(infra.FilePath, str, dict)
+    open_file_sig = QtCore.Signal(backends.FilePath, str, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
     cap_lst = ['hdf base path',
@@ -1009,7 +1010,7 @@ class LFReaderGui(QtGui.QMainWindow):
             hdf_bp = self.paths_dict['hdf base path']
 
         path_, fname_ = os.path.split(fname[(len(hdf_bp) + 1):])
-        new_hdf_fname = infra.FilePath(hdf_bp, path_, fname_)
+        new_hdf_fname = backends.FilePath(hdf_bp, path_, fname_)
 
         tmp_dict = {'cine_cache_dir': self.paths_dict['cine cache path'],
                     'hdf_cache_dir': self.paths_dict['hdf cache path']}
