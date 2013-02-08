@@ -18,7 +18,7 @@ from __future__ import division
 
 
 import time
-
+import itertools
 import numpy as np
 
 import numpy.fft as fft
@@ -907,6 +907,38 @@ def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_se
     return best_order, best_accum
 
 
+def link_run(source, dest, max_search_range):
+    '''
+    wrapper function for _link_run that handles setting up and parsing the output
+
+    assumes the objects that come in have a `set_next` method
+    '''
+    best_accum = np.inf
+    best_order = []
+    cur_accum = np.inf
+    cur_order = []
+    wsource = list(source)
+    wdest = list(dest)
+
+    best_order, best_accum = _link_run(best_accum, best_order, cur_accum, cur_order, wsource, wdest, max_search_range)
+
+    wsource = list(source)
+    wdest = list(dest)
+    res = []
+    for r in best_order:
+        if r == 0:
+            res.append((wsource.pop(0), wdest.pop(0)))
+        elif r == -1:
+            res.append((None, wdest.pop(0)))
+        elif r == 1:
+            res.append((wsource.pop(0), None))
+        else:
+            raise RuntimeError("should never reach this")
+
+    return res, best_accum
+
+
+
 # class FringeRing(object):
 #     '''
 #     A class to carry around and work with the location of fringes for
@@ -1150,11 +1182,8 @@ class Fringe(Point1D_circ):
                     else:
                         raise RuntimeError("should never hit this")
                 elif prev_p.charge == next_p.charge:
-                    # this is another configuration that needs more
-                    # than one total fringe insterted, only deal with
-                    # trailing case
                     if cur_p.color == prev_p.color:
-                        return False, [(-cur_p.color, prev_p.charge)]
+                        return False, [(-cur_p.color, 0)]
                     elif cur_p.color == next_p.color:
                         return True, None
                     else:
@@ -1180,6 +1209,22 @@ class Fringe(Point1D_circ):
                     # same color, same charge, missing fringe in run
                     return False, [(-cur_p.color, cur_p.charge)]
                 elif prev_p.charge == 0:
+                    prev_prev_p = prev_p.prev_P
+                    if prev_prev_p.color is None or prev_prev_p.color is None or prev_prev_p.color == cur_p.color:
+                        raise RuntimeError("here to break stuff, need to think about multiple near by fringes being added")
+                    elif prev_prev_p.color == -cur_p.color:
+                        # this should be the only valid place to hit
+                        while prev_prev_p.charge == 0:
+                            print 'it fixit loop'
+                            prev_prev_p = prev_prev_p.prev_P
+                        if prev_prev_p.charge == cur_p.charge:
+                            return False, [(-cur_p.color, 0)]
+                        elif prev_prev_p.charge == -cur_p.charge:
+                            return False, [(-cur_p.color, cur_p.charge)]
+                        else:
+                            raise RuntimeError("should never hit this")
+                    else:
+                        raise RuntimeError("should never hit this")
                     # only one possible insertion
                     return False, [(-cur_p.color, cur_p.charge)]
                 else:
@@ -1258,15 +1303,22 @@ class FringeRing(object):
         return np.cumsum([f.f_dh for f in self.fringes])
 
     def find_invalid_sequence(self):
+        list_tmp = []
         for f in self.fringes:
             valid, configs = f.is_valid_order()
             if not valid:
                 pre_f = f.prev_P
                 invalid_fringe = Fringe(0, pre_f.phi + pre_f.distance(f) / 2)
                 f.insert_behind(invalid_fringe)
-                self.invalid_fringes.append((invalid_fringe, configs))
+                # if there is only one option, just set it
+                if len(configs) == 1:
+                    invalid_fringe.set_color_charge(*configs[0])
+                    list_tmp.append(invalid_fringe)
+                else:
+                    self.invalid_fringes.append((invalid_fringe, configs))
 
         self.fringes.extend([f for f, _ in self.invalid_fringes])
+        self.fringes.extend(list_tmp)
         self.fringes.sort(key=lambda x: x.phi)
 
     def set_reverse_deltas(self):
@@ -1276,11 +1328,22 @@ class FringeRing(object):
         return np.cumsum([f.f_dh for f in self.fringes])
 
     def compute_cumulative_reverse(self):
-        pass
+        raise NotImplementedError()
 
-    def sort_out_invalid(self):
+    def plot_fringes(self, ax):
+        colors = ['r', 'b']
+        shapes = ['^', 'o', 'v']
+        lines = []
+        for color, c in zip([-1, 1], colors):
+            for charge, s in zip([-1, 0, 1], shapes):
+                phi, q = zip(*[(fr.phi, fr.q) for fr in self.fringes if fr.color == color and fr.charge == charge])
+                x, y = self.curve.q_phi_to_xy(q, phi)
+                lines.extend(ax.plot(x, y, linestyle='none', marker=s, color=c))
+        return lines
 
-        pass
+    def return_tracking_lists(self):
+        return [[fr for fr in self.fringes if fr.color == color and fr.charge == charge] for (color, charge) in
+                itertools.product([-1, 1], 2)]
 
 
 def get_rf(hf, j):
