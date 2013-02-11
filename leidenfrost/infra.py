@@ -77,7 +77,7 @@ class hash_line_angular(object):
         tmp_box = []
         for j in range(box_indx - bbuffer, box_indx + bbuffer + 1):
             j = j + self.bin_count if j < 0 else j
-            j = j - self.bin_count if j > self.bin_count else j
+            j = j - self.bin_count if j >= self.bin_count else j
             tmp_box.extend(self.boxes[j])
         return tmp_box
 
@@ -842,10 +842,12 @@ def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_se
     if len(source) == 0:
         tmp_accum = cur_accum + len(dest) * max_search_range
         if tmp_accum < best_accum:
+            print best_accum, len(source), len(dest), len(cur_order)
+            print cur_order
             # we have a winner
-            cur_order = cur_order[:]      # get a copy
-            cur_order.extend([1] * len(dest))
-            return cur_order, tmp_accum
+            best_order = cur_order[:]      # get a copy
+            best_order.extend([1] * len(dest))
+            return best_order, tmp_accum
         else:
             # old way is still best
             return best_order, best_accum
@@ -853,9 +855,12 @@ def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_se
     if len(dest) == 0:
         tmp_accum = cur_accum + len(source) * max_search_range
         if tmp_accum < best_accum:
-            cur_order = cur_order[:]      # get a copy
-            cur_order.extend([-1] * len(dest))
-            return cur_order, tmp_accum
+            print best_accum, len(source), len(dest), len(cur_order)
+            print cur_order
+            best_order = cur_order[:]      # get a copy
+            best_order.extend([1] * len(source))
+            return best_order, tmp_accum
+
         else:
             # old way is still best
             return best_order, best_accum
@@ -913,9 +918,9 @@ def link_run(source, dest, max_search_range):
 
     assumes the objects that come in have a `set_next` method
     '''
-    best_accum = np.inf
+    best_accum = ((len(source) + len(dest)) / 4) * max_search_range
     best_order = []
-    cur_accum = np.inf
+    cur_accum = 0
     cur_order = []
     wsource = list(source)
     wdest = list(dest)
@@ -925,6 +930,7 @@ def link_run(source, dest, max_search_range):
     wsource = list(source)
     wdest = list(dest)
     res = []
+    print best_order
     for r in best_order:
         if r == 0:
             res.append((wsource.pop(0), wdest.pop(0)))
@@ -981,7 +987,7 @@ class Fringe(Point1D_circ):
 
     '''
 
-    def __init__(self, q, phi):
+    def __init__(self, q, phi, frame_number=0):
         Point1D_circ.__init__(self, q=q, phi=phi)                  # initialize first base class
         # linked list for time
         self.next_T = None   #: next fringe in time
@@ -1007,16 +1013,18 @@ class Fringe(Point1D_circ):
         self.slope_r = None  #: the slope going backward
         self.slope = None    #: the 'average' slope at this point
 
-    def add_to_track(self, track):
-        if self.prev_T is not None:
-            raise Exception("This fringe already has a preceding fringe")
-        prev_F = track.last_point()
-        if prev_F.next_T is not None:
-            raise Exception("The last fringe in this track already has a next, something is very wrong")
-        self.prev_T = prev_F
-        prev_F.next_T = self
-        # pass it off to the super class
-        Point1D_circ.add_to_track(self, track)
+        self.frame_number = frame_number    #: the frame that this fringe belongs to
+
+    # def add_to_track(self, track):
+    #     if self.prev_T is not None:
+    #         raise Exception("This fringe already has a preceding fringe")
+    #     prev_F = track.last_point()
+    #     if prev_F.next_T is not None:
+    #         raise Exception("The last fringe in this track already has a next, something is very wrong")
+    #     self.prev_T = prev_F
+    #     prev_F.next_T = self
+    #     # pass it off to the super class
+    #     Point1D_circ.add_to_track(self, track)
 
     def remove_from_track(self, track):
         # re-link the linked list... not sure if we ever will _want_ to do this
@@ -1308,7 +1316,7 @@ class FringeRing(object):
             valid, configs = f.is_valid_order()
             if not valid:
                 pre_f = f.prev_P
-                invalid_fringe = Fringe(0, pre_f.phi + pre_f.distance(f) / 2)
+                invalid_fringe = Fringe(0, pre_f.phi + pre_f.distance(f) / 2, frame_number=f.frame_number)
                 f.insert_behind(invalid_fringe)
                 # if there is only one option, just set it
                 if len(configs) == 1:
@@ -1343,7 +1351,7 @@ class FringeRing(object):
 
     def return_tracking_lists(self):
         return [[fr for fr in self.fringes if fr.color == color and fr.charge == charge] for (color, charge) in
-                itertools.product([-1, 1], 2)]
+                itertools.product([-1, 1], repeat=2)]
 
 
 def get_rf(hf, j):
