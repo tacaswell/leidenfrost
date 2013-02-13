@@ -149,7 +149,7 @@ class LFDbWrapper(object):
 
 
 class LFmongodb(LFDbWrapper):
-    def __init__(self, host='10.9.8.1', port=27017, *args, **kwargs):
+    def __init__(self, host='10.8.0.1', port=27017, *args, **kwargs):
         LFDbWrapper.__init__(self, *args, **kwargs)
         self.connection = MongoClient(host, port)
         self.db = self.connection.LF
