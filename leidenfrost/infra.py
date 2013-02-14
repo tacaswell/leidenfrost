@@ -1218,12 +1218,14 @@ class Fringe(Point1D_circ):
                     return False, [(-cur_p.color, cur_p.charge)]
                 elif prev_p.charge == 0:
                     prev_prev_p = prev_p.prev_P
-                    if prev_prev_p.color is None or prev_prev_p.color is None or prev_prev_p.color == cur_p.color:
+                    if prev_prev_p.color is None or prev_prev_p.color is None:
                         raise RuntimeError("here to break stuff, need to think about multiple near by fringes being added")
+                    elif prev_prev_p.color == cur_p.color:
+                        return False, [(-cur_p.color, cur_p.charge)]
                     elif prev_prev_p.color == -cur_p.color:
                         # this should be the only valid place to hit
                         while prev_prev_p.charge == 0:
-                            print 'it fixit loop'
+                            print 'in fixit loop'
                             prev_prev_p = prev_prev_p.prev_P
                         if prev_prev_p.charge == cur_p.charge:
                             return False, [(-cur_p.color, 0)]
