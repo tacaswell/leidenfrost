@@ -553,7 +553,7 @@ class FringeRing(object):
 
         self.fringes = [Fringe(fcls, floc, self.frame_number) for fcls, floc in izip(f_classes, f_locs)]
 
-Def _get_fc_lists(mbe):
+def _get_fc_lists(mbe):
 
     colors = [-1, 1]
     f_classes = deque()
