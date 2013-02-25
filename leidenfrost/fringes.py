@@ -17,19 +17,21 @@
 from __future__ import division
 from itertools import tee, izip, cycle, product, islice
 from collections import namedtuple, defaultdict, deque
+import numpy as np
 
-fringe_c = namedtuple('fringe_c', ['color', 'charge', 'hint'])
+fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
+fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
 
 # set up all the look-up dictionaries
 # list of the needed combinations
-fringe_type_list = [fringe_c(1, 0, 1),
-                    fringe_c(1, 0, -1),
-                    fringe_c(1, 1, 0),
-                    fringe_c(1, -1, 0),
-                    fringe_c(-1, 0, 1),
-                    fringe_c(-1, 0, -1),
-                    fringe_c(-1, 1, 0),
-                    fringe_c(-1, -1, 0)]
+fringe_type_list = [fringe_cls(1, 0, 1),
+                    fringe_cls(1, 0, -1),
+                    fringe_cls(1, 1, 0),
+                    fringe_cls(1, -1, 0),
+                    fringe_cls(-1, 0, 1),
+                    fringe_cls(-1, 0, -1),
+                    fringe_cls(-1, 1, 0),
+                    fringe_cls(-1, -1, 0)]
 
 fringe_type_dict = dict(enumerate(fringe_type_list))
 fringe_type_dict.update(reversed(i) for i in fringe_type_dict.items())
@@ -118,7 +120,6 @@ forward_dh_dict[(fringe_type_dict[7], fringe_type_dict[4])] = 0
 forward_dh_dict[(fringe_type_dict[7], fringe_type_dict[1])] = 1
 
 
-
 def latex_print_pairs():
     '''
     Prints out the information in the look-up dictionaries in latex
@@ -157,11 +158,40 @@ def latex_print_pairs():
             '\\begin{eqnarray*}\n' + '\\\\\n'.join(res_lst) + '\n\end{eqnarray*}')
 
 
+# this should be replaced with a look-up table
+def get_valid_between(a, b):
+    '''Returns a tuple of the valid fringe types between fringes a and b '''
+    v_follow = set(valid_follow_dict[a])
+    v_prec = set(valid_precede_dict[b])
+    return tuple(v_follow & v_prec)
+
+
+### atomic validity tests
+def is_valid_3(a, b, c):
+    '''
+    returns if this is a valid sequence of fringes
+    '''
+    return a in valid_precede_dict[b] and c in valid_follow_dict[b]
+
+
+def is_valid_run(args):
+    '''Returns if this *non-periodic* run is a valid'''
+    return all([p in valid_precede_dict[f] for p, f in pairwise(args)])
+
+
+def is_valid_run_periodic(args):
+    '''Returns if this *periodic* run is a valid'''
+    return all([p in valid_precede_dict[f] for p, f in pairwise_periodic(args)])
+
+
 ### iterator toys
 
 # ganked from docs
 def roundrobin(*iterables):
-    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
+    """roundrobin('ABC', 'D', 'EF') --> A D E B F C
+
+    copied from documentation
+    """
     # Recipe credited to George Sakkis
     pending = len(iterables)
     nexts = cycle(iter(it).next for it in iterables)
@@ -174,13 +204,62 @@ def roundrobin(*iterables):
             nexts = cycle(islice(nexts, pending))
 
 
+#ganked from docs
+def pairwise(iterable):
+    """s -> (s0,s1), (s1,s2), (s2,s3), ...
+
+    copied from documentation
+    """
+    a, b = tee(iterable)
+    next(b, None)
+    return izip(a, b)
+
+
+def pairwise_periodic(iterable):
+    """s -> (s0,s1), (s1,s2), (s2,s3), ..., (sn,s0)
+
+    modified from example in documentation
+    """
+    a, b = tee(iterable)
+    b = cycle(b)
+    next(b, None)
+    return izip(a, b)
+
+
+def triple_wise_periodic(iterable):
+    """s -> (s0,s1,s2), (s1,s2,s3), ..., (sn,s0,s1)
+
+    modified from example in documentation
+    """
+    a, _b = tee(iterable)
+    b, c = tee(cycle(_b))
+    next(b, None)
+    next(c, None)
+    next(c, None)
+
+    return izip(a, b, c)
+
+
+def triple_wise(iterable):
+    """s -> (s0,s1,s2), (s1,s2,s3),
+
+    modified from example in documentation
+    """
+    a, b, c = tee(iterable, 3)
+    next(b, None)
+    next(c, None)
+    next(c, None)
+
+    return izip(a, b, c)
+
+##### find problematic runs
 
 def find_bad_runs(d):
     '''
     Takes in a list of bools, returns a list of tuples that are continuous False runs.
 
     Does not know if the list in periodic, so a run that is split across the beginging/end will
-    be 2 slices
+    be 2 slices -> rotate so that first and last are valid before
     '''
     d_len = len(d)
 
@@ -203,21 +282,20 @@ def find_bad_runs(d):
 
 def cleanup_fringes(fringe_list, fringe_locs):
     '''
-
     Assume that we only have (color, charge, hint) tuples, adapt this
     to objects later once we know _how_ to do this
     '''
     # step one, hint the zeros
-    fringe_list = list(fringe_list) # make a copy, and make sure it is really a list
+    fringe_list = list(fringe_list)  # make a copy, and make sure it is really a list
     ln_fr_lst = len(fringe_list)
     zero_hints = hint_zero_charges(fringe_list)
-    multiple_hint_region = set() # multiple valid hint configurations
+    multiple_hint_region = set()  # multiple valid hint configurations
     invalid_hint_region = set()  # no valid hint configurations, need to add a fringe
     for s, res in zero_hints.iteritems():
         print s, res
         if len(res) == 1:
             # replace the fringes in the fringe list with the deduced hinting
-            # the fringe_c objects are immuatble, so things that refer to this are now broken
+            # the fringe_cls objects are immuatble, so things that refer to this are now broken
             if s[1] < ln_fr_lst:
                 sl = slice(*s)
                 fringe_list[sl] = [_f._replace(hint=th) for _f, th in izip(fringe_list[sl], res[0])]
@@ -230,15 +308,12 @@ def cleanup_fringes(fringe_list, fringe_locs):
             multiple_hint_region.add(s)
         else:
             raise RuntimeError("Should never hit this")
-
-    d = list(is_valid_3(*p) for p in triple_wise_periodic(fringe_list))
-    d = d[:-1] + d[1:]  # to account for the offset in is_valid_3
     if all(d):
         # we are done, awesome
         print 'woo'
         return fringe_list, fringe_locs
 
-    bad_runs = find_bad_runs(d)
+
     ### TODO add check to make sure that the invalid fringe does not span the circular buffer edge
 
     ### filter out the runs that have multiple valid hinting configurations (still not sure that can really exist
@@ -248,99 +323,263 @@ def cleanup_fringes(fringe_list, fringe_locs):
         work_run = None
 
 
-def is_valid_3(a, b, c):
+def _valid_run_fixes_with_hinting(run, locs):
     '''
-    returns if this is a valid sequence of fringes
+
+    This takes a run of un-hinted invalid fringes and return valid runs that include both hinting and added fringes
+
     '''
-    return a in valid_precede_dict[b] and c in valid_follow_dict[b]
-
-
-def is_valid_run(args):
-    return all([p in valid_precede_dict[f] for p, f in pairwise(args)])
-
-
-def get_valid_between(a, b):
-    v_follow = set(valid_follow_dict[a])
-    v_prec = set(valid_precede_dict[b])
-    return list(v_follow & v_prec)
-
-
-#ganked from docs
-def pairwise(iterable):
-    "s -> (s0,s1), (s1,s2), (s2,s3), ..."
-    a, b = tee(iterable)
-    next(b, None)
-    return izip(a, b)
-
-
-def pairwise_periodic(iterable):
-    "s -> (s0,s1), (s1,s2), (s2,s3), ..., (sn,s0)"
-    a, b = tee(iterable)
-    b = cycle(b)
-    next(b, None)
-    return izip(a, b)
-
-
-def triple_wise_periodic(iterable):
-    "s -> (s0,s1,s2), (s1,s2,s3), ..., (sn,s0,s1)"
-    a, _b = tee(iterable)
-    b, c = tee(cycle(_b))
-    next(b, None)
-    next(c, None)
-    next(c, None)
-
-    return izip(a, b, c)
-
-
-def triple_wise(iterable):
-    "s -> (s0,s1,s2), (s1,s2,s3), "
-    a, b, c = tee(iterable, 3)
-    next(b, None)
-    next(c, None)
-    next(c, None)
-
-    return izip(a, b, c)
-
-
-def hint_zero_charges_run(a, zero_run, c):
-    valid_runs = []
-    for trial_hints in product([1, -1], repeat=len(zero_run)):
-        trial_run = [a] + [_f._replace(hint=th) for _f, th in izip(zero_run, trial_hints)] + [c]
-        if is_valid_run(trial_run):
-            valid_runs.append(trial_hints)
-    return valid_runs
-
-
-def hint_zero_charges(fringes):
     j = 0
-    f_count = len(fringes)
-    #k -> j, v -> hint or None
-    hints_dict = {}
-    while j < f_count:
-        b = fringes[j]
-        if b.charge == 0:
-            zero_run = deque([b])
-            start_j = j
-            a = fringes[(start_j - 1) % f_count]
-            if len(zero_run) < f_count:
-                while a.charge == 0:
-                    start_j -= 1
-                    zero_run.appendleft(a)
-                    if len(zero_run) == f_count:
-                        break
 
-                    a = fringes[(start_j - 1) % f_count]
+    zero_runs = []
+    while j < len(run):
+        print j
+        if run[j].charge != 0:
+            j += 1
+            continue
+        elif run[j].charge == 0:
+            run_start = j
+            k = j + 1
+            while k < len(run) and run[k].charge == 0:
+                k += 1
+            run_end = k
+            j = k + 1
+            zero_runs.append((run_start, run_end))
 
-            end_j = j + 1
-            c = fringes[(end_j) % f_count]
-            if len(zero_run) < f_count:
-                while c.charge == 0:
-                    zero_run.append(c)
-                    if len(zero_run) == f_count:
-                        break
-                    end_j += 1
-                    c = fringes[(end_j) % f_count]
+    valid_runs = []
+    valid_locs = []
+    # the product of all the possible combinations of all of the zero runs (this should be 2 ** N),
+    # we have to do this in this funny broken up way because we could have 1 0 0 1 0 1 which will show up
+    # as a single long run of invalid fringes
 
-            hints_dict[(start_j, end_j)] = hint_zero_charges_run(a, zero_run, c)
-        j += 1
-    return hints_dict
+    for trial_hints in product(*[product([-1, 1], repeat=len(z_r)) for z_r in zero_runs]):
+
+        # make local copy of the list
+        trial_run = list(run)
+        trial_locs = list(locs)
+        # apply all of the hints
+        for hint, z_r in izip(trial_hints, zero_runs):
+            cur_slice = slice(*z_r)
+            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in izip(trial_run[cur_slice], hint)]
+        d = list(is_valid_3(*p) for p in triple_wise(trial_run))
+
+        if all(d):
+            # just setting the hints was enough and the configuration is happy
+            valid_runs.append(trial_run)
+            valid_locs.append(trial_locs)
+            continue
+
+        print trial_run
+        d = [True] + d[-1:] + d[:-1] + [True]  # shift due to off set in is_valid_3 and tack the ends back on
+        res = find_bad_runs(d)
+        slices = [slice(*_r) for _r in res]
+
+        valid_sub_regions = [valid_run_fixes(trial_run[s_], trial_locs[s_]) for s_ in slices]
+        v_sub_runs, v_locs = zip(*valid_sub_regions)
+        for vsr_prod in product(*v_sub_runs):
+            for vsr, s_, vsl in izip(vsr_prod[::-1], slices[::-1], v_locs[::-1]):
+                print  s_
+                print 'vsr', vsr
+                print 'vsl', vsl
+                # do this loop backwards so slices stay valid
+                l_trial_runs = list(trial_run)
+                l_trial_locs = list(trial_locs)
+                print d
+
+                l_trial_runs[s_] = vsr
+                l_trial_locs[s_] = vsl
+            print list(is_valid_3(*p) for p in triple_wise(trial_run))
+            if is_valid_run(l_trial_runs):
+                valid_runs.append(l_trial_runs)
+                valid_locs.append(l_trial_locs)
+
+    return valid_runs, valid_locs
+
+
+def _valid_run_fixes(run, locs):
+    '''
+    This takes a run of fringes with no hinting issues and returns possible
+    '''
+    possible_insertions = []
+    possible_locs = []
+    for (a, b), (a_loc, b_loc) in izip(pairwise(run), pairwise(locs)):
+        pi = set(valid_follow_dict[a]) & set(valid_precede_dict[b])
+        possible_insertions.append(pi)
+        phi_dist = (a_loc[1] - b_loc[1])
+        if phi_dist > np.pi:
+            phi_dist = 2 * np.pi - phi_dist
+        phi_dist /= 2
+
+        possible_locs.append((0, b_loc[1] + phi_dist))
+
+    vaild_runs = []
+
+    for pi in product(*possible_insertions):
+        pos_run = list(roundrobin(run, pi))
+
+        if all(is_valid(pos_run)):
+            vaild_runs.append(pos_run)
+
+    new_locs = list(roundrobin(locs, possible_locs))
+    return vaild_runs, new_locs
+
+
+class Fringe(Point1D_circ):
+    '''
+    Version of :py:class:`Point1D_circ` for representing fringes
+
+    '''
+
+    def __init__(self, f_class, f_loc, frame_number):
+        Point1D_circ.__init__(self, q=f_loc.q, phi=f_loc.phi)                  # initialize first base class
+
+        self.f_class = f_class            #: fringe class
+
+        # linked list for time
+        self.next_T = None   #: next fringe in time
+        self.prev_T = None   #: prev fringe in time
+        # linked list for space
+        self.next_P = None   #: next fringe in angle
+        self.prev_P = None   #: prev fringe in angle
+
+        # properties of fringe shape
+        # self.q and self, phi are set by Point1D_circ __init__
+
+        self.f_dh = None     #: dh figured going forward
+        self.r_dh = None     #: dh figured going backwards
+        self.f_cumh = None   #: the cumulative shift counting forward
+        self.r_cumh = None   #: the cumulative shift counting forward
+
+        self.abs_height = None   #: the height of this fringe as given by tracking in time
+
+        self.slope_f = None  #: the slope going forward
+        self.slope_r = None  #: the slope going backward
+        self.slope = None    #: the 'average' slope at this point
+
+        self.frame_number = frame_number    #: the frame that this fringe belongs to
+
+    def remove_from_track(self, track):
+        # re-link the linked list... not sure if we ever will _want_ to do this
+        if self.prev_T is not None:
+            self.prev_T.next_T = self.next_T
+        if self.next_T is not None:
+            self.next_T.prev_T = self.prev_T
+        Point1D_circ.remove_from_track(self, track)
+
+    def insert_ahead(self, other):
+        '''
+        Inserts `other` ahead of this Fringe in the spatial linked-list
+        '''
+        if self.next_P is not None:
+            self.next_P.prev_P = other
+            other.next_P = self.next_P
+
+        self.next_P = other
+        other.prev_P = self
+
+    def insert_behind(self, other):
+        '''
+        Inserts other behind this Fringe in the spatial linked-list
+        '''
+        if self.prev_P is not None:
+            self.prev_P.next_P = other
+            other.prev_P = self.prev_P
+
+        self.prev_P = other
+        other.next_P = self
+
+    def remove_R(self):
+        '''
+        Removes this Fringe from the spatial linked-list
+        '''
+        if self.prev_P is not None:
+            self.prev_P.next_P = self.next_P
+        if self.next_P is not None:
+            self.next_P.prev_P = self.prev_P
+
+        self.remove_from_track(self.track)
+
+
+class FringeRing(object):
+    '''
+    A class to carry around Fringe data
+    '''
+    def __init__(self, mbe):
+        '''Extracts the data from the mbe, cleans up the fringes, and constructs the `Fringe` objects needed for tracking. '''
+        self.frame_number = mbe.frame_number
+        self.curve = mbe.curve
+
+        f_classes, f_locs = _get_fc_lists(mbe)
+
+        d = deque(is_valid_3(*p) for p in triple_wise_periodic(f_classes))
+        # rotate to deal with offset of 1 in is_valid_3
+        d.rotate(1)
+        # if there are any in-valid fringes, we need to try and patch them up
+        if not all(d):
+            # if an invalid run spans the loop over point, rotate everything
+            while d[0] is False and d[-1] is False:
+                d.rotate(1)
+                f_classes.rotate(1)
+                f_locs.rotate(1)
+
+            # get the bad runs
+            bad_runs = find_bad_runs(d)
+            fixes = list()
+            for br in bad_runs:
+                slc = slice(*br)
+                working_classes = f_classes[slc]
+                working_locs = f_locs[slc]
+                if any([f.charge == 0 for f in working_locs]):
+                    # we have at least one zero fringe
+                    fixes.append(_valid_run_fixes_with_hinting(working_classes, working_locs))
+                else:
+                    fixes.append(_valid_run_fixes(working_classes, working_locs))
+
+            best_lst = None
+            min_miss = np.inf
+            for props in product(fixes):
+                working_class_lst = list(f_classes)
+                working_locs_lst = list(f_locs)
+                for (prop_c, prop_l), br in izip(props, bad_runs):
+                    slc = slice(br)
+                    working_class_lst[slc] = prop_c
+                    working_locs_lst[slc] = prop_l
+                miss_count = np.sum([forward_dh_dict[a, b] for a, b in pairwise_periodic(working_class_lst)])
+                if miss_count < min_miss:
+                    min_miss = miss_count
+                    best_lst = (working_class_lst, working_locs_lst)
+
+            f_classes, f_locs = best_lst
+
+        self.fringes = [Fringe(fcls, floc, self.frame_number) for fcls, floc in izip(f_classes, f_locs)]
+
+Def _get_fc_lists(mbe):
+
+    colors = [-1, 1]
+    f_classes = deque()
+    f_locs = deque()
+    junk_fringes = []
+
+    # convert the curve to X,Y
+    XY = np.vstack(mbe.curve.q_phi_to_xy(0,
+                                         np.linspace(0, 2 * np.pi, 2 ** 10)))
+    # get center
+    center = np.mean(XY, 1)
+    # get relative position of first point
+    first_pt = center - XY[:, 0]
+    # get the off set angle of the first
+    th_offset = np.arctan2(first_pt[1], first_pt[0])
+
+    for color, trk_lst in izip(colors, mbe.trk_lst):
+        for t in trk_lst:
+            t.classify2()
+            if t.charge is not None:
+                f_locs.append(fringe_loc(t.q, np.mod(t.phi + th_offset, 2 * np.pi)))
+                f_classes.append(fringe_cls(color, t.charge, 0))
+            else:
+                junk_fringes.append(t)
+
+    f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs), key=lambda x: x[1][1]))
+    # TODO: deal with junk fringes in sensible way
+
+    return f_classes, f_locs

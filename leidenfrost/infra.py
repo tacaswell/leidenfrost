@@ -945,353 +945,47 @@ def link_run(source, dest, max_search_range):
 
 
 
-# class FringeRing(object):
-#     '''
-#     A class to carry around and work with the location of fringes for
-#     the purpose of tracking a fixed height faring from frame to frame.
-#     '''
-#     def __init__(self, theta, charge, th_offset=0, ringID=None):
 
-#         rel_height, th_new = construct_corrected_profile((theta, charge),
-#                                                          th_offset)
-
-#         self.fringes = []
-
-#         for th, h in zip(th_new, rel_height):
-
-#             self.fringes.append(Point1D_circ(ringID, th, h))
-
-#     def __iter__(self):
-#         return self.fringes.__iter__()
-
-#     def plot_fringe_flat(self, ax, **kwargs):
-#         q, phi = zip(*sorted([(f.q, f.phi) for f in self.fringes],
-#                              key=lambda x: x[1]))
-#         ax.plot(phi, q, **kwargs)
-#         plt.draw()
+def get_rf(hf, j):
+    mbe = hf[j]
+    th_offset = mbe.get_theta_offset()
+    rf = FringeRing(mbe.res[0][1],
+                    mbe.res[0][0],
+                    th_offset=th_offset,
+                    ringID=j)
+    return rf
 
 
-class FringeRun(object):
-    '''
-    A class to carry around 'runs' of fringes, that is fringes of the same charge in a row.
-    '''
-    def __init__(self, thetas, run_charge):
-        self.theta = np.mean(thetas)
-        self.thetas = thetas
-        self.charge = run_charge
+def _fit_quad_to_peak(x, y):
+    """
+    Fits a quadratic to the data points handed in
+    to the from y = b[0](x-b[1]) + b[2]
 
+    x -- locations
+    y -- values
 
-class Fringe(Point1D_circ):
-    '''
-    Version of :py:class:`Point1D_circ` for representing fringes
+    returns (b, R2)
 
-    '''
+    """
 
-    def __init__(self, q, phi, frame_number=0):
-        Point1D_circ.__init__(self, q=q, phi=phi)                  # initialize first base class
-        # linked list for time
-        self.next_T = None   #: next fringe in time
-        self.prev_T = None   #: prev fringe in time
-        # linked list for space
-        self.next_P = None   #: next fringe in angle
-        self.prev_P = None   #: prev fringe in angle
-        # properties of fringe shape
-        self.charge = None   #: up or down [-1, 0, 1]
-        self.R2 = None       # how well shape in described by quadratic
-        # self.q and self, phi are set by Point1D_circ __init__
-        self.color = None    #: if this is a light or dark fringe [-1, 1]
-        # properties of fringe height
+    lenx = len(x)
 
-        self.f_dh = None     #: dh figured going forward
-        self.r_dh = None     #: dh figured going backwards
-        self.f_cumh = None   #: the cumulative shift counting forward
-        self.r_cumh = None   #: the cumulative shift counting forward
+    # some sanity checks
+    if lenx < 3:
+        raise Exception('insufficient points handed in ')
+    # set up fitting array
+    X = np.vstack((x ** 2, x, np.ones(lenx))).T
+    # use linear least squares fitting
+    beta, _, _, _ = np.linalg.lstsq(X, y)
 
-        self.height = None   #: the height of this fringe as given by tracking in time
+    SSerr = np.sum(np.power(np.polyval(beta, x) - y, 2))
+    SStot = np.sum(np.power(y - np.mean(y), 2))
+    # re-map the returned value to match the form we want
+    ret_beta = (beta[0],
+                -beta[1] / (2 * beta[0]),
+                beta[2] - beta[0] * (beta[1] / (2 * beta[0])) ** 2)
 
-        self.slope_f = None  #: the slope going forward
-        self.slope_r = None  #: the slope going backward
-        self.slope = None    #: the 'average' slope at this point
-
-        self.frame_number = frame_number    #: the frame that this fringe belongs to
-
-    # def add_to_track(self, track):
-    #     if self.prev_T is not None:
-    #         raise Exception("This fringe already has a preceding fringe")
-    #     prev_F = track.last_point()
-    #     if prev_F.next_T is not None:
-    #         raise Exception("The last fringe in this track already has a next, something is very wrong")
-    #     self.prev_T = prev_F
-    #     prev_F.next_T = self
-    #     # pass it off to the super class
-    #     Point1D_circ.add_to_track(self, track)
-
-    def remove_from_track(self, track):
-        # re-link the linked list... not sure if we ever will _want_ to do this
-        if self.prev_T is not None:
-            self.prev_T.next_T = self.next_T
-        if self.next_T is not None:
-            self.next_T.prev_T = self.prev_T
-        Point1D_circ.remove_from_track(self, track)
-
-    def insert_ahead(self, other):
-        '''
-        Inserts `other` ahead of this Fringe in the spatial linked-list
-        '''
-        if self.next_P is not None:
-            self.next_P.prev_P = other
-            other.next_P = self.next_P
-
-        self.next_P = other
-        other.prev_P = self
-
-    def insert_behind(self, other):
-        '''
-        Inserts other behind this Fringe in the spatial linked-list
-        '''
-        if self.prev_P is not None:
-            self.prev_P.next_P = other
-            other.prev_P = self.prev_P
-
-        self.prev_P = other
-        other.next_P = self
-
-    def remove_R(self):
-        '''
-        Removes this Fringe from the spatial linked-list
-        '''
-        if self.prev_P is not None:
-            self.prev_P.next_P = self.next_P
-        if self.next_P is not None:
-            self.next_P.prev_P = self.prev_P
-
-    def determine_forward_dh(self):
-        '''
-        Looks at the trailing fringe and figures out what the delta
-        from that fringe to this one should be.
-
-        Raises an exception of there is an invalid sequence
-        '''
-
-        prev = self.prev_P
-        cur = self
-        if prev is None:
-            raise RuntimeError("should not have called this function with out a valid angular linkage")
-        if prev.color is None or prev.charge is None:
-            self.f_dh = None
-            raise RuntimeError("The previous fringe in invalid")
-        if cur.charge is None or cur.color is None:
-            self.f_dh = None
-            raise RuntimeError("The current fringe in invalid")
-        if prev.color == cur.color:
-            # the fringes are the same color (light-light or dark-dark)
-            # then they must have opposite charge.
-            if prev.charge == -cur.charge:
-                # they have opposite charge
-                # no height change between these two fringes (inner fringes on extrema
-                self.f_dh = 0
-            else:
-                self.f_dh = None
-                # they do not have opposite charge, this is a problem
-                if cur.charge == 0:
-                    raise InvalidSequence([(-prev.color, prev.charge)], 'same color, next 0')
-                elif prev.charge == 0:
-                    raise InvalidSequence([(-cur.color, cur.charge)], 'same color, prev 0')
-                else:
-                    raise InvalidSequence([(-prev.color, prev.charge)], 'same color, same charge')
-        else:
-            # they have different color
-            if prev.charge == 0 and prev.charge == 0:
-                self.f_dh = -np.sign(prev.prev_P.charge)
-            elif prev.charge == 0:
-                self.f_dh = np.sign(cur.charge)
-            elif cur.charge == 0:
-                self.f_dh = np.sign(prev.charge)
-            elif prev.charge == cur.charge:
-                self.f_dh = np.sign(cur.charge)
-            else:
-                # they have different charges, both are non-zero, and
-                # different colors, this is a problem
-                self.f_dh = None
-                raise InvalidSequence([(prev.color, -prev.charge),
-                                       (cur.color, -cur.charge)
-                                       ], 'different color, different charge')
-
-    def is_valid_order(self):
-        '''
-        Looks at the region around a fringe an determines if it is valid or not.
-
-        If it looks good, it will return (True, None)
-
-        If it looks like the current fringe is miss-classified, fix it and return (True, None)
-
-        If there is a missing fringe, return (False, [(color,charge),..])
-
-        '''
-        prev_p = self.prev_P
-        cur_p = self
-
-        if prev_p is None:
-            raise RuntimeError("should not have called this function with out a valid angular linkage")
-        if prev_p.color is None or prev_p.charge is None:
-            return True, None  # can't tell
-        if cur_p.charge is None or cur_p.color is None:
-            return True, None  # can't tell
-
-        if cur_p.charge == 0:
-            # need the next fringe to reason about charge 0 fringes
-            next_p = self.next_P
-            if next_p is None:
-                raise RuntimeError("should not have called this function with out a valid angular linkage")
-            # bracket by same color
-            if prev_p.color == next_p.color:
-                if prev_p.charge == -next_p.charge:
-                    if prev_p.color != cur_p.color:
-                        # this zero is in an extreama happy day (or a run of 3 zeros)
-                        return True, None
-                    elif prev_p.color == cur_p.color:
-                        # we have three things in the same color and charge in a row
-                        # because we always insert _behind_ the current fringe when
-                        # we add extra fringes, only worry about fixing the trailing gap
-                        return False, [(-prev_p.color, prev_p.charge)]
-                    else:
-                        raise RuntimeError("should never hit this")
-                elif prev_p.charge == next_p.charge:
-                    if cur_p.color == prev_p.color:
-                        # deal only with the trailing correction
-                        return False, [(-cur_p.color, prev_p.charge)]
-                    elif cur_p.color != prev_p.color:
-                        # this is the case of a zero in the middle of a run, probably a miss classification
-                        cur_p.charge = prev_p.charge
-                        return True, None
-                    else:
-                        raise RuntimeError("should never hit this")
-                elif prev_p.charge == 0 or next_p.charge == 0:
-                    if prev_p.color == cur_p.color:
-                        return False, [(-prev_p.color, prev_p.charge)]
-                    elif prev_p.color != cur_p.color:
-                        return True, None
-                    else:
-                        raise RuntimeError("should never hit this")
-
-                else:
-                    raise RuntimeError("should never hit this")
-            # bracketed by different colors
-            elif prev_p.color != next_p.color:
-                if prev_p.charge == -next_p.charge:
-                    # this is likely a fringe incorrectly labeled as zero charge
-                    # and is really the other side of an exmtrema pair
-                    if cur_p.color == prev_p.color:
-                        cur_p.charge = -prev_p.charge
-                        return True, None
-                    elif cur_p.color == next_p.color:
-                        cur_p.charge = -next_p.charge
-                        return True, None
-                    else:
-                        raise RuntimeError("should never hit this")
-                elif prev_p.charge == next_p.charge:
-                    if cur_p.color == prev_p.color:
-                        return False, [(-cur_p.color, 0)]
-                    elif cur_p.color == next_p.color:
-                        return True, None
-                    else:
-                        raise RuntimeError("should never hit this")
-                elif prev_p.charge == 0 or next_p.charge == 0:
-                    if prev_p.color == cur_p.color:
-                        return False, [(-prev_p.color, prev_p.charge)]
-                    elif prev_p.color != cur_p.color:
-                        return True, None
-                    else:
-                        raise RuntimeError("should never hit this")
-                else:
-                    raise RuntimeError("should never hit this")
-            else:
-                raise RuntimeError("should never hit this")
-
-        elif cur_p.charge != 0:
-            if prev_p.color == cur_p.color:
-                if prev_p.charge == -cur_p.charge:
-                    # same color, opposite charge -> extrema we are happy
-                    return True, None
-                elif prev_p.charge == cur_p.charge:
-                    # same color, same charge, missing fringe in run
-                    return False, [(-cur_p.color, cur_p.charge)]
-                elif prev_p.charge == 0:
-                    prev_prev_p = prev_p.prev_P
-                    if prev_prev_p.color is None or prev_prev_p.color is None:
-                        raise RuntimeError("here to break stuff, need to think about multiple near by fringes being added")
-                    elif prev_prev_p.color == cur_p.color:
-                        return False, [(-cur_p.color, cur_p.charge)]
-                    elif prev_prev_p.color == -cur_p.color:
-                        # this should be the only valid place to hit
-                        while prev_prev_p.charge == 0:
-                            print 'in fixit loop'
-                            prev_prev_p = prev_prev_p.prev_P
-                        if prev_prev_p.charge == cur_p.charge:
-                            return False, [(-cur_p.color, 0)]
-                        elif prev_prev_p.charge == -cur_p.charge:
-                            return False, [(-cur_p.color, cur_p.charge)]
-                        else:
-                            raise RuntimeError("should never hit this")
-                    else:
-                        raise RuntimeError("should never hit this")
-                    # only one possible insertion
-                    return False, [(-cur_p.color, cur_p.charge)]
-                else:
-                    raise RuntimeError("should never hit this")
-
-            elif prev_p.color != cur_p.color:
-                if prev_p.charge == -cur_p.charge:
-                    # this is a blown extrma, could be one of two fringes
-                    return False, [(prev_p.color, -prev_p.charge),
-                                   (cur_p.color, -cur_p.charge)]
-                elif prev_p.charge == cur_p.charge:
-                    # on a run
-                    return True, None
-                elif prev_p.charge == 0:
-                    return True, None
-                else:
-                    raise RuntimeError("should never hit this")
-
-            else:
-                raise RuntimeError("should never hit this")
-
-        else:
-            raise RuntimeError("should never hit this")
-        print cur_p.charge, cur_p.color
-        raise RuntimeError("should never hit this")
-
-    def determine_reverse_dh(self):
-        '''
-        Looks at the trailing fringe and figures out what the delta
-        from that fringe to this one should be
-
-        Raises an exception of there is an invalid sequence
-        '''
-        pass
-
-    def set_color_charge(self, color, charge):
-        self.color = color
-        self.charge = charge
-
-    def clear_color_charge(self):
-        self.color = None
-        self.charge = None
-
-    def __unicode__(self):
-        return 'q: %0.2f, phi: %0.2f, charge: %s, color: %s' % (self.q, self.phi, str(self.charge), str(self.color))
-
-    def __str__(self):
-        return unicode(self).encode('utf-8')
-
-    def __repr__(self):
-        return 'Fringe(%f, %f, %s, %s)' % (self.q, self.phi, str(self.charge), str(self.color))
-
-
-class InvalidSequence(Exception):
-    def __init__(self, valid_configs, msg='', *args, **kwargs):
-        Exception.__init__(self, msg, *args, **kwargs)
-        self.valid_configs = valid_configs
+    return ret_beta, 1 - SSerr / SStot
 
 
 class FringeRing(object):
@@ -1354,45 +1048,3 @@ class FringeRing(object):
     def return_tracking_lists(self):
         return [[fr for fr in self.fringes if fr.color == color and fr.charge == charge] for (color, charge) in
                 itertools.product([-1, 1], repeat=2)]
-
-
-def get_rf(hf, j):
-    mbe = hf[j]
-    th_offset = mbe.get_theta_offset()
-    rf = FringeRing(mbe.res[0][1],
-                    mbe.res[0][0],
-                    th_offset=th_offset,
-                    ringID=j)
-    return rf
-
-
-def _fit_quad_to_peak(x, y):
-    """
-    Fits a quadratic to the data points handed in
-    to the from y = b[0](x-b[1]) + b[2]
-
-    x -- locations
-    y -- values
-
-    returns (b, R2)
-
-    """
-
-    lenx = len(x)
-
-    # some sanity checks
-    if lenx < 3:
-        raise Exception('insufficient points handed in ')
-    # set up fitting array
-    X = np.vstack((x ** 2, x, np.ones(lenx))).T
-    # use linear least squares fitting
-    beta, _, _, _ = np.linalg.lstsq(X, y)
-
-    SSerr = np.sum(np.power(np.polyval(beta, x) - y, 2))
-    SStot = np.sum(np.power(y - np.mean(y), 2))
-    # re-map the returned value to match the form we want
-    ret_beta = (beta[0],
-                -beta[1] / (2 * beta[0]),
-                beta[2] - beta[0] * (beta[1] / (2 * beta[0])) ** 2)
-
-    return ret_beta, 1 - SSerr / SStot
