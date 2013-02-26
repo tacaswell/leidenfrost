@@ -582,21 +582,21 @@ class FringeRing(object):
 
         f_classes, f_locs = _get_fc_lists(mbe)
 
-        d = deque(is_valid_3(*p) for p in triple_wise_periodic(f_classes))
+        d = list(is_valid_3(*p) for p in triple_wise_periodic(f_classes))
         # rotate to deal with offset of 1 in is_valid_3
-        d.rotate(1)
+        d = d[-1:] + d[:-1]
         # if there are any in-valid fringes, we need to try and patch them up
         if not all(d):
             # if an invalid run spans the loop over point, rotate everything and has at least 2 fringes padding
             while d[0] is False or d[-1] is False or d[-1] is False or d[-2] is False:
-                d.rotate(1)
+                d = d[-1:] + d[:-1]
                 f_classes = f_classes[-1:] + f_classes[:-1]
                 f_locs = f_locs[-1:] + f_locs[:-1]
 
             # get the bad runs
             bad_runs = find_bad_runs(d)
             # provide some more padding
-            bad_runs = [(br[0] - 1, br[1] + 1) for br in bad_runs]
+            bad_runs = [(br[0], br[1]) for br in bad_runs]
             fixes = list()
             for br in bad_runs:
                 slc = slice(*br)
@@ -607,10 +607,10 @@ class FringeRing(object):
                     fix_ = _valid_run_fixes_with_hinting(working_classes, working_locs)
                     fixes.append(fix_)
                 else:
-                    fix_ = _valid_run_fixes(working_classes[1:-1], working_locs[1:-1])
+                    fix_ = _valid_run_fixes(working_classes, working_locs)
 
-                    fixes.append([[working_classes[:1] + fx + working_classes[-1:] for fx in fix_[0]],
-                                  [working_locs[:1] + fix_[1]] + working_locs[-1:] * len(fix_[0])])
+                    fixes.append([fix_[0],
+                                  [fix_[1]] * len(fix_[0])])
 
             best_lst = None
             min_miss = np.inf
