@@ -353,7 +353,8 @@ def _valid_run_fixes_with_hinting(run, locs):
     # the product of all the possible combinations of all of the zero runs (this should be 2 ** N),
     # we have to do this in this funny broken up way because we could have 1 0 0 1 0 1 which will show up
     # as a single long run of invalid fringes
-    print 'zero runs', zero_runs
+
+    # do the loop with _only_ hinting correction
     for trial_hints in product(*[product([-1, 1], repeat=z_r[1] - z_r[0]) for z_r in zero_runs]):
         # make local copy of the list
         trial_run = list(run)
@@ -370,9 +371,25 @@ def _valid_run_fixes_with_hinting(run, locs):
             valid_locs.append(trial_locs)
             continue
 
+    # if we found hinting-only valid runs, then return
+    if len(valid_runs) > 0:
+        return valid_runs, valid_locs
 
-        # this section still needs work
-        d = [True] + d + [True]  # add edges back on
+    # we made it this far, so we need to do hinting + corrections
+    for trial_hints in product(*[product([-1, 1], repeat=z_r[1] - z_r[0]) for z_r in zero_runs]):
+        # make local copy of the list
+        trial_run = list(run)
+        trial_locs = list(locs)
+        # apply all of the hints
+        for hint, z_r in izip(trial_hints, zero_runs):
+            cur_slice = slice(*z_r)
+            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in izip(trial_run[cur_slice], hint)]
+        d = list(is_valid_3(*p) for p in triple_wise(trial_run))
+
+        # add the edges back (that got cut-off by the triple iterator
+        d = ([trial_run[1] in valid_follow_dict[trial_run[0]]] +
+             d +
+             [trial_run[-2] in valid_precede_dict[trial_run[-1]]])
         res = find_bad_runs(d)
         slices = [slice(*_r) for _r in res]
 
@@ -391,7 +408,48 @@ def _valid_run_fixes_with_hinting(run, locs):
                 valid_runs.append(l_trial_runs)
                 valid_locs.append(l_trial_locs)
 
+    if len(valid_locs) > 0:
+        if len(valid_runs) > 5:
+            print 'hinting + adding'
+            print len(valid_runs), [format_fringe_txt(_f) for _f in run]
+        return valid_runs, valid_locs
+
+    # so, we have made it this far and not found a valid
+    # configuration, hueristically do something stupid related to the
+    # fact that some of our 0 charge fringes are miss-identified (really should fix this in
+    # the location/classify step, but alea iacta est.
+    print [format_fringe_txt(f) for f in run]
+    striped_run, striped_locs = zip(*[(_r, _l) for _r, _l in zip(run, locs) if _r.charge != 0])
+    d = list(is_valid_3(*p) for p in triple_wise(striped_run))
+
+    # add the edges back (that got cut-off by the triple iterator
+    d = ([trial_run[1] in valid_follow_dict[trial_run[0]]] +
+         d +
+         [trial_run[-2] in valid_precede_dict[trial_run[-1]]])
+    res = find_bad_runs(d)
+    print res
+    slices = [slice(*_r) for _r in res]
+
+    valid_sub_regions = [_valid_run_fixes(striped_run[s_], striped_locs[s_]) for s_ in slices]
+    v_sub_runs, v_locs = zip(*valid_sub_regions)
+    for vsr_prod in product(*v_sub_runs):
+        for vsr, s_, vsl in izip(vsr_prod[::-1], slices[::-1], v_locs[::-1]):
+            # do this loop backwards so slices stay valid
+            l_trial_runs = list(striped_run)
+            l_trial_locs = list(striped_locs)
+
+            l_trial_runs[s_] = vsr
+            l_trial_locs[s_] = vsl
+
+        if is_valid_run(l_trial_runs):
+            valid_runs.append(l_trial_runs)
+            valid_locs.append(l_trial_locs)
+
+    if len(valid_runs) > 5:
+        print 'stip'
+        print len(valid_runs), [format_fringe_txt(_f) for _f in run]
     return valid_runs, valid_locs
+    #
 
 
 def _valid_run_fixes(run, locs, add_zcharge=True):
@@ -401,6 +459,7 @@ def _valid_run_fixes(run, locs, add_zcharge=True):
     possible_insertions = []
     possible_locs = []
     for (a, b), (a_loc, b_loc) in izip(pairwise(run), pairwise(locs)):
+        # make this a look up!
         pi = set(valid_follow_dict[a]) & set(valid_precede_dict[b])
         if not add_zcharge:
             pi = [_p for _p in pi if _p.charge != 0]
@@ -412,16 +471,20 @@ def _valid_run_fixes(run, locs, add_zcharge=True):
 
         possible_locs.append(fringe_loc(0, b_loc[1] + phi_dist))
 
-    vaild_runs = []
+    valid_runs = []
 
     for pi in product(*possible_insertions):
         pos_run = list(roundrobin(run, pi))
 
         if is_valid_run(pos_run):
-            vaild_runs.append(pos_run)
+            valid_runs.append(pos_run)
 
     new_locs = list(roundrobin(locs, possible_locs))
-    return vaild_runs, new_locs
+
+    if len(valid_runs) > 5:
+        print 'without hinting'
+        print len(valid_runs), [format_fringe_txt(f) for f in run]
+    return valid_runs, new_locs
 
 
 class Fringe(Point1D_circ):
@@ -544,9 +607,10 @@ class FringeRing(object):
                     fix_ = _valid_run_fixes_with_hinting(working_classes, working_locs)
                     fixes.append(fix_)
                 else:
-                    fix_ = _valid_run_fixes(working_classes, working_locs)
+                    fix_ = _valid_run_fixes(working_classes[1:-1], working_locs[1:-1])
 
-                    fixes.append([fix_[0], [fix_[1]] * len(fix_[0])])
+                    fixes.append([[working_classes[:1] + fx + working_classes[-1:] for fx in fix_[0]],
+                                  [working_locs[:1] + fix_[1]] + working_locs[-1:] * len(fix_[0])])
 
             best_lst = None
             min_miss = np.inf
@@ -564,12 +628,12 @@ class FringeRing(object):
                     working_class_lst[slc] = p
                     working_locs_lst[slc] = loc
 
-                print is_valid_run_periodic(working_class_lst)
-
                 # count up how much we missed by
                 miss_count = np.sum([forward_dh_dict[a, b] for a, b in pairwise_periodic(working_class_lst)])
                 # if better than current best, store this one
                 if np.abs(miss_count) < min_miss:
+                    if miss_count == 0:
+                        print 'good enough'
                     min_miss = np.abs(miss_count)
                     best_lst = (working_class_lst, working_locs_lst)
 
