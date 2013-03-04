@@ -82,6 +82,7 @@ class HdfBackend(object):
         try:
             self.db = db.LFmongodb()  # hard code the mongodb
         except:
+            print 'gave up and the DB'
             # this eats _ALL_ exceptions
             self.db = None
 
