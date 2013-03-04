@@ -281,48 +281,50 @@ def find_bad_runs(d):
 
     return res
 
+def _hinting_only(run, locs):
+    '''Only try to guess hinting, return empty lists if this will require  '''
+    j = 0
 
-def cleanup_fringes(fringe_list, fringe_locs):
-    '''
-    Assume that we only have (color, charge, hint) tuples, adapt this
-    to objects later once we know _how_ to do this
-    '''
-    # step one, hint the zeros
-    fringe_list = list(fringe_list)  # make a copy, and make sure it is really a list
-    ln_fr_lst = len(fringe_list)
-    zero_hints = hint_zero_charges(fringe_list)
-    multiple_hint_region = set()  # multiple valid hint configurations
-    invalid_hint_region = set()  # no valid hint configurations, need to add a fringe
-    for s, res in zero_hints.iteritems():
-        print s, res
-        if len(res) == 1:
-            # replace the fringes in the fringe list with the deduced hinting
-            # the fringe_cls objects are immuatble, so things that refer to this are now broken
-            if s[1] < ln_fr_lst:
-                sl = slice(*s)
-                fringe_list[sl] = [_f._replace(hint=th) for _f, th in izip(fringe_list[sl], res[0])]
-            else:
-                raise NotImplementedError("need to write this code")
+    zero_runs = []
+    while j < len(run):
 
-        elif len(res) == 0:
-            invalid_hint_region.add(s)
-        elif len(res) > 1:
-            multiple_hint_region.add(s)
-        else:
-            raise RuntimeError("Should never hit this")
-    if all(d):
-        # we are done, awesome
-        print 'woo'
-        return fringe_list, fringe_locs
+        if run[j].charge != 0:
+            j += 1
+            continue
+        elif run[j].charge == 0:
+            run_start = j
+            k = j + 1
+            while k < len(run) and run[k].charge == 0:
+                k += 1
+            run_end = k
+            j = k + 1
+            zero_runs.append((run_start, run_end))
+
+    valid_runs = []
+    valid_locs = []
+    # the product of all the possible combinations of all of the zero runs (this should be 2 ** N),
+    # we have to do this in this funny broken up way because we could have 1 0 0 1 0 1 which will show up
+    # as a single long run of invalid fringes
+
+    # do the loop with _only_ hinting correction
+    for trial_hints in product(*[product([-1, 1], repeat=z_r[1] - z_r[0]) for z_r in zero_runs]):
+        # make local copy of the list
+        trial_run = list(run)
+        trial_locs = list(locs)
+        # apply all of the hints
+        for hint, z_r in izip(trial_hints, zero_runs):
+            cur_slice = slice(*z_r)
+            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in izip(trial_run[cur_slice], hint)]
+        d = list(is_valid_3(*p) for p in triple_wise(trial_run))
+
+        if all(d):
+            # just setting the hints was enough and the configuration is happy
+            valid_runs.append(trial_run)
+            valid_locs.append(trial_locs)
+            continue
 
 
-    ### TODO add check to make sure that the invalid fringe does not span the circular buffer edge
-
-    ### filter out the runs that have multiple valid hinting configurations (still not sure that can really exist
-    slices = [slice(*j) for j in bad_runs]
-    trial_corrections = []
-    for s_ in slices:
-        work_run = None
+    return valid_runs, valid_locs
 
 
 def _valid_run_fixes_with_hinting(run, locs):
@@ -510,6 +512,8 @@ class Fringe(Point1D_circ):
 
         self.frame_number = frame_number    #: the frame that this fringe belongs to
 
+        self.region = np.nan #: region of the khymograph
+
     def remove_from_track(self, track):
         # re-link the linked list... not sure if we ever will _want_ to do this
         if self.prev_T is not None:
@@ -551,6 +555,22 @@ class Fringe(Point1D_circ):
 
         self.remove_from_track(self.track)
 
+    def valid_follower(self, other):
+        return other.f_class in valid_follow_dict[self.f_class]
+
+    def forward_dh(self):
+        other = self.next_P
+        if self.valid_follower(other):
+            return forward_dh_dict[(self.f_class, other.f_class)]
+        return np.nan
+
+    def reverse_dh(self):
+        other = self.prev_P
+        if other.valid_follower(self):
+            return forward_dh_dict[(other.f_class, self.f_class)]
+        return np.nan
+
+
 t_format_dicts = [{1:'B', -1:'D'},
                   {1:'L', 0:'_', -1:'R'},
                   {1:'P', 0:'_', -1:'S'}]
@@ -572,7 +592,8 @@ class FringeRing(object):
         f_classes, f_locs = _get_fc_lists(mbe)
 
         self.fringes = [Fringe(fcls, floc, self.frame_number) for fcls, floc in izip(f_classes, f_locs)]
-
+        for a, b in pairwise_periodic(self.fringes):
+            a.insert_ahead(b)
 
 def _clean_fringes(f_classes, f_locs):
     d = list(is_valid_3(*p) for p in triple_wise_periodic(f_classes))
