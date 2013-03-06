@@ -366,11 +366,7 @@ class LFGui(QtGui.QMainWindow):
         self.diag.show()
 
     def save_config(self):
-        fname, _ = QtGui.QFileDialog.getSaveFileName(self,
-                                                     caption='Save File',
-                                                     dir=self.paths_dict['cine base path'])
-        if len(fname) > 0:
-                self.worker.process_backend.gen_stub_h5(fname, self.cur_curve)
+        self.worker.process_backend.write_config(self.cur_curve)
 
     def open_file(self):
 
