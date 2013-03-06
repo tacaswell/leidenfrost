@@ -17,6 +17,7 @@
 from __future__ import division, print_function
 
 import cine.cine
+from datetime import datetime
 import cPickle
 
 import pymongo
@@ -118,12 +119,24 @@ class LFDbWrapper(object):
         '''
         raise NotImplementedError('you must define this is a sub class')
 
-    def add_proc(self, cine_hash, data, **kwargs):
+    def store_proc(self, cine_hash, config_key, file_out, **kwargs):
         '''
         Adds information about processing a data set to the data base
 
         :param cine_hash: A unique identifier for the data set of interest.
-        :param data: a dictionary with the data in it
+        :param config_key: A unique ID for the configuration used
+        :param file_out: a `leidenfrost.FilePath` object
+
+        `**kwargs` can be used to pass implementation specific arguements
+        '''
+        raise NotImplementedError('you must define this is a sub class')
+
+    def store_config(self, cine_hash, data, **kwargs):
+        '''
+        Adds a configuration to the store
+
+        :param cine_hash: A unique identifier for the data set of interest.
+        :param data: a dictionary with the configuration meta-data in it
 
         `**kwargs` can be used to pass implementation specific arguements
         '''
@@ -131,16 +144,28 @@ class LFDbWrapper(object):
 
 
 class LFmongodb(LFDbWrapper):
+    col_map = {'bck_img': 'backimg_collection',  # collection for the background images
+               'movs': 'movie_collection',  # collection for pointing to movies
+               'proc': 'proc_collection',  # collection for point to the results of processing a cine
+               'config': 'config_collection'  # collection of configurations used for procs
+               }
+
     def __init__(self, host='10.8.0.1', port=27017, *args, **kwargs):
         LFDbWrapper.__init__(self, *args, **kwargs)
         self.connection = MongoClient(host, port)
         self.db = self.connection.LF
-        self.bck_img_coll = self.db.backimg_collection
-        self.bck_img_coll.ensure_index('cine', unique=True)
+        self.coll_dict = {}
+        self.coll_dict['bck_img'] = self.db[self.col_map['bck_img']]
+        self.coll_dict['bck_img'].ensure_index('cine', unique=True)
+        for f in self.col_map:
+            if f is 'bck_img':
+                pass
+            self.coll_dict[f] = self.db[self.col_map[f]]
+            self.coll_dict[f].ensure_index('cine')
         pass
 
     def get_background_img(self, cine_hash):
-        record = self.bck_img_coll.find_one({'cine': cine_hash})
+        record = self.coll_dict['bck_img'].find_one({'cine': cine_hash})
         if record is None:
             return None
         return cPickle.loads(record['bck_img'])
@@ -150,7 +175,7 @@ class LFmongodb(LFDbWrapper):
         record = {'cine': cine_hash}
         record['bck_img'] = bson.binary.Binary(bck_img.dumps())
         try:
-            self.bck_img_coll.insert(record)
+            self.coll_dict['bck_img'].insert(record)
         except pymongo.errors.DuplicateKeyError as e:
             if overwrite:
                 self.rm_background_img(cine_hash)
@@ -160,28 +185,44 @@ class LFmongodb(LFDbWrapper):
                 raise BackImgClash(e.message)
 
     def rm_background_img(self, cine_hash):
-        self.bck_img_coll.remove({'cine': cine_hash})
+        self.coll_dict['bck_img'].remove({'cine': cine_hash})
 
     def get_all_configs(self, cine_hash):
-
-        raise NotImplementedError('you must define this is a sub class')
+        return [_ for _ in self.coll_dict['config'].find({'cine': cine_hash})]
 
     def get_proced_configs(self, cine_hash):
-
-        raise NotImplementedError('you must define this is a sub class')
+        return [_ for _ in self.coll_dict['config'].find({'$and': [{'cine': cine_hash}, {"proced": True}]})]
 
     def get_unproced_configs(self, cine_hash):
+        return [_ for _ in self.coll_dict['config'].find({'$and': [{'cine': cine_hash}, {"proced": False}]})]
 
-        raise NotImplementedError('you must define this is a sub class')
-
-    def get_config_by_key(self, key):
-
-        raise NotImplementedError('you must define this is a sub class')
+    def get_config_by_key(self, config_key):
+        if isinstance(config_key, str):
+            config_key = bson.objectid.ObjectId(config_key)
+        return self.coll_dict['config'].find_one({'_id': config_key})
 
     def get_procs(self, cine_hash):
 
         raise NotImplementedError('you must define this is a sub class')
 
-    def add_proc(self, cine_hash, data, **kwargs):
+    def store_proc(self, cine_hash, config_key, file_out, **kwargs):
+        record = {'cine': cine_hash}
+        record['conig_key'] = config_key
+        f_dict = file_out._asdict()
+        f_dict.pop('base_path', None)  # don't want to save the base_path part
+        record['out_file'] = f_dict
+        record['time_stamp'] = datetime.now()
+        p_id = self.coll_dict['proc'].insert(record)
+        # code goes here to update the config entries
+        config_record = self.coll_dict['config'].find_one({'_id': config_key})
+        config_record['proc_keys'].append(p_id)
+        config_record['proced'] = True
+        self.coll_dict['config'].save(config_record)
 
-        raise NotImplementedError('you must define this is a sub class')
+    def store_config(self, cine_hash, data, **kwargs):
+        record = {'cine': cine_hash}
+        record['config'] = data
+        record['time_stamp'] = datetime.now()
+        record['proced'] = False
+        record['proc_keys'] = []
+        self.coll_dict['config'].insert(record)
