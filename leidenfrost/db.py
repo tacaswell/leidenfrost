@@ -28,24 +28,6 @@ class BackImgClash(RuntimeError):
     pass
 
 
-class ParamWrapper(object):
-    '''
-    Simple class to wrap configurations up nicely
-    '''
-    def __init__(self, config, date, processed):
-        '''
-        :param config: A dictionary of parameters
-        :type config: `dict`
-        :param date: the date of saving the parameters
-        :type date: `datetime.datetime`
-        :param processed: if this set of parameters has ever been run on the full data set
-        :type processed: `bool`
-        '''
-        self.config = config
-        self.date = date
-        self.processed = processed
-
-
 class LFDbWrapper(object):
     '''
     An ABC for dealing with talking to a data base.
