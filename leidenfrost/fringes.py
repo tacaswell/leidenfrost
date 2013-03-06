@@ -17,6 +17,10 @@
 from __future__ import division
 from itertools import tee, izip, cycle, product, islice
 from collections import namedtuple, defaultdict, deque
+
+import scipy.ndimage as ndi
+from scipy.ndimage.interpolation import map_coordinates
+
 import numpy as np
 
 from infra import Point1D_circ
@@ -504,7 +508,7 @@ class Fringe(Point1D_circ):
         self.f_cumh = None   #: the cumulative shift counting forward
         self.r_cumh = None   #: the cumulative shift counting forward
 
-        self.abs_height = None   #: the height of this fringe as given by tracking in time
+
 
         self.slope_f = None  #: the slope going forward
         self.slope_r = None  #: the slope going backward
@@ -513,6 +517,7 @@ class Fringe(Point1D_circ):
         self.frame_number = frame_number    #: the frame that this fringe belongs to
 
         self.region = np.nan #: region of the khymograph
+        self.abs_height = None   #: the height of this fringe as given by tracking in time
 
     def remove_from_track(self, track):
         # re-link the linked list... not sure if we ever will _want_ to do this
@@ -594,6 +599,10 @@ class FringeRing(object):
         self.fringes = [Fringe(fcls, floc, self.frame_number) for fcls, floc in izip(f_classes, f_locs)]
         for a, b in pairwise_periodic(self.fringes):
             a.insert_ahead(b)
+
+    def __iter__(self):
+        return self.fringes.__iter__()
+
 
 def _clean_fringes(f_classes, f_locs):
     d = list(is_valid_3(*p) for p in triple_wise_periodic(f_classes))
@@ -686,3 +695,238 @@ def _get_fc_lists(mbe):
     # TODO: deal with junk fringes in sensible way
 
     return list(f_classes), list(f_locs)
+
+
+class Region_map(object):
+    @staticmethod
+    def _label_regions(mask, size_cut, structure):
+
+        if structure is not None:
+            mask = ndi.binary_erosion(mask, structure=structure, border_value=1)
+        #    mask = ndi.binary_propagation(mask)
+
+        lab_regions, nb = ndi.label(mask)
+        sizes = ndi.sum(mask, lab_regions, range(nb + 1))
+        print len(sizes)
+        mask_sizes = sizes < size_cut
+        print sum(mask_sizes)
+        remove_pix = mask_sizes[lab_regions]
+        lab_regions[remove_pix] = 0
+        # loop to make periodic
+        for j in range(lab_regions.shape[1]):
+            top_lab = lab_regions[0,j]
+            bot_lab = lab_regions[-1,j]
+            if top_lab != bot_lab and top_lab != 0 and bot_lab != 0:
+               lab_regions[lab_regions == bot_lab] = top_lab
+
+
+        labels = np.unique(lab_regions)
+        lab_regions = np.searchsorted(labels, lab_regions)
+        return lab_regions, len(labels)
+
+    @classmethod
+    def from_backend(cls, backend, n_frames=None,  **kwargs):
+        if n_frames is None:
+            n_frames = len(backend)
+        img_bck_grnd_slices = []
+        fringe_rings = []
+        for j in range(n_frames):
+            print j
+            mbe = backend.get_frame(j, img=True, raw=True)
+
+            fringe_rings.append(FringeRing(mbe))
+            curve = mbe.get_next_spline()
+            img = mbe.img
+
+            # convert the curve to X,Y
+            XY = np.vstack(mbe.curve.q_phi_to_xy(0,
+                                                 np.linspace(0, 2 * np.pi, 2 ** 10)))
+            # get center
+            center = np.mean(XY, 1)
+            # get relative position of first point
+            first_pt = center - XY[:, 0]
+            # get the off set angle of the first
+            th_offset = np.arctan2(first_pt[1], first_pt[0])
+
+            XY = np.vstack(mbe.curve.q_phi_to_xy(0,
+                                                 -th_offset + np.linspace(0, 2 * np.pi, 2 ** 12)))
+            img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
+
+        working_img = np.vstack(img_bck_grnd_slices).T
+
+        return cls(working_img, FRs=fringe_rings, **kwargs)
+
+    def __init__(self, working_img, FRs, thresh=0, size_cut=100, structure=None):
+        up_mask = working_img > 1 + thresh
+        down_mask = working_img < 1 - thresh
+
+        lab_bright_regions, nb_br = self._label_regions(up_mask, size_cut, structure)
+        lab_dark_regions, nb_dr = self._label_regions(down_mask, size_cut, structure)
+        lab_dark_regions[lab_dark_regions > 0] += nb_br
+
+        self.fring_rings = FRs
+        self.label_regions = lab_dark_regions + lab_bright_regions
+        self.height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
+        self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
+        self.region_fringes = [[] for j in range(nb_br + nb_dr)]
+        self.working_img = working_img
+
+        for FR in self.fring_rings:
+            for fr in FR:
+                theta_indx = int((np.mod(fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
+                label = self.label_regions[theta_indx, fr.frame_number]
+                fr.region = label
+                fr.abs_height = np.nan
+                self.region_fringes[label].append(fr)
+
+
+    def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
+        height_img = self.height_img
+        if ax is None:
+            # make this smarter
+            ax = plt.gca()
+
+
+        my_cmap = cm.get_cmap(cmap)
+        my_cmap.set_bad(alpha=0)
+
+
+        frac_size = 4
+        step = fractions.Fraction(1, frac_size)
+        ax.set_yticks([np.pi * j * step for j in range(2 * frac_size + 1)])
+        ax.set_yticklabels([format_frac(j * step) + '$\pi$'
+                              for j in range(2 * frac_size + 1)])
+
+        ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]) )
+        ax.set_ylabel(r'$\theta$')
+
+        data = self.label_regions
+
+
+        ax.imshow(height_img,
+                  interpolation='none',
+                  cmap=my_cmap,
+                  extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                  aspect='auto',
+            origin='bottom',
+            )
+        if bckgnd:
+            ax.imshow(self.working_img,
+                      interpolation='none',
+                      cmap='gray',
+            extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+            aspect='auto',
+            origin='bottom',alpha=alpha)
+
+    def display_region(self, n, ax=None):
+
+        if ax is None:
+            # make this smarter
+            ax = plt.gca()
+
+        norm_br = matplotlib.colors.Normalize(vmin=.5, vmax=np.max(data), clip=False)
+        my_cmap = cm.get_cmap('jet')
+        my_cmap.set_under(alpha=0)
+
+        ax.imshow(n * (data == n),
+                  cmap=my_cmap,
+                  norm=norm_br,
+                  aspect='auto')
+        ax.figure.canvas.draw()
+
+    def get_height(self, frame_num, theta):
+        theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
+        label = self.label_regions[theta_indx, frame_num]
+        return self.height_map[label]
+
+    def _set_height(self, fr, height, overwrite=False):
+
+
+        label = fr.region
+        assert not np.isnan(label), 'label should not be nan'
+        # we can't do anything with points in the un-labeled regions of the image
+        if label == 0:
+            return
+        if not overwrite and not isnan(self.height_map[label]):
+            # we won't over-write at this region already has a height
+            # TODO make this a custom exception
+            raise RuntimeError("already set the height of this region!")
+
+        self.height_map[label] = height
+        self.height_img[self.label_regions == label] = height
+        for _fr in self.region_fringes[label]:
+            _fr.abs_height = height
+
+    def set_height(self, frame_num, theta, height, overwrite=False):
+        theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
+
+        label = self.label_regions[theta_indx, frame_num]
+        # we can't do anything with points in the un-labeled regions of the image
+        if label == 0:
+            print 'label is 0'
+            return
+        if not overwrite and not isnan(self.height_map[label]):
+            # we won't over-write at this region already has a height
+            # TODO make this a custom exception
+            raise RuntimeError("already set the height of this region!")
+
+        self.height_map[label] = height
+        self.height_img[self.label_regions == label] = height
+
+    def _boot_strap_frame(self, j):
+
+        FR = self.fring_rings[j]
+        for fr in FR.fringes:
+            fr.abs_height = self.get_height(j, fr.phi)
+
+        invalid_fringes = [fr for fr in FR.fringes if np.isnan(fr.abs_height) and fr.region > 0]
+
+        try_again_flag = len(invalid_fringes) > 0
+        while try_again_flag:
+            try_again_flag = False
+            invalid_fringes = [fr for fr in invalid_fringes if np.isnan(fr.abs_height) and fr.region > 0]
+            for fr in invalid_fringes:
+                if isnan(fr.abs_height):
+                    # we need to try to figure out the height
+                    prev = fr.prev_P
+                    nexp = fr.next_P
+                    if prev.valid_follower(fr):
+                        # if previous to current is a valid combination
+                        p_h = prev.abs_height
+                        if not isnan(p_h):
+                            # only set the height if the fringes on either side agree
+                            dh_prev = prev.forward_dh()
+                            self._set_height(fr, p_h + dh_prev)
+                            try_again_flag = True
+
+                    elif fr.valid_follower(nexp):
+                        n_h = nexp.abs_height
+                        if not isnan(n_h):
+                            dh_next = fr.forward_dh()
+                            self._set_height(fr, n_h - dh_next)
+                            try_again_flag = True
+
+    def boot_strap(self):
+        for j in range(self.label_regions.shape[1]):
+            if j % 100 == 0:
+                print j
+            self._boot_strap_frame(j)
+
+    def seed_frame0(self):
+        FR = self.fring_rings[0]
+        first_frame_dh, ff_phi = [np.array(_) for _ in zip(*[(fr.forward_dh(), fr.phi) for fr in FR])]
+        invalid_steps, = np.where(np.isnan(first_frame_dh))
+        best_run_start = argmax(diff(invalid_steps))
+
+        h = 0
+        slic = slice(invalid_steps[best_run_start] + 1, invalid_steps[best_run_start + 1])
+        for j in range(invalid_steps[best_run_start] + 1, invalid_steps[best_run_start + 1]):
+            print 'h: ', h
+            try:
+                self.set_height(0, ff_phi[j], h)
+            except RuntimeError:
+                eh = self.get_height(0, ff_phi[j])
+                print eh, h
+                h = eh
+
+            h += first_frame_dh[j]
