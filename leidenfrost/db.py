@@ -219,9 +219,10 @@ class LFmongodb(LFDbWrapper):
         config_record['proced'] = True
         self.coll_dict['config'].save(config_record)
 
-    def store_config(self, cine_hash, data, **kwargs):
+    def store_config(self, cine_hash, config_dict, curves_dict, **kwargs):
         record = {'cine': cine_hash}
-        record['config'] = data
+        record['config'] = config_dict
+        record['curves'] = curves_dict
         record['time_stamp'] = datetime.now()
         record['proced'] = False
         record['proc_keys'] = []

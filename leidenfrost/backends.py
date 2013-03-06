@@ -291,6 +291,12 @@ class ProcessBackend(object):
         self._verify_params(params)
         self.params = params
 
+    def write_config(self, seed_curve):
+        if self.db is None:
+            raise RuntimeError("need a valid db object to do this")
+        tmpcurve_dict = {[(lab, _tck.dumps()) for lab, _tck in zip(['tck0', 'tck1', 'tck2'], seed_curve.tck)]}
+        self.db.store_config(self.cine_.hash, self.params, {0: tmpcurve_dict})
+
     def gen_stub_h5(self, h5_fname, seed_curve):
         '''Generates a h5 file that can be read back in for later
         processing.  This assumes that the location of the h5 file is
