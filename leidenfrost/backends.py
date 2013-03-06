@@ -35,8 +35,8 @@ import collections
 
 import leidenfrost.db as db
 import leidenfrost.infra as infra
+from leidenfrost import FilePath
 
-FilePath = collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
 
