@@ -72,7 +72,7 @@ class LFWorker(QtCore.QObject):
 
     def get_frame(self, ind, *args, **kwargs):
         if self.process_backend is not None:
-            tmp = self.process_backend.get_frame(ind, *args, **kwargs)
+            tmp = self.process_backend.get_image(ind, *args, **kwargs)
             return np.asarray(tmp, dtype=np.float)
         return None
 

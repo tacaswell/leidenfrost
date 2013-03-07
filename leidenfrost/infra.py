@@ -215,7 +215,7 @@ class lf_Track(Track):
         ln.payload = weakref.ref(self)
         return ln
 
-    def classify2(self, min_len=None, min_extent=None, straddle=True, **kwargs):
+    def classify2(self, min_len=5, min_extent=None, straddle=True, **kwargs):
         '''
         :param min_len: the minimum length a track must be to considered
         :param min_extent: the minimum extent in :py:attr:`q` the of the track
@@ -224,6 +224,9 @@ class lf_Track(Track):
         Classification function which sorts out the charge of the track.
 
         '''
+        # this is here because if the length is too small, it will blow up the quad fit
+        if min_len < 5:
+            min_len = 5
         phi, q = zip(*[(p.phi, p.q) for p in self.points])
         q = np.asarray(q)
         # if the track is less than 25, don't try to classify

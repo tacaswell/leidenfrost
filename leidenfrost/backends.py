@@ -17,7 +17,7 @@
 
 from __future__ import division
 import itertools
-
+import cPickle
 import os
 
 import numpy as np
@@ -251,7 +251,7 @@ class ProcessBackend(object):
 
     def process_frame(self, frame_number, curve):
         # get the raw data, and convert to float
-        tmp_img = self.get_frame(frame_number)
+        tmp_img = self.get_image(frame_number)
 
         tm, trk_res, tim, tam, miv, mav = infra.proc_frame(curve,
                                                            tmp_img,
@@ -294,7 +294,7 @@ class ProcessBackend(object):
     def write_config(self, seed_curve):
         if self.db is None:
             raise RuntimeError("need a valid db object to do this")
-        tmpcurve_dict = {[(lab, _tck.dumps()) for lab, _tck in zip(['tck0', 'tck1', 'tck2'], seed_curve.tck)]}
+        tmpcurve_dict = dict((lab, cPickle.dumps(_tck, cPickle.HIGHEST_PROTOCOL)) for lab, _tck in zip(['tck0', 'tck1', 'tck2'], seed_curve.tck))
         self.db.store_config(self.cine_.hash, self.params, {0: tmpcurve_dict})
 
     def gen_stub_h5(self, h5_fname, seed_curve):
