@@ -20,6 +20,7 @@ from __future__ import division
 import time
 import itertools
 import numpy as np
+import cPickle
 
 import numpy.fft as fft
 import matplotlib.pyplot as plt
@@ -509,6 +510,10 @@ class SplineCurve(object):
                parent_group.attrs['tck1'],
                parent_group.attrs['tck2']]
         return cls(tck)
+
+    @classmethod
+    def from_pickle_dict(cls, pickle_dict):
+        tck = [cPickle.loads(pickle_dict[_tk]) for _tk in ['tck0', 'tck1', 'tck2']]
 
     def __init__(self, tck):
         '''A really hacky way of doing different
