@@ -513,7 +513,8 @@ class SplineCurve(object):
 
     @classmethod
     def from_pickle_dict(cls, pickle_dict):
-        tck = [cPickle.loads(pickle_dict[_tk]) for _tk in ['tck0', 'tck1', 'tck2']]
+        tck = [cPickle.loads(str(pickle_dict[_tk])) for _tk in ['tck0', 'tck1', 'tck2']]
+        return cls(tck)
 
     def __init__(self, tck):
         '''A really hacky way of doing different
