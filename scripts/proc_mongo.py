@@ -48,7 +48,7 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
     db = ldb.LFmongodb()
 
     ch = cine.Cine(cine_fname.format).hash
-    config_dict_lst = db.get_all_configs(ch)
+    config_dict_lst = db.get_unproced_configs(ch)
 
     for config_dict in config_dict_lst:
         print cine_fname
