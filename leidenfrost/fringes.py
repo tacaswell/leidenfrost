@@ -589,12 +589,12 @@ class FringeRing(object):
     '''
     A class to carry around Fringe data
     '''
-    def __init__(self, mbe):
+    def __init__(self, mbe, reclassify=False):
         '''Extracts the data from the mbe, cleans up the fringes, and constructs the `Fringe` objects needed for tracking. '''
         self.frame_number = mbe.frame_number
         self.curve = mbe.curve
 
-        f_classes, f_locs = _get_fc_lists(mbe)
+        f_classes, f_locs = _get_fc_lists(mbe, reclassify)
 
         self.fringes = [Fringe(fcls, floc, self.frame_number) for fcls, floc in izip(f_classes, f_locs)]
         for a, b in pairwise_periodic(self.fringes):
@@ -665,7 +665,7 @@ def _clean_fringes(f_classes, f_locs):
     return f_classes, f_locs
 
 
-def _get_fc_lists(mbe):
+def _get_fc_lists(mbe, reclassify):
 
     colors = [-1, 1]
     f_classes = deque()
@@ -681,15 +681,20 @@ def _get_fc_lists(mbe):
     first_pt = center - XY[:, 0]
     # get the off set angle of the first
     th_offset = np.arctan2(first_pt[1], first_pt[0])
-
-    for color, trk_lst in izip(colors, mbe.trk_lst):
-        for t in trk_lst:
-            t.classify2()
-            if t.charge is not None:
-                f_locs.append(fringe_loc(t.q, np.mod(t.phi + th_offset, 2 * np.pi)))
-                f_classes.append(fringe_cls(color, t.charge, 0))
-            else:
-                junk_fringes.append(t)
+    if reclassify:
+        for color, trk_lst in izip(colors, mbe.trk_lst):
+            for t in trk_lst:
+                t.classify2()
+                if t.charge is not None:
+                    f_locs.append(fringe_loc(t.q, np.mod(t.phi + th_offset, 2 * np.pi)))
+                    f_classes.append(fringe_cls(color, t.charge, 0))
+                else:
+                    junk_fringes.append(t)
+    else:
+        for res_lst, color in izip(mbe.res, colors):
+            for charge, phi, q in izip(*res_lst):
+                f_locs.append(fringe_loc(q, np.mod(phi + th_offset, 2 * np.pi)))
+                f_classes.append(fringe_cls(color, charge, 0))
 
     f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs), key=lambda x: x[1][1]))
     # TODO: deal with junk fringes in sensible way
@@ -725,17 +730,20 @@ class Region_map(object):
         return lab_regions, len(labels)
 
     @classmethod
-    def from_backend(cls, backend, n_frames=None,  **kwargs):
+    def from_backend(cls, backend, n_frames=None, reclassify=False, **kwargs):
         if n_frames is None:
             n_frames = len(backend)
         img_bck_grnd_slices = []
         fringe_rings = []
         for j in range(n_frames):
             print j
-            mbe = backend.get_frame(j, img=True, raw=True)
+            mbe = backend.get_frame(j, img=True, raw=reclassify)
 
-            fringe_rings.append(FringeRing(mbe))
-            curve = mbe.get_next_spline()
+            fringe_rings.append(FringeRing(mbe, reclassify=reclassify))
+            if reclassify:
+                curve = mbe.get_next_spline()
+            else:
+                curve = mbe.curve
             img = mbe.img
 
             # convert the curve to X,Y
