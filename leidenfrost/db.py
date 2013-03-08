@@ -227,3 +227,7 @@ class LFmongodb(LFDbWrapper):
         record['proced'] = False
         record['proc_keys'] = []
         self.coll_dict['config'].insert(record)
+
+    def remove_proc(self, proc_key):
+        # need to write this...
+        pass
