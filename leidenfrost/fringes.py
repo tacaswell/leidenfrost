@@ -18,6 +18,8 @@ from __future__ import division
 from itertools import tee, izip, cycle, product, islice
 from collections import namedtuple, defaultdict, deque
 
+from matplotlib import cm
+import fractions
 import scipy.ndimage as ndi
 from scipy.ndimage.interpolation import map_coordinates
 
@@ -855,7 +857,7 @@ class Region_map(object):
         # we can't do anything with points in the un-labeled regions of the image
         if label == 0:
             return
-        if not overwrite and not isnan(self.height_map[label]):
+        if not overwrite and not np.isnan(self.height_map[label]):
             # we won't over-write at this region already has a height
             # TODO make this a custom exception
             raise RuntimeError("already set the height of this region!")
@@ -873,7 +875,7 @@ class Region_map(object):
         if label == 0:
             print 'label is 0'
             return
-        if not overwrite and not isnan(self.height_map[label]):
+        if not overwrite and not np.isnan(self.height_map[label]):
             # we won't over-write at this region already has a height
             # TODO make this a custom exception
             raise RuntimeError("already set the height of this region!")
@@ -894,14 +896,14 @@ class Region_map(object):
             try_again_flag = False
             invalid_fringes = [fr for fr in invalid_fringes if np.isnan(fr.abs_height) and fr.region > 0]
             for fr in invalid_fringes:
-                if isnan(fr.abs_height):
+                if np.isnan(fr.abs_height):
                     # we need to try to figure out the height
                     prev = fr.prev_P
                     nexp = fr.next_P
                     if prev.valid_follower(fr):
                         # if previous to current is a valid combination
                         p_h = prev.abs_height
-                        if not isnan(p_h):
+                        if not np.isnan(p_h):
                             # only set the height if the fringes on either side agree
                             dh_prev = prev.forward_dh()
                             self._set_height(fr, p_h + dh_prev)
@@ -909,7 +911,7 @@ class Region_map(object):
 
                     elif fr.valid_follower(nexp):
                         n_h = nexp.abs_height
-                        if not isnan(n_h):
+                        if not np.isnan(n_h):
                             dh_next = fr.forward_dh()
                             self._set_height(fr, n_h - dh_next)
                             try_again_flag = True
@@ -924,7 +926,7 @@ class Region_map(object):
         FR = self.fring_rings[0]
         first_frame_dh, ff_phi = [np.array(_) for _ in zip(*[(fr.forward_dh(), fr.phi) for fr in FR])]
         invalid_steps, = np.where(np.isnan(first_frame_dh))
-        best_run_start = argmax(diff(invalid_steps))
+        best_run_start = np.argmax(np.diff(invalid_steps))
 
         h = 0
         slic = slice(invalid_steps[best_run_start] + 1, invalid_steps[best_run_start + 1])
@@ -938,3 +940,10 @@ class Region_map(object):
                 h = eh
 
             h += first_frame_dh[j]
+
+def format_frac(fr):
+    sp = str(fr).split('/')
+    if len(sp) == 1:
+        return sp[0]
+    else:
+        return r'$\frac{%s}{%s}$' % tuple(sp)
