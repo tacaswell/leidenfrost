@@ -1,7 +1,7 @@
-from multiprocessing import Pool
+from multiprocessing import Process, JoinableQueue
 import cine
 import argparse
-import itertools
+
 import os
 from leidenfrost import FilePath
 import leidenfrost.infra as li
@@ -10,11 +10,45 @@ import leidenfrost.backends as lfbe
 import h5py
 
 
-def proc_cine_fname(arg):
+class worker(Process):
+    """Worker class for farming out the work of doing the least
+    squares fit
+
+    """
+
+    def __init__(self,
+                 work_queue):
+        """
+        Work queue is a joinable queue, res_queue can be any sort of thing that supports put()
+        """
+        # background set up that must be done
+        Process.__init__(self)
+        self.daemonic = True
+        self.work_queue = work_queue
+
+    def run(self):
+        """
+        The assumption is that these will be run daemonic and reused for multiple work sessions
+        """
+        while True:
+            work_arg = self.work_queue.get()
+            if work_arg is None:          # poison pill
+                return
+            try:
+                cine_fname, hdf_fname_template = work_arg
+                proc_cine_fname(cine_fname, hdf_fname_template)
+            except Exception as E:
+                # we want to catch _EVERYTHING_ so errors don't blow up the other computations with it
+                print E
+
+            self.work_queue.task_done()
+
+
+def proc_cine_fname(cine_fname, hdf_fname_template):
     db = ldb.LFmongodb()
-    cine_fname, hdf_fname_template = arg
+
     ch = cine.Cine(cine_fname.format).hash
-    config_dict_lst = db.get_unproced_configs(ch)
+    config_dict_lst = db.get_all_configs(ch)
 
     for config_dict in config_dict_lst:
         print cine_fname
@@ -31,7 +65,7 @@ def proc_cine_fname(arg):
         file_out = h5py.File(h5_fname.format, 'r+')
         try:
             for j in range(len(stack)):
-                mbe,seed_curve = stack.process_frame(j, seed_curve)
+                mbe, seed_curve = stack.process_frame(j, seed_curve)
                 mbe.write_to_hdf(file_out)
                 del mbe
                 file_out.flush()
@@ -40,6 +74,7 @@ def proc_cine_fname(arg):
             # make sure that no matter what the output file gets cleaned up
             file_out.close()
 
+    return None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -76,5 +111,19 @@ if __name__ == '__main__':
 
     # special check
     cine_fnames = [cf for cf in cine_fnames if '320C_round_mode1.cine' != cf.fname]
-    p = Pool(N)
-    p.map(proc_cine_fname, zip(cine_fnames, itertools.repeat(hdf_fname_template)), chunksize=1)
+
+    WORK_QUEUE = JoinableQueue()
+    PROCS = [worker(WORK_QUEUE) for j in range(N)]
+    for p in PROCS:
+        p.start()
+
+    for cf in cine_fnames:
+        print 'adding', cf
+        WORK_QUEUE.put((cf, hdf_fname_template))
+
+    # poison the worker processes
+    for j in range(len(PROCS)):
+        WORK_QUEUE.put(None)
+
+    # wait for everything to finish
+    WORK_QUEUE.join()
