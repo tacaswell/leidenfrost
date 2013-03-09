@@ -738,7 +738,8 @@ class Region_map(object):
         img_bck_grnd_slices = []
         fringe_rings = []
         for j in range(n_frames):
-            print j
+            if j % 1000 == 0:
+                print j
             mbe = backend.get_frame(j, img=True, raw=reclassify)
 
             fringe_rings.append(FringeRing(mbe, reclassify=reclassify))
@@ -775,7 +776,7 @@ class Region_map(object):
         lab_dark_regions[lab_dark_regions > 0] += nb_br
 
         self.fring_rings = FRs
-        self.label_regions = lab_dark_regions + lab_bright_regions
+        self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions, dtype=np.uint)
         self.height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
         self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
         self.region_fringes = [[] for j in range(nb_br + nb_dr)]
