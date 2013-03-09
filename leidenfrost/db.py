@@ -131,6 +131,10 @@ class LFDbWrapper(object):
         '''
         raise NotImplementedError('you must define this is a sub class')
 
+    def remove_proc(self, proc_key):
+        '''Removes a proc record from the db '''
+        raise NotImplementedError('you must define this is a sub class')
+
     def store_config(self, cine_hash, data, **kwargs):
         '''
         Adds a configuration to the store
@@ -142,12 +146,23 @@ class LFDbWrapper(object):
         '''
         raise NotImplementedError('you must define this is a sub class')
 
+    def add_hash_lookup(self, cine_hash, path, fname):
+        '''
+        Adds a mapping from the `cine_hash` -> file path
+
+        :param cine_hash: A unique identifier for the data set of interest.
+        :param path: the path of the file _relative to a base path_
+        :param fname: file name of data
+        '''
+
 
 class LFmongodb(LFDbWrapper):
     col_map = {'bck_img': 'backimg_collection',  # collection for the background images
                'movs': 'movie_collection',  # collection for pointing to movies
                'proc': 'proc_collection',  # collection for point to the results of processing a cine
-               'config': 'config_collection'  # collection of configurations used for procs
+               'config': 'config_collection',  # collection of configurations used for procs
+               'comment': 'comment_collection',  # collection of comments on data and/or results
+               'fpath': 'filepath_collection',  # collection that maps cine_hash -> file path
                }
 
     def __init__(self, host='10.8.0.1', port=27017, *args, **kwargs):
@@ -226,8 +241,32 @@ class LFmongodb(LFDbWrapper):
         record['time_stamp'] = datetime.now()
         record['proced'] = False
         record['proc_keys'] = []
-        self.coll_dict['config'].insert(record)
+        _id = self.coll_dict['config'].insert(record)
+        return _id
 
-    def remove_proc(self, proc_key):
-        # need to write this...
-        pass
+    def add_comment(self, cine_hash, comment_dict=None, **kwargs):
+        '''
+        Add a comment to about a LF movie or processed result to db
+        '''
+        record = {'cine': cine_hash}
+        record['time_stamp'] = datetime.now()
+        if comment_dict is not None:
+            for key, val in comment_dict.items():
+                if key in record:
+                    print('a')
+                    pass
+                record[key] = val
+        for key, val in kwargs.items():
+            if key in record:
+                print ('duplicate key!')
+            record[key] = val
+        _id = self.coll_dict['comment'].insert(record)
+        return _id
+
+    def get_comment_by_id(self, _id):
+        if isinstance(_id, str):
+            _id = bson.objectid.ObjectId(_id)
+        return self.coll_dict['comment'].find_one({'_id': _id})
+
+    def get_comment_by_cine_hash(self, cine_hash):
+        return [_ for _ in self.coll_dict['config'].find({'cine': cine_hash})]
