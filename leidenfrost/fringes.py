@@ -777,7 +777,7 @@ class Region_map(object):
         lab_dark_regions[lab_dark_regions > 0] += nb_br
 
         self.fring_rings = FRs
-        self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions, dtype=np.uint)
+        self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions, dtype=np.uint32)
         self.height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
         self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
         self.region_fringes = [[] for j in range(nb_br + nb_dr)]
