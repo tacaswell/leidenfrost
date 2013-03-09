@@ -33,6 +33,7 @@ class worker(Process):
         while True:
             work_arg = self.work_queue.get()
             if work_arg is None:          # poison pill
+                self.work_queue.task_done()
                 return
             try:
                 cine_fname, hdf_fname_template = work_arg
