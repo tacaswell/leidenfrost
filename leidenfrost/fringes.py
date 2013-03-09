@@ -17,6 +17,7 @@
 from __future__ import division
 from itertools import tee, izip, cycle, product, islice
 from collections import namedtuple, defaultdict, deque
+import os.path
 
 from matplotlib import cm
 import fractions
@@ -782,6 +783,10 @@ class Region_map(object):
         self.region_fringes = [[] for j in range(nb_br + nb_dr)]
         self.working_img = working_img
 
+        self.thresh = thresh
+        self.structure = structure
+        self.size_cut = size_cut
+
         for FR in self.fring_rings:
             for fr in FR:
                 theta_indx = int((np.mod(fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
@@ -941,6 +946,53 @@ class Region_map(object):
                 h = eh
 
             h += first_frame_dh[j]
+
+    def write_to_hdf(self, out_file, md_dict):
+
+        # this will blow up if the file exists
+        h5file = h5py.File(out_file.format, 'w-')
+        try:
+            file_out.attrs['ver'] = '0.1'
+            # store all the md passed in
+            for key, val in md_dict:
+                try:
+                    h5file.attrs[key] = val
+                except TypeError:
+                    print 'key: ' + key + ' can not be gracefully shoved into'
+                    print ' an hdf object, please reconsider your life choices'
+            h5file.attrs['thresh'] = self.thresh
+            h5file.attrs['size_cut'] = self.size_cut
+            if self.structure is not None:
+                h5file.attrs['structure'] = np.asarray(self.structure)
+
+            # the kymograph extracted from the image series
+            h5file.create_dataset('working_img',
+                                  self.working_img.shape,
+                                  self.working_img.dtype,
+                                  compression='szip')
+            h5file['working_img'][:] = self.working_img
+            # the mapping of region number to bootstrapped height
+            h5file.create_dataset('height_map',
+                                  self.height_map.shape,
+                                  self.height_map.dtype)
+            h5file['height_map'][:] = self.height_map
+            # the regions of space
+            h5file.create_dataset('label_regions',
+                                  self.label_regions.shape,
+                                  self.label_regions.dtype,
+                                  compression='szip')
+            h5file['label_regions'][:] = self.label_regions
+
+
+
+        finally:
+            # make sure than no matter what we clean up after our selves
+            h5file.close()
+
+    @classmethod
+    def from_hdf(cls, in_file):
+        pass
+
 
 def format_frac(fr):
     sp = str(fr).split('/')
