@@ -23,7 +23,7 @@ from matplotlib import cm
 import fractions
 import scipy.ndimage as ndi
 from scipy.ndimage.interpolation import map_coordinates
-
+import matplotlib.pyplot as plt
 import numpy as np
 
 from infra import Point1D_circ
@@ -606,6 +606,9 @@ class FringeRing(object):
     def __iter__(self):
         return self.fringes.__iter__()
 
+    def __len__(self):
+        return len(self.fringes)
+
 
 def _clean_fringes(f_classes, f_locs):
     d = list(is_valid_3(*p) for p in triple_wise_periodic(f_classes))
@@ -751,8 +754,8 @@ class Region_map(object):
             img = mbe.img
 
             # convert the curve to X,Y
-            XY = np.vstack(mbe.curve.q_phi_to_xy(0,
-                                                 np.linspace(0, 2 * np.pi, 2 ** 10)))
+            XY = np.vstack(curve.q_phi_to_xy(0,
+                                              np.linspace(0, 2 * np.pi, 2 ** 10)))
             # get center
             center = np.mean(XY, 1)
             # get relative position of first point
@@ -760,13 +763,17 @@ class Region_map(object):
             # get the off set angle of the first
             th_offset = np.arctan2(first_pt[1], first_pt[0])
 
-            XY = np.vstack(mbe.curve.q_phi_to_xy(0,
-                                                 -th_offset + np.linspace(0, 2 * np.pi, 2 ** 12)))
+            XY = np.vstack(curve.q_phi_to_xy(0,
+                                            -th_offset + np.linspace(0, 2 * np.pi, 2 ** 12)))
             img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
 
         working_img = np.vstack(img_bck_grnd_slices).T
 
         return cls(working_img, FRs=fringe_rings, **kwargs)
+
+    @classmethod
+    def from_RM(cls, RM):
+        return cls(RM.working_img, RM.fring_rings, RM.thresh, RM.size_cut, RM.structure)
 
     def __init__(self, working_img, FRs, thresh=0, size_cut=100, structure=None):
         up_mask = working_img > 1 + thresh
@@ -794,7 +801,6 @@ class Region_map(object):
                 fr.region = label
                 fr.abs_height = np.nan
                 self.region_fringes[label].append(fr)
-
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
         height_img = self.height_img
@@ -833,6 +839,9 @@ class Region_map(object):
             extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
             aspect='auto',
             origin='bottom',alpha=alpha)
+
+        ax.figure.canvas.draw()
+
 
     def display_region(self, n, ax=None):
 
@@ -923,20 +932,39 @@ class Region_map(object):
                             try_again_flag = True
 
     def boot_strap(self):
-        for j in range(self.label_regions.shape[1]):
-            if j % 100 == 0:
-                print j
-            self._boot_strap_frame(j)
+        re_boot = True
+        while re_boot:
+            re_boot = False
+            pre_un_lab_count = np.sum(np.isnan(self.height_map))
+            for j in range(self.label_regions.shape[1]):
+                if j % 1000 == 0:
+                    print j
+                self._boot_strap_frame(j)
+            post_unlab_count = np.sum(np.isnan(self.height_map))
+            if pre_un_lab_count != post_unlab_count:
+                re_boot = True
 
     def seed_frame0(self):
         FR = self.fring_rings[0]
         first_frame_dh, ff_phi = [np.array(_) for _ in zip(*[(fr.forward_dh(), fr.phi) for fr in FR])]
         invalid_steps, = np.where(np.isnan(first_frame_dh))
-        best_run_start = np.argmax(np.diff(invalid_steps))
+
+        if len(invalid_steps) > 2:
+            # this needs more work to deal with periodic runs properly
+            best_run_start = np.argmax(np.diff(invalid_steps))
+            run_rng = range(invalid_steps[best_run_start] + 1, invalid_steps[best_run_start + 1])
+        elif len(invalid_steps) == 2:
+            if invalid_steps[1] - invalid_steps[0] > invalid_steps[0] + len(FR) - invalid_steps[1]:
+                run_rng = range(invalid_steps[0] + 1, invalid_steps[1])
+            else:
+                run_rng = range(invalid_steps[1] + 1, len(FR)) + range(0, invalid_steps[0])
+        elif len(invalid_steps) == 1:
+            run_rng = range(invalid_steps[0] + 1, len(FR)) + range(0, invalid_steps[0])
+        elif len(invalid_steps) == 0:
+            run_rng = range(0, len(FR))
 
         h = 0
-        slic = slice(invalid_steps[best_run_start] + 1, invalid_steps[best_run_start + 1])
-        for j in range(invalid_steps[best_run_start] + 1, invalid_steps[best_run_start + 1]):
+        for j in run_rng:
             print 'h: ', h
             try:
                 self.set_height(0, ff_phi[j], h)

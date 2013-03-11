@@ -181,6 +181,7 @@ class ZProfile(object):
         return (self.prof_ln, )
 
 
+
 class RProfile(object):
     def __init__(self, ax):
         self.ax = ax
@@ -316,7 +317,12 @@ class MarkedupImage(object):
                 self.seed_curve.set_ydata(y + .5)
             center_line_lst.append(self.seed_curve)
 
-        return tuple(self.fringe_lines) + (self.img, ) + tuple(center_line_lst)
+        if self.draw_finges:
+            for f_ln in self.fringe_lines:
+                f_ln.remove()
+                self.fringe_lines = mbe.ax_plot_tracks(self.ax)
+
+        return tuple(self.fringe_lines) + (self.img, ) + tuple(center_line_lst) + tuple(self.fringe_lines)
 
 
 def animate_profile(data_iter):
@@ -388,3 +394,29 @@ def animate_profile(data_iter):
                                               fr_num, miss_txt),
                                        interval=100)
     return prof_ani
+
+
+class ZProfileRM(object):
+    def __init__(self, ax):
+        self.ax = ax
+        self.prof_ln, = self.ax.plot([], [], '.-k')
+        self.ax.set_xlim([0, 2 * np.pi])
+        self.ax.set_ylim([-10, 10])
+        ax.set_xlabel(r'$\theta$')
+        ax.set_ylabel('$h$ [um]')
+        frac_size = 2
+        step = fractions.Fraction(1, frac_size)
+        ax.set_xticks([np.pi * j * step for j in range(2 * frac_size + 1)])
+        ax.set_xticklabels([format_frac(j * step) + '$\pi$'
+                            for j in range(2 * frac_size + 1)])
+
+        ax.axvline(.5 * np.pi, color='k', linestyle='--')
+        ax.axvline(np.pi, color='k', linestyle='--')
+        ax.axvline(1.5 * np.pi, color='k', linestyle='--')
+
+    def update(self, RM, j):
+        th, h = reduce_line_sample(RM.height_img[:, j], np.linspace(0, 2 * np.pi, RM.height_img.shape[0], endpoint=False))
+
+        self.prof_ln.set_xdata(th)
+        self.prof_ln.set_ydata(-h * .632 / 4)
+        return (self.prof_ln, )

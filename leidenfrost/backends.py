@@ -371,13 +371,14 @@ class MemBackendFrame(object):
 
         pass
 
-    def get_extent(self):
-        if self.img is not None:
+    def get_extent(self, curve_extent=True):
+        if self.img is not None and not curve_extent:
             return [0, self.img.shape[1], 0, self.img.shape[0]]
         else:
             x, y = self.curve.q_phi_to_xy(1, np.linspace(0, 2 * np.pi, 100))
-            return [.9 * np.min(y), 1.1 * np.max(y),
-                    .9 * np.min(x), 1.1 * np.max(x)]
+            return [.9 * np.min(x), 1.1 * np.max(x),
+                    .9 * np.min(y), 1.1 * np.max(y),
+                    ]
 
     def get_next_spline(self, mix_in_count=0, pix_err=0, **kwargs):
         if self.next_curve is not None and self.mix_in_count == mix_in_count:
@@ -437,21 +438,27 @@ class MemBackendFrame(object):
                           (all_tracks or bool(t.charge))])
         return lines
 
-    def ax_draw_center_curves(self, ax):
-        lo = ax.plot(*self.curve.get_xy_samples(1000), color='g', lw=2)
-        if self.next_curve is None:
-            self.get_next_spline()
+    def ax_draw_center_curves(self, ax, prev_c=True, next_c=True):
+        if prev_c:
+            lo = ax.plot(*self.curve.get_xy_samples(1000), color='g', lw=2)
+        else:
+            lo = []
+        if next_c:
+            if self.next_curve is None:
+                self.get_next_spline()
 
-        new_curve = self.next_curve
-        ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
-                     lw=2, linestyle='--')
+            new_curve = self.next_curve
+            ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
+                         lw=2, linestyle='--')
+        else:
+            ln = []
 
         return lo + ln
 
-    def ax_draw_img(self, ax):
+    def ax_draw_img(self, ax, cmap='cubehelix'):
         if self.img is not None:
             c_img = ax.imshow(self.img,
-                              cmap=plt.get_cmap('cubehelix'),
+                              cmap=plt.get_cmap(cmap),
                               interpolation='nearest')
             c_img.set_clim([.5, 1.5])
             return c_img
