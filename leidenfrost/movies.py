@@ -320,7 +320,7 @@ class MarkedupImage(object):
         if self.draw_finges:
             for f_ln in self.fringe_lines:
                 f_ln.remove()
-                self.fringe_lines = mbe.ax_plot_tracks(self.ax)
+                self.fringe_lines = mbe.ax_plot_tracks(self.ax, all_tracks=False)
 
         return tuple(self.fringe_lines) + (self.img, ) + tuple(center_line_lst) + tuple(self.fringe_lines)
 
