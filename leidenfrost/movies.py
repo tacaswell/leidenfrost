@@ -249,8 +249,8 @@ class MarkedupImage(object):
         self.ax = ax
         ax.cla()               # just to be safe
         # # set up for the image + fringe lines
-        self.img = self.ax.imshow(np.zeros((limits[1] - limits[0],
-                                           limits[3] - limits[2])),
+        self.img = self.ax.imshow(np.zeros((limits[3] - limits[2],
+                                           limits[1] - limits[0])),
                                   extent=limits, cmap='gray_r',
                                   origin='lower',
                                   interpolation='nearest')
