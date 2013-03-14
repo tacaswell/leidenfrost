@@ -426,7 +426,7 @@ class MemBackendFrame(object):
         return ax
 
     def ax_plot_tracks(self, ax, min_len=0, all_tracks=True):
-        color_cycle = ['r', 'b']
+        color_cycle = ['y', 'm']
         lines = []
         for tk_l, c in zip(self.trk_lst, color_cycle):
             lines.extend([t.plot_trk_img(self.curve,
@@ -440,7 +440,7 @@ class MemBackendFrame(object):
 
     def ax_draw_center_curves(self, ax, prev_c=True, next_c=True):
         if prev_c:
-            lo = ax.plot(*self.curve.get_xy_samples(1000), color='g', lw=2)
+            lo = ax.plot(*self.curve.get_xy_samples(1000), color='c', lw=1, linestyle='--')
         else:
             lo = []
         if next_c:
@@ -448,8 +448,8 @@ class MemBackendFrame(object):
                 self.get_next_spline()
 
             new_curve = self.next_curve
-            ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
-                         lw=2, linestyle='--')
+            ln = ax.plot(*new_curve.get_xy_samples(1000), color='c',
+                         lw=1, linestyle='--')
         else:
             ln = []
 

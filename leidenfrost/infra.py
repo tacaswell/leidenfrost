@@ -202,7 +202,7 @@ class lf_Track(Track):
                 kwargs['marker'] = ''
 
         if bool(self.charge):
-            kwargs['lw'] = .5
+            kwargs['lw'] = .75
         else:
             kwargs['lw'] = .25
 
