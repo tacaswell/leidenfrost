@@ -202,13 +202,13 @@ class lf_Track(Track):
                 kwargs['marker'] = ''
 
         if bool(self.charge):
-            kwargs['lw'] = .75
+            kwargs['lw'] = 2
         else:
-            kwargs['lw'] = .25
+            kwargs['lw'] = 1
 
         if self.charge == 0:
             kwargs['linestyle'] = ':'
-            kwargs['lw'] = .25
+            kwargs['lw'] = 1
 
         if 'picker' not in kwargs:
             kwargs['picker'] = 5

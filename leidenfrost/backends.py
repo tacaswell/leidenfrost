@@ -426,7 +426,7 @@ class MemBackendFrame(object):
         return ax
 
     def ax_plot_tracks(self, ax, min_len=0, all_tracks=True):
-        color_cycle = ['y', 'm']
+        color_cycle = ['r', 'b']
         lines = []
         for tk_l, c in zip(self.trk_lst, color_cycle):
             lines.extend([t.plot_trk_img(self.curve,
@@ -448,8 +448,8 @@ class MemBackendFrame(object):
                 self.get_next_spline()
 
             new_curve = self.next_curve
-            ln = ax.plot(*new_curve.get_xy_samples(1000), color='c',
-                         lw=1, linestyle='--')
+            ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
+                         lw=1, linestyle='--', zorder=-5)
         else:
             ln = []
 
