@@ -17,14 +17,16 @@
 from __future__ import division
 from itertools import tee, izip, cycle, product, islice
 from collections import namedtuple, defaultdict, deque
-import os.path
+
 
 from matplotlib import cm
+import matplotlib
 import fractions
 import scipy.ndimage as ndi
 from scipy.ndimage.interpolation import map_coordinates
 import matplotlib.pyplot as plt
 import numpy as np
+import h5py
 
 from infra import Point1D_circ
 
@@ -288,6 +290,7 @@ def find_bad_runs(d):
 
     return res
 
+
 def _hinting_only(run, locs):
     '''Only try to guess hinting, return empty lists if this will require  '''
     j = 0
@@ -329,7 +332,6 @@ def _hinting_only(run, locs):
             valid_runs.append(trial_run)
             valid_locs.append(trial_locs)
             continue
-
 
     return valid_runs, valid_locs
 
@@ -511,15 +513,13 @@ class Fringe(Point1D_circ):
         self.f_cumh = None   #: the cumulative shift counting forward
         self.r_cumh = None   #: the cumulative shift counting forward
 
-
-
         self.slope_f = None  #: the slope going forward
         self.slope_r = None  #: the slope going backward
         self.slope = None    #: the 'average' slope at this point
 
         self.frame_number = frame_number    #: the frame that this fringe belongs to
 
-        self.region = np.nan #: region of the khymograph
+        self.region = np.nan     #: region of the khymograph
         self.abs_height = None   #: the height of this fringe as given by tracking in time
 
     def remove_from_track(self, track):
@@ -579,9 +579,9 @@ class Fringe(Point1D_circ):
         return np.nan
 
 
-t_format_dicts = [{1:'B', -1:'D'},
-                  {1:'L', 0:'_', -1:'R'},
-                  {1:'P', 0:'_', -1:'S'}]
+t_format_dicts = [{1: 'B', -1: 'D'},
+                  {1: 'L', 0: '_', -1: 'R'},
+                  {1: 'P', 0: '_', -1: 'S'}]
 
 
 def format_fringe_txt(f):
@@ -725,11 +725,10 @@ class Region_map(object):
         lab_regions[remove_pix] = 0
         # loop to make periodic
         for j in range(lab_regions.shape[1]):
-            top_lab = lab_regions[0,j]
-            bot_lab = lab_regions[-1,j]
+            top_lab = lab_regions[0, j]
+            bot_lab = lab_regions[-1, j]
             if top_lab != bot_lab and top_lab != 0 and bot_lab != 0:
-               lab_regions[lab_regions == bot_lab] = top_lab
-
+                lab_regions[lab_regions == bot_lab] = top_lab
 
         labels = np.unique(lab_regions)
         lab_regions = np.searchsorted(labels, lab_regions)
@@ -755,7 +754,7 @@ class Region_map(object):
 
             # convert the curve to X,Y
             XY = np.vstack(curve.q_phi_to_xy(0,
-                                              np.linspace(0, 2 * np.pi, 2 ** 10)))
+                                             np.linspace(0, 2 * np.pi, 2 ** 10)))
             # get center
             center = np.mean(XY, 1)
             # get relative position of first point
@@ -764,7 +763,7 @@ class Region_map(object):
             th_offset = np.arctan2(first_pt[1], first_pt[0])
 
             XY = np.vstack(curve.q_phi_to_xy(0,
-                                            -th_offset + np.linspace(0, 2 * np.pi, 2 ** 12)))
+                                             -th_offset + np.linspace(0, 2 * np.pi, 2 ** 12)))
             img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
 
         working_img = np.vstack(img_bck_grnd_slices).T
@@ -808,46 +807,43 @@ class Region_map(object):
             # make this smarter
             ax = plt.gca()
 
-
         my_cmap = cm.get_cmap(cmap)
         my_cmap.set_bad(alpha=0)
-
 
         frac_size = 4
         step = fractions.Fraction(1, frac_size)
         ax.set_yticks([np.pi * j * step for j in range(2 * frac_size + 1)])
         ax.set_yticklabels([format_frac(j * step) + '$\pi$'
-                              for j in range(2 * frac_size + 1)])
+                            for j in range(2 * frac_size + 1)])
 
-        ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]) )
+        ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]))
         ax.set_ylabel(r'$\theta$')
-
-        data = self.label_regions
-
 
         ax.imshow(height_img,
                   interpolation='none',
                   cmap=my_cmap,
                   extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
                   aspect='auto',
-            origin='bottom',
-            )
+                  origin='bottom',
+                  )
         if bckgnd:
             ax.imshow(self.working_img,
                       interpolation='none',
                       cmap='gray',
-            extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
-            aspect='auto',
-            origin='bottom',alpha=alpha)
+                      extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                      aspect='auto',
+                      origin='bottom',
+                      alpha=alpha)
 
         ax.figure.canvas.draw()
-
 
     def display_region(self, n, ax=None):
 
         if ax is None:
             # make this smarter
             ax = plt.gca()
+
+        data = self.label_regions
 
         norm_br = matplotlib.colors.Normalize(vmin=.5, vmax=np.max(data), clip=False)
         my_cmap = cm.get_cmap('jet')
@@ -865,7 +861,6 @@ class Region_map(object):
         return self.height_map[label]
 
     def _set_height(self, fr, height, overwrite=False):
-
 
         label = fr.region
         assert not np.isnan(label), 'label should not be nan'
@@ -980,7 +975,7 @@ class Region_map(object):
         # this will blow up if the file exists
         h5file = h5py.File(out_file.format, 'w-')
         try:
-            file_out.attrs['ver'] = '0.1'
+            h5file.attrs['ver'] = '0.1'
             # store all the md passed in
             for key, val in md_dict:
                 try:
@@ -1010,8 +1005,6 @@ class Region_map(object):
                                   self.label_regions.dtype,
                                   compression='szip')
             h5file['label_regions'][:] = self.label_regions
-
-
 
         finally:
             # make sure than no matter what we clean up after our selves
