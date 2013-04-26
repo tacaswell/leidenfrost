@@ -195,10 +195,8 @@ class Fringe(object):
     '''
 
     def __init__(self, f_class, f_loc):
-        self.q = f_loc.q        #: the q location of this fringe
-        self.phi = f_loc.phi    #: The angular location of this fringe
-
         self.f_class = f_class            #: fringe class
+        self.f_loc = f_loc                #: fringe location
 
         # linked list for space
         self.next_P = None   #: next fringe in angle
@@ -209,6 +207,14 @@ class Fringe(object):
 
         self.region = np.nan     #: region of the khymograph
         self.abs_height = None   #: the height of this fringe as given by tracking in time
+
+    @property
+    def q(self):
+        return self.f_loc.q
+
+    @property
+    def phi(self):
+        return self.f_loc.phi
 
     def insert_ahead(self, other):
         '''
@@ -643,6 +649,18 @@ class Region_map(object):
                                   self.label_regions.dtype,
                                   compression='szip')
             h5file['label_regions'][:] = self.label_regions
+
+            fr_grp = h5file.create_group('fringe_rings')
+            for FR in self.fring_rings:
+                f_cls = np.vstack([fr.f_cls for fr in FR])
+                f_loc = np.vstack([fr.f_cls for fr in FR])
+                frame_number = fr.frame_number
+                dset_names = ["f_class_{frn:02}".format(frn=frame_number),
+                              "f_loc_{frn:02}".format(frn=frame_number)]
+                for n, v, t in izip(dset_names, [f_cls, f_loc], [np.int8, np.float]):
+                    fr_grp.create_dataset(n,
+                                          v.shape,
+                                          t)
 
     @classmethod
     def from_hdf(cls, in_file):
