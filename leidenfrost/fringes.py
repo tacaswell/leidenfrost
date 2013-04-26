@@ -18,6 +18,7 @@ from __future__ import division
 from itertools import tee, izip, cycle, product, islice
 from collections import namedtuple, defaultdict, deque
 
+from contextlib import closing
 
 from matplotlib import cm
 import matplotlib
@@ -973,8 +974,8 @@ class Region_map(object):
     def write_to_hdf(self, out_file, md_dict):
 
         # this will blow up if the file exists
-        h5file = h5py.File(out_file.format, 'w-')
-        try:
+        with closing(h5py.File(out_file.format, 'w-')) as h5file:
+
             h5file.attrs['ver'] = '0.1'
             # store all the md passed in
             for key, val in md_dict:
@@ -1005,10 +1006,6 @@ class Region_map(object):
                                   self.label_regions.dtype,
                                   compression='szip')
             h5file['label_regions'][:] = self.label_regions
-
-        finally:
-            # make sure than no matter what we clean up after our selves
-            h5file.close()
 
     @classmethod
     def from_hdf(cls, in_file):
