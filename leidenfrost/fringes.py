@@ -428,7 +428,6 @@ class Region_map(object):
 
         self.fring_rings = FRs
         self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions, dtype=np.uint32)
-        self.height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
         self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
         self.region_fringes = [[] for j in range(nb_br + nb_dr)]
         self.working_img = working_img
@@ -446,7 +445,10 @@ class Region_map(object):
                 self.region_fringes[label].append(fr)
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
-        height_img = self.height_img
+        height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
+
+        for j in range(1, len(self.height_map)):
+                height_img[self.label_regions == j] = self.height_map[j]
         if ax is None:
             # make this smarter
             ax = plt.gca()
@@ -517,25 +519,8 @@ class Region_map(object):
             raise RuntimeError("already set the height of this region!")
 
         self.height_map[label] = height
-        self.height_img[self.label_regions == label] = height
         for _fr in self.region_fringes[label]:
             _fr.abs_height = height
-
-    def set_height(self, frame_num, theta, height, overwrite=False):
-        theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
-
-        label = self.label_regions[theta_indx, frame_num]
-        # we can't do anything with points in the un-labeled regions of the image
-        if label == 0:
-            print 'label is 0'
-            return
-        if not overwrite and not np.isnan(self.height_map[label]):
-            # we won't over-write at this region already has a height
-            # TODO make this a custom exception
-            raise RuntimeError("already set the height of this region!")
-
-        self.height_map[label] = height
-        self.height_img[self.label_regions == label] = height
 
     def _boot_strap_frame(self, j):
 
@@ -606,7 +591,7 @@ class Region_map(object):
         for j in run_rng:
             print 'h: ', h
             try:
-                self.set_height(0, ff_phi[j], h)
+                self._set_height(0, FR[j], h)
             except RuntimeError:
                 eh = self.get_height(0, ff_phi[j])
                 print eh, h
