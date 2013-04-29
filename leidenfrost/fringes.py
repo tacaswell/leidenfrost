@@ -15,7 +15,7 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
-from itertools import tee, izip, cycle, islice
+from itertools import tee, izip, cycle
 from collections import namedtuple, defaultdict, deque
 
 from contextlib import closing
@@ -195,6 +195,7 @@ class Fringe(object):
     '''
 
     def __init__(self, f_class, f_loc):
+
         self.f_class = f_class            #: fringe class
         self.f_loc = f_loc                #: fringe location
 
@@ -303,7 +304,8 @@ class FringeRing(object):
         return cls(frame_number, f_classes, f_locs)
 
     def __init__(self, frame_number, f_classes, f_locs):
-        self.fringes = [Fringe(fcls, floc, self.frame_number) for fcls, floc in izip(f_classes, f_locs)]
+        self.frame_number = frame_number
+        self.fringes = [Fringe(fcls, floc) for fcls, floc in izip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
         for a, b in pairwise_periodic(self.fringes):
             a.insert_ahead(b)
@@ -313,6 +315,9 @@ class FringeRing(object):
 
     def __len__(self):
         return len(self.fringes)
+
+    def __getitem__(self, key):
+        return self.fringes[key]
 
 
 def _get_fc_lists(mbe, reclassify):
@@ -439,16 +444,17 @@ class Region_map(object):
         for FR in self.fring_rings:
             for fr in FR:
                 theta_indx = int((np.mod(fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
-                label = self.label_regions[theta_indx, fr.frame_number]
+                label = self.label_regions[theta_indx, FR.frame_number]
                 fr.region = label
                 fr.abs_height = np.nan
                 self.region_fringes[label].append(fr)
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
         height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
-
         for j in range(1, len(self.height_map)):
                 height_img[self.label_regions == j] = self.height_map[j]
+
+
         if ax is None:
             # make this smarter
             ax = plt.gca()
@@ -544,14 +550,14 @@ class Region_map(object):
                         p_h = prev.abs_height
                         if not np.isnan(p_h):
                             # only set the height if the fringes on either side agree
-                            dh_prev = prev.forward_dh()
+                            dh_prev = prev.forward_dh
                             self._set_height(fr, p_h + dh_prev)
                             try_again_flag = True
 
                     elif fr.valid_follower(nexp):
                         n_h = nexp.abs_height
                         if not np.isnan(n_h):
-                            dh_next = fr.forward_dh()
+                            dh_next = fr.forward_dh
                             self._set_height(fr, n_h - dh_next)
                             try_again_flag = True
 
@@ -570,7 +576,7 @@ class Region_map(object):
 
     def seed_frame0(self):
         FR = self.fring_rings[0]
-        first_frame_dh, ff_phi = [np.array(_) for _ in zip(*[(fr.forward_dh(), fr.phi) for fr in FR])]
+        first_frame_dh, ff_phi = [np.array(_) for _ in zip(*[(fr.forward_dh, fr.phi) for fr in FR])]
         invalid_steps, = np.where(np.isnan(first_frame_dh))
 
         if len(invalid_steps) > 2:
@@ -591,7 +597,7 @@ class Region_map(object):
         for j in run_rng:
             print 'h: ', h
             try:
-                self._set_height(0, FR[j], h)
+                self._set_height(FR[j], h)
             except RuntimeError:
                 eh = self.get_height(0, ff_phi[j])
                 print eh, h
