@@ -194,8 +194,8 @@ class Fringe(object):
 
     '''
 
-    def __init__(self, f_class, f_loc):
-
+    def __init__(self, f_class, f_loc, frame_number):
+        self.frame_number = frame_number
         self.f_class = f_class            #: fringe class
         self.f_loc = f_loc                #: fringe location
 
@@ -305,7 +305,7 @@ class FringeRing(object):
 
     def __init__(self, frame_number, f_classes, f_locs):
         self.frame_number = frame_number
-        self.fringes = [Fringe(fcls, floc) for fcls, floc in izip(f_classes, f_locs)]
+        self.fringes = [Fringe(fcls, floc, frame_number) for fcls, floc in izip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
         for a, b in pairwise_periodic(self.fringes):
             a.insert_ahead(b)
@@ -454,7 +454,6 @@ class Region_map(object):
         for j in range(1, len(self.height_map)):
                 height_img[self.label_regions == j] = self.height_map[j]
 
-
         if ax is None:
             # make this smarter
             ax = plt.gca()
@@ -504,7 +503,9 @@ class Region_map(object):
         ax.imshow(n * (data == n),
                   cmap=my_cmap,
                   norm=norm_br,
-                  aspect='auto')
+                  aspect='auto',
+                  interpolation='none'
+                  )
         ax.figure.canvas.draw()
 
     def get_height(self, frame_num, theta):
