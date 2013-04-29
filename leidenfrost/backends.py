@@ -49,6 +49,19 @@ class HdfBackend(object):
                  cine_buffer_base_path=None,
                  *args,
                  **kwargs):
+        """
+        Parameters
+        ----------
+        fname: `Leidenfrost.FilePath`
+            Fully qualified path to the hdf file to open
+        cine_base_path: str or `None`
+            If not `None`, base path to find the raw cine files
+        h5_buffer_bas_path: str or `None`
+            If not `None`, base path for buffering the h5 file
+        cine_buffer_base_path: str or `None`
+            If not `None`, base path for buffering the cine file
+        """
+
         print fname
         self._iter_cur_item = -1
         self.buffers = []
@@ -56,7 +69,7 @@ class HdfBackend(object):
         if h5_buffer_base_path is not None:
             fname = copy_to_buffer_disk(fname, h5_buffer_base_path)
             self.buffers.append(fname)
-        self.file = h5py.File('/'.join(fname), 'r')
+        self.file = h5py.File(fname.format, 'r')
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
         self.prams = HdfBEPram(True, True)
         self.proc_prams = dict(self.file.attrs)
