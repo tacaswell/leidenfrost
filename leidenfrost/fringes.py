@@ -727,3 +727,22 @@ class Region_map(object):
             else:
                 return 'x=%1.4f, y=%1.4f' % (x, y)
         return format_coord
+
+    def connection_network(self):
+        """ Sets up the network between the regions based on what fringes fall in them.
+
+        """
+        inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
+
+        # main data structure
+        connections = [defaultdict(inner_dict) for j in range(len(self.height_map))]
+        for FR in self.fring_rings:
+            for fr in FR:
+                if fr.region == 0 or fr.next_P.region == 0:
+                    continue
+                fdh = fr.forward_dh
+                if not np.isnan(fdh):
+                    fdh = int(fdh)
+                    connections[fr.region][fr.next_P.region][fdh] += 1
+
+        return connections
