@@ -321,7 +321,16 @@ class FringeRing(object):
 
 
 def _get_fc_lists(mbe, reclassify):
+    """ Generate `f_class` and `f_loc` lists from a backend object
 
+    Parameters
+    ----------
+    mbe: `MemoryBackend`
+        data backend for the frame data
+    reclassify: `Bool`
+        if the location/class should be re-computed from the raw
+        fringes.  If `False`, use the results chached in the hdf file
+    """
     colors = [-1, 1]
     f_classes = deque()
     f_locs = deque()
@@ -508,6 +517,30 @@ class Region_map(object):
                   )
         ax.figure.canvas.draw()
 
+    def display_regions(self, ns, ax=None):
+
+        if ax is None:
+            # make this smarter
+            ax = plt.gca()
+
+        data = self.label_regions
+
+        norm_br = matplotlib.colors.Normalize(vmin=.5, vmax=np.max(data), clip=False)
+        my_cmap = cm.get_cmap('jet')
+        my_cmap.set_under(alpha=0)
+        tmp = np.zeros(data.shape, dtype='uint32')
+
+        for n in ns:
+            tmp[data == n] = n
+
+        ax.imshow(tmp,
+                  cmap=my_cmap,
+                  norm=norm_br,
+                  aspect='auto',
+                  interpolation='none'
+                  )
+        ax.figure.canvas.draw()
+
     def get_height(self, frame_num, theta):
         theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
         label = self.label_regions[theta_indx, frame_num]
@@ -657,3 +690,40 @@ class Region_map(object):
     @classmethod
     def from_hdf(cls, in_file):
         pass
+
+    def error_check(self):
+        error_count = 0
+        correct_count = 0
+        error_regions = defaultdict(int)
+        for FR in self.fring_rings:
+            for fr in FR:
+                fdh = fr.forward_dh
+
+                if (not np.isnan(fdh)) and (not np.isnan(fr.abs_height)) and (not np.isnan(fr.next_P.abs_height)):
+                    if int(fr.next_P.abs_height - fr.abs_height) != fdh:
+
+                        error_count += 1
+                        ra, rb = fr.region, fr.next_P.region
+
+                        error_regions[(ra, rb)] += 1
+
+                    else:
+                        correct_count += 1
+
+        return error_count, error_regions
+
+    def format_factory(self, xscale=1, yscale=1):
+        numrows, numcols = self.label_regions.shape
+
+        def format_coord(x, y):
+            col = int(x / xscale)
+            row = int(y / yscale)
+            if col >= 0 and col < numcols and row >= 0 and row < numrows:
+                region = self.label_regions[row, col]
+                return "x:{x}, y:{y}, r:{reg}, h:{h}".format(x=col * xscale,
+                                                             y=row * yscale,
+                                                             reg=region,
+                                                             h=self.height_map[region])
+            else:
+                return 'x=%1.4f, y=%1.4f' % (x, y)
+        return format_coord
