@@ -308,7 +308,7 @@ class FringeRing(object):
         self.fringes = [Fringe(fcls, floc, frame_number) for fcls, floc in izip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
         for a, b in pairwise_periodic(self.fringes):
-            a.insert_ahead(b)
+        a.insert_ahead(b)
 
     def __iter__(self):
         return self.fringes.__iter__()
@@ -430,7 +430,7 @@ class Region_map(object):
 
     @classmethod
     def from_RM(cls, RM):
-        return cls(RM.working_img, RM.fring_rings, RM.thresh, RM.size_cut, RM.structure)
+        return cls(RM.working_img, RM.fringe_rings, RM.thresh, RM.size_cut, RM.structure)
 
     def __init__(self, working_img, FRs, thresh=0, size_cut=100, structure=None):
         up_mask = working_img > 1 + thresh
@@ -440,7 +440,7 @@ class Region_map(object):
         lab_dark_regions, nb_dr = self._label_regions(down_mask, size_cut, structure)
         lab_dark_regions[lab_dark_regions > 0] += nb_br
 
-        self.fring_rings = FRs
+        self.fringe_rings = FRs
         self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions, dtype=np.uint32)
         self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
         self.region_fringes = [[] for j in range(nb_br + nb_dr)]
@@ -450,7 +450,7 @@ class Region_map(object):
         self.structure = structure
         self.size_cut = size_cut
 
-        for FR in self.fring_rings:
+        for FR in self.fringe_rings:
             for fr in FR:
                 theta_indx = int((np.mod(fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
                 label = self.label_regions[theta_indx, FR.frame_number]
@@ -564,7 +564,7 @@ class Region_map(object):
 
     def _boot_strap_frame(self, j):
 
-        FR = self.fring_rings[j]
+        FR = self.fringe_rings[j]
         for fr in FR.fringes:
             fr.abs_height = self.get_height(j, fr.phi)
 
@@ -609,7 +609,7 @@ class Region_map(object):
                 re_boot = True
 
     def seed_frame0(self):
-        FR = self.fring_rings[0]
+        FR = self.fringe_rings[0]
         first_frame_dh, ff_phi = [np.array(_) for _ in zip(*[(fr.forward_dh, fr.phi) for fr in FR])]
         invalid_steps, = np.where(np.isnan(first_frame_dh))
 
@@ -676,7 +676,7 @@ class Region_map(object):
             h5file['label_regions'][:] = self.label_regions
 
             fr_grp = h5file.create_group('fringe_rings')
-            for FR in self.fring_rings:
+            for FR in self.fringe_rings:
                 f_cls = np.vstack([fr.f_cls for fr in FR])
                 f_loc = np.vstack([fr.f_cls for fr in FR])
                 frame_number = fr.frame_number
@@ -695,7 +695,7 @@ class Region_map(object):
         error_count = 0
         correct_count = 0
         error_regions = defaultdict(int)
-        for FR in self.fring_rings:
+        for FR in self.fringe_rings:
             for fr in FR:
                 fdh = fr.forward_dh
 
@@ -736,7 +736,7 @@ class Region_map(object):
 
         # main data structure
         connections = [defaultdict(inner_dict) for j in range(len(self.height_map))]
-        for FR in self.fring_rings:
+        for FR in self.fringe_rings:
             for fr in FR:
                 if fr.region == 0 or fr.next_P.region == 0:
                     continue
