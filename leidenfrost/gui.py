@@ -948,11 +948,8 @@ class LFReaderGui(QtGui.QMainWindow):
         if img is None:
             img = 1.5 * np.ones((1, 1))
 
-        extent = mbe.get_extent()
-
         self.im = self.axes.imshow(img,
                                    cmap='gray',
-                                   extent=extent,
                                    origin='lower',
                                    interpolation='nearest')
         self.im.set_clim([.5, 1.5])
