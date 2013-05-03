@@ -307,8 +307,8 @@ class FringeRing(object):
         self.frame_number = frame_number
         self.fringes = [Fringe(fcls, floc, frame_number) for fcls, floc in izip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
-        for a, b in pairwise_periodic(self.fringes):
-        a.insert_ahead(b)
+        #for a, b in pairwise_periodic(self.fringes):
+        #    a.insert_ahead(b)
 
     def __iter__(self):
         return self.fringes.__iter__()
