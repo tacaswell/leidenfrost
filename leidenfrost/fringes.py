@@ -28,6 +28,7 @@ from scipy.ndimage.interpolation import map_coordinates
 import matplotlib.pyplot as plt
 import numpy as np
 import h5py
+from bisect import bisect
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
@@ -264,7 +265,9 @@ class Fringe(object):
     def forward_dh(self):
         if self._fdh is None:
             other = self.next_P
-            if self.valid_follower(other):
+            if other is None:
+                self._fdh = np.nan
+            elif self.valid_follower(other):
                 self._fdh = forward_dh_dict[(self.f_class, other.f_class)]
             else:
                 self._fdh = np.nan
@@ -275,7 +278,9 @@ class Fringe(object):
     def reverse_dh(self):
         if self._rdh is None:
             other = self.prev_P
-            if other.valid_follower(self):
+            if other is None:
+                self._rdh = np.nan
+            elif other.valid_follower(self):
                 self._rdh = forward_dh_dict[(other.f_class, self.f_class)]
             else:
                 self._rdh = np.nan
@@ -450,13 +455,33 @@ class Region_map(object):
         self.structure = structure
         self.size_cut = size_cut
 
-        for FR in self.fringe_rings:
-            for fr in FR:
-                theta_indx = int((np.mod(fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
-                label = self.label_regions[theta_indx, FR.frame_number]
-                fr.region = label
-                fr.abs_height = np.nan
-                self.region_fringes[label].append(fr)
+        for FR, region_list in izip(self.fringe_rings, self.label_regions.T):
+            # build list of regions
+            region_starts, region_labels, region_ends = _segment_labels(region_list)
+            for fr_b, fr_f in pairwise_periodic(FR):
+
+                fr_b.abs_height = np.nan
+
+                b_b, b_f = [_bin_region(int((np.mod(_fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0]),
+                                        region_starts,
+                                        region_ends)
+                            for _fr in (fr_b, fr_f)]
+
+                # handle the other mapping
+                if b_b is None:
+                    label = 0
+                else:
+                    label = region_labels[b_b]
+                fr_b.region = label
+                self.region_fringes[label].append(fr_b)
+                fr_b.abs_height = np.nan
+                self.region_fringes[label].append(fr_b)
+
+                # handle the linking
+                if b_b is None or b_f is None:
+                    continue
+                if (b_b + 1 == b_f) or (b_f == 0 and b_b == len(region_labels) - 1):
+                    fr_b.insert_ahead(fr_f)
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
         height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
@@ -738,7 +763,7 @@ class Region_map(object):
         connections = [defaultdict(inner_dict) for j in range(len(self.height_map))]
         for FR in self.fringe_rings:
             for fr in FR:
-                if fr.region == 0 or fr.next_P.region == 0:
+                if fr.region == 0 or fr.next_P is None or fr.next_P.region == 0:
                     continue
                 fdh = fr.forward_dh
                 if not np.isnan(fdh):
@@ -746,3 +771,48 @@ class Region_map(object):
                     connections[fr.region][fr.next_P.region][fdh] += 1
 
         return connections
+
+
+def _segment_labels(region_list, zero_thresh=2):
+    region_starts = []
+    region_labels = []
+    region_ends = []
+    cur_region = None
+    zero_count = 0
+    for j, lab in enumerate(region_list):
+        # we are still in the same region, keep going
+        if lab == cur_region:
+            zero_count = 0
+            continue
+        # we are
+        elif lab == 0:
+            if cur_region is not None:
+                zero_count += 1
+                # if we hit enough zeros in a row, start looking for a new region
+                if zero_count > zero_thresh:
+                    region_ends.append(j - zero_count)  # add end of previous label
+                    cur_region = None  # reset current label
+                    zero_count = 0  #
+            continue
+        elif lab != cur_region:
+            # if the current region is not
+            if cur_region is not None:
+                region_ends.append(j - zero_count)
+            zero_count = 0
+            region_labels.append(lab)
+            region_starts.append(j)
+            cur_region = lab
+    if cur_region is not None:
+        region_ends.append(len(region_list))
+
+    return region_starts, region_labels, region_ends
+
+
+def _bin_region(N, region_starts, region_ends):
+    n = bisect(region_starts, N) - 1
+    if n == -1:
+        return None
+    if region_ends[n] > N:
+        return n
+    else:
+        return None
