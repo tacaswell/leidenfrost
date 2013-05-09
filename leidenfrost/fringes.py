@@ -493,7 +493,7 @@ class Region_map(object):
             ax = plt.gca()
 
         my_cmap = cm.get_cmap(cmap)
-        my_cmap.set_bad(alpha=0)
+        my_cmap.set_bad('k', alpha=.5)
 
         frac_size = 4
         step = fractions.Fraction(1, frac_size)
@@ -664,6 +664,44 @@ class Region_map(object):
 
             h += first_frame_dh[j]
 
+    def boot_strap2(self):
+        """An improved boot-strap operation
+        """
+        valid_connections = deque()
+        for dd in self.connection_network():
+            tmp_dict = {}
+            for k, v in dd.items():
+                dh = _dict_to_dh(v, threshold=5)
+                if dh is not None:
+                    tmp_dict[k] = dh
+            valid_connections.append(tmp_dict)
+
+        valid_connections = list(valid_connections)
+
+        start = np.argmax([len(r) for r in valid_connections])
+        # clear height map
+        self.height_map *= np.nan
+        #set first height
+        self.height_map[start] = 0
+
+        set_by = dict()
+        fails = deque()
+        work_list = deque()
+        work_list.extend([(start, k) for k in valid_connections[start].keys()])
+        while len(work_list) > 0:
+            a, b = work_list.pop()
+            prop_height = self.height_map[a] + valid_connections[a][b]
+            if np.isnan(self.height_map[b]):
+                self.height_map[b] = prop_height
+                work_list.extend([(b, k) for k in valid_connections[b].keys()])
+                set_by[b] = a
+            else:
+                if self.height_map[b] != prop_height:
+                    print a, b, prop_height, self.height_map[b], valid_connections[a][b]
+                    fails.append((a, b))
+
+        return set_by, fails
+
     def write_to_hdf(self, out_file, md_dict):
 
         # this will blow up if the file exists
@@ -816,3 +854,30 @@ def _bin_region(N, region_starts, region_ends):
         return n
     else:
         return None
+
+
+def _dict_to_dh(input_d, threshold=15):
+    """Converts a (-1, 0, 1) dict -> a single dh.  Returns `None` if
+    the conversion is ambiguous.  The conversion in ambiguous if a)
+    more than one bin has counts b) the number of counts is less than `threshold`
+
+    Parameters
+    ----------
+    input_d: dict
+        `input_d` contains the keys [-1, 0, 1] with values that are counts
+    threshold: int
+        the minimum number of counts to be valid
+
+    Returns
+    -------
+    dh: int, (-1, 0, 1) or `None`
+    """
+    # check of there is more than one entry with non-zero counts
+    if input_d[0] and input_d[-1] and input_d[1]:
+        return None
+
+    # if any
+    for k in [-1, 0, 1]:
+        if input_d[k] > threshold:
+            return k
+    return None
