@@ -281,7 +281,8 @@ class Fringe(object):
             if other is None:
                 self._rdh = np.nan
             elif other.valid_follower(self):
-                self._rdh = forward_dh_dict[(other.f_class, self.f_class)]
+                # need the negative, as we want the step from this one _to_ that one
+                self._rdh = -forward_dh_dict[(other.f_class, self.f_class)]
             else:
                 self._rdh = np.nan
         return self._rdh
