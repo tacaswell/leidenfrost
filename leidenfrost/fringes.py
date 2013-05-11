@@ -576,16 +576,23 @@ class Region_map(object):
         """An improved boot-strap operation
         """
         valid_connections = deque()
-        for dd in self.connection_network():
+        for dd in izip(self.connection_network('f'), self.connection_network('r')):
             tmp_dict = {}
-            for k, v in dd.items():
-                dh = _dict_to_dh(v, threshold=5)
-                if dh is not None:
-                    tmp_dict[k] = dh
+            for _dd in dd:
+                for k, v in _dd.items():
+                    dh = _dict_to_dh(v, threshold=5)
+                    if dh is not None:
+                        if k in tmp_dict and tmp_dict[k] != dh:
+                            print 'conflict'
+                            # if we have inconsistent linking, throw everything out
+                            del tmp_dict[k]
+                            continue
+                        tmp_dict[k] = dh
             valid_connections.append(tmp_dict)
 
         valid_connections = list(valid_connections)
 
+        # pick the one with the most forward connections
         start = np.argmax([len(r) for r in valid_connections])
         # clear height map
         self.height_map *= np.nan
