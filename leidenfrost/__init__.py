@@ -16,9 +16,12 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 import collections
+import os.path
+
 
 class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])):
     __slots__ = ()
+
     @property
     def format(self):
-        return '/'.join(self)
+        return os.path.join(*self)
