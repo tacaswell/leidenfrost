@@ -387,3 +387,216 @@ def _clean_fringes(f_classes, f_locs):
         print zero_count, '/', np.prod([len(_p) for _p in prop_l_lsts])
         f_classes, f_locs = best_lst
     return f_classes, f_locs
+
+
+class FringeRing(object):
+    '''
+    A class to carry around Fringe data
+    '''
+    def __init__(self, tau):
+        self.fringes = []
+        self.tau = tau
+        self.invalid_fringes = []
+        self.curve = None
+
+    def link_to_next_ring(self, other):
+        pass
+
+    def set_forward_deltas(self):
+        for f in self.fringes:
+            f.determine_forward_dh()
+        return np.cumsum([f.f_dh for f in self.fringes])
+
+    def find_invalid_sequence(self):
+        list_tmp = []
+        for f in self.fringes:
+            valid, configs = f.is_valid_order()
+            if not valid:
+                pre_f = f.prev_P
+                invalid_fringe = Fringe(0, pre_f.phi + pre_f.distance(f) / 2, frame_number=f.frame_number)
+                f.insert_behind(invalid_fringe)
+                # if there is only one option, just set it
+                if len(configs) == 1:
+                    invalid_fringe.set_color_charge(*configs[0])
+                    list_tmp.append(invalid_fringe)
+                else:
+                    self.invalid_fringes.append((invalid_fringe, configs))
+
+        self.fringes.extend([f for f, _ in self.invalid_fringes])
+        self.fringes.extend(list_tmp)
+        self.fringes.sort(key=lambda x: x.phi)
+
+    def set_reverse_deltas(self):
+        raise NotImplementedError()
+
+    def compute_cumulative_forward(self):
+        return np.cumsum([f.f_dh for f in self.fringes])
+
+    def compute_cumulative_reverse(self):
+        raise NotImplementedError()
+
+    def plot_fringes(self, ax):
+        colors = ['r', 'b']
+        shapes = ['^', 'o', 'v']
+        lines = []
+        for color, c in zip([-1, 1], colors):
+            for charge, s in zip([-1, 0, 1], shapes):
+                phi, q = zip(*[(fr.phi, fr.q) for fr in self.fringes if fr.color == color and fr.charge == charge])
+                x, y = self.curve.q_phi_to_xy(q, phi)
+                lines.extend(ax.plot(x, y, linestyle='none', marker=s, color=c))
+        return lines
+
+    def return_tracking_lists(self):
+        return [[fr for fr in self.fringes if fr.color == color and fr.charge == charge] for (color, charge) in
+                itertools.product([-1, 1], repeat=2)]
+
+def get_rf(hf, j):
+    mbe = hf[j]
+    th_offset = mbe.get_theta_offset()
+    rf = FringeRing(mbe.res[0][1],
+                    mbe.res[0][0],
+                    th_offset=th_offset,
+                    ringID=j)
+    return rf
+
+
+def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_search_range):
+    '''
+
+    A function to link 'runs' together.  A run is an ordered 1D
+    sequence.  This will link together two subsequent runs, allowing
+    there to be gaps and overhang at both ends, but does not allow
+    crossing.  That is, if a1 < b1 -> a2 < b2.
+
+    The algorithm is a modified version of the Crocker-Grier
+    algorithm.  Given two lists, there are three possible options, the
+    first item in each list are linked [0], the first item in the
+    source list is not linked to anything (skipped) [1] or the first
+    item in the second list is not linked to anything (skipped) [-1].
+    The remainder of the lists are then dealt with recursively.  If
+    one list is exhausted first, the remainder of the other list is
+    marked as skipped.
+
+    This function runs recursively, with a maximum depth the length of
+    the longest input.
+
+    This is an internal function and probably shouldn't be directly
+    used
+
+    :param best_accum: the current minimum penalty
+    :param best_order: the current best linkange
+    :param cur_accum: the accumulated penalty of the current candidate
+    linkage
+    :param cur_order: the current proposed linkage
+    :param source: a list of objects to link from.  Objects must
+    implement `distance`
+    :param dest: a list of objects to link to.  Objects must implement
+    `dist`
+    :param max_search_range: the maximum distance away to consider a link.
+    Also sets penalty for skipping a link
+    '''
+
+    # base cases
+    if len(source) == 0:
+        tmp_accum = cur_accum + len(dest) * max_search_range
+        if tmp_accum < best_accum:
+            print best_accum, len(source), len(dest), len(cur_order)
+            print cur_order
+            # we have a winner
+            best_order = cur_order[:]      # get a copy
+            best_order.extend([1] * len(dest))
+            return best_order, tmp_accum
+        else:
+            # old way is still best
+            return best_order, best_accum
+
+    if len(dest) == 0:
+        tmp_accum = cur_accum + len(source) * max_search_range
+        if tmp_accum < best_accum:
+            print best_accum, len(source), len(dest), len(cur_order)
+            print cur_order
+            best_order = cur_order[:]      # get a copy
+            best_order.extend([1] * len(source))
+            return best_order, tmp_accum
+
+        else:
+            # old way is still best
+            return best_order, best_accum
+
+    # try by linking the first two entries of the lists together, recurse on the rest
+    source_head = source.pop(0)
+    dest_head = dest.pop(0)
+    dist = source_head.distance(dest_head)
+    if dist < max_search_range:  # if the distance is less than the maximum
+        tmp_accum = cur_accum + dist      # get new trial accum
+        if tmp_accum < best_accum:
+            cur_order.append(0)
+            best_order, best_accum = _link_run(best_accum, best_order,
+                                               tmp_accum, cur_order,
+                                               source, dest,
+                                               max_search_range)
+
+            cur_order.pop()
+
+    # only need to do this once for both of the next two checks
+    tmp_accum = cur_accum + max_search_range
+    # try dropping just the first entry in source
+    dest.insert(0, dest_head)
+
+    if tmp_accum < best_accum:
+            cur_order.append(-1)
+            best_order, best_accum = _link_run(best_accum, best_order,
+                                               tmp_accum, cur_order,
+                                               source, dest,
+                                               max_search_range)
+
+            cur_order.pop()
+
+    # try dropping the first entry of the dest
+    source.insert(0, source_head)
+    dest_head = dest.pop(0)
+
+    if tmp_accum < best_accum:
+            cur_order.append(1)
+            best_order, best_accum = _link_run(best_accum, best_order,
+                                               tmp_accum, cur_order,
+                                               source, dest,
+                                               max_search_range)
+
+            cur_order.pop()
+
+    dest.insert(0, dest_head)             # make sure list is unchanged by pass through function
+
+    return best_order, best_accum
+
+
+def link_run(source, dest, max_search_range):
+    '''
+    wrapper function for _link_run that handles setting up and parsing the output
+
+    assumes the objects that come in have a `set_next` method
+    '''
+    best_accum = ((len(source) + len(dest)) / 4) * max_search_range
+    best_order = []
+    cur_accum = 0
+    cur_order = []
+    wsource = list(source)
+    wdest = list(dest)
+
+    best_order, best_accum = _link_run(best_accum, best_order, cur_accum, cur_order, wsource, wdest, max_search_range)
+
+    wsource = list(source)
+    wdest = list(dest)
+    res = []
+    print best_order
+    for r in best_order:
+        if r == 0:
+            res.append((wsource.pop(0), wdest.pop(0)))
+        elif r == -1:
+            res.append((None, wdest.pop(0)))
+        elif r == 1:
+            res.append((wsource.pop(0), None))
+        else:
+            raise RuntimeError("should never reach this")
+
+    return res, best_accum
