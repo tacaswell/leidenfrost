@@ -848,16 +848,17 @@ def _fit_quad_to_peak(x, y):
 
 
 def update_average_cache(base_path):
-    base_path = '/media/leidenfrost_b'
     cine_fnames = []
     for dirpath, dirnames, fnames in os.walk(base_path + '/' + 'leidenfrost'):
         cine_fnames.extend([FilePath(base_path, dirpath[len(base_path) + 1:], f) for f in fnames if 'cine' in f])
 
     db = ldb.LFmongodb()
 
-    for cn in cine_fnames[26:]:
+    for cn in cine_fnames:
         if 'cine' not in cn[-1]:
             continue
-        cine_hash = cine.Cine('/'.join(cn)).hash
-        bck_img = gen_bck_img('/'.join(cn))
-        db.store_background_img(cine_hash, bck_img)
+        cine_hash = cine.Cine(cn.format).hash
+        bck_img = db.get_background_img(cine_hash)
+        if bck_img is None:
+            bck_img = gen_bck_img(cn.format)
+            db.store_background_img(cine_hash, bck_img)
