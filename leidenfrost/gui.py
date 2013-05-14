@@ -1377,7 +1377,7 @@ class BinaryFrameSearch(QtGui.QDialog):
     @QtCore.Slot()
     def bad_jump(self):
         self.top = self.cur
-        self.cur =  self.cur + int((self.bottom - self.cur) // 2)
+        self.cur = self.cur + int((self.bottom - self.cur) // 2)
         self._update()
 
     @QtCore.Slot()
