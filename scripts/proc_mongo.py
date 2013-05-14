@@ -66,6 +66,8 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
         file_out = h5py.File(h5_fname.format, 'r+')
         try:
             for j in range(len(stack)):
+                if j % 5000 == 0:
+                    print cine_fname.fname, j
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
                 mbe.write_to_hdf(file_out)
                 del mbe
