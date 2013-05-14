@@ -815,8 +815,8 @@ class LFReader(QtCore.QObject):
 
         print fname, cbp, kwargs
         self.backend = backends.HdfBackend(fname,
-                                        cine_base_path=cbp,
-                                        **kwargs)
+                                           cine_base_path=cbp,
+                                           **kwargs)
         self.mbe = self.backend.get_frame(0,
                                           raw=True,
                                           get_img=True)
@@ -832,7 +832,7 @@ class LFReaderGui(QtGui.QMainWindow):
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
     cap_lst = ['hdf base path',
-               'cine base directory',
+               'cine base path',
                'cine cache path',
                'hdf cache path']
 
@@ -888,7 +888,7 @@ class LFReaderGui(QtGui.QMainWindow):
     def on_draw(self, refresh_lines=True, refresh_img=True):
         """ Redraws the figure
         """
-        print 'on_draw'
+
 
         mbe = self.reader.get_mbe()
         if mbe is None:
@@ -929,7 +929,7 @@ class LFReaderGui(QtGui.QMainWindow):
         if self.im is not None:
             self.im.remove()
 
-        print 'entered redraw'
+
 
         # clear the lines we have
         for ln in self.fringe_lines:
