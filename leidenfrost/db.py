@@ -135,6 +135,16 @@ class LFDbWrapper(object):
         '''Removes a proc record from the db '''
         raise NotImplementedError('you must define this is a sub class')
 
+    def remove_config(self, c_id):
+        '''Removes a configuration from the data base
+
+        Parameters
+        ----------
+        c_id : id type
+             The id of the configuration to remove
+        '''
+        raise NotImplementedError('you must define this is a sub class')
+
     def store_config(self, cine_hash, data, **kwargs):
         '''
         Adds a configuration to the store
@@ -243,6 +253,9 @@ class LFmongodb(LFDbWrapper):
         record['proc_keys'] = []
         _id = self.coll_dict['config'].insert(record)
         return _id
+
+    def remove_config(self, c_id):
+        self.coll_dict['config'].remove({'_id': c_id})
 
     def add_comment(self, cine_hash, comment_dict=None, **kwargs):
         '''
