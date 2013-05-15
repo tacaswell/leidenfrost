@@ -487,7 +487,7 @@ class Region_map(object):
     def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
         height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
         for j in range(1, len(self.height_map)):
-                height_img[self.label_regions == j] = self.height_map[j]
+            height_img[self.label_regions == j] = self.height_map[j]
 
         if ax is None:
             # make this smarter
