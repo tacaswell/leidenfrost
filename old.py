@@ -161,12 +161,13 @@ def fit_ellipse(r):
 def gen_to_parm(p):
     a, b, c, d, f = p
     g = -1
+
     x0 = (c*d - b*f) / (b*b - a*c)
     y0 = (a*f - b*d) / (b*b - a*c)
-    ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
-    bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g))/((b*b - a*c) * (-np.sqrt((a-c)**2 + 4 *b*b)-(a+c))))
+    ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)) / ((b*b - a*c) * (np.sqrt((a-c) ** 2 + 4*b*b) - (a+c))))
+    bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)) / ((b*b - a*c) * (-np.sqrt((a-c) ** 2 + 4*b*b) - (a+c))))
 
-    t0 =  (1/2) * np.arctan(2*b / (a-c))
+    t0 = (1/2) * np.arctan(2*b / (a-c))
 
     if a > c:
         t0 = (1 / 2) * np.arctan(2 * b / (a - c))
