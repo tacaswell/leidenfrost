@@ -524,6 +524,8 @@ class SplineCurve(object):
         '''A really hacky way of doing different
         '''
         self.tck = tck
+        self._cntr = None
+        self._circ = None
 
     def get_xy_samples(self, sample_count):
         '''
@@ -543,9 +545,27 @@ class SplineCurve(object):
         parent_group.attrs['tck2'] = self.tck[2]
 
     def circumference(self):
-        '''returns a rough estimate of the circumference'''
+        '''returns a rough estimate of the circumference
+        DEPRECATED
+        '''
         new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
         return np.sum(np.sqrt(np.sum(np.diff(new_pts, axis=1) ** 2, axis=0)))
+
+    @property
+    def circ(self):
+        '''returns a rough estimate of the circumference'''
+        if self._circ is None:
+            new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
+            self._circ = np.sum(np.sqrt(np.sum(np.diff(new_pts, axis=1) ** 2, axis=0)))
+        return self._circ
+
+    @property
+    def cntr(self):
+        '''returns a rough estimate of the circumference'''
+        if self._cntr is None:
+            new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
+            self._cntr = np.mean(new_pts)
+        return self._cntr
 
     def q_phi_to_xy(self, q, phi, cross=None):
         '''Converts q, phi pairs -> x, y pairs.  All other code that
