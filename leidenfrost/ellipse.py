@@ -23,6 +23,19 @@ import scipy.odr as sodr
 
 # http://mathworld.wolfram.com/Ellipse.html
 def gen_to_parm(p):
+    '''
+    Converts the parameters for the general quadratic form to the human readable parameters.
+
+    Parameters
+    ----------
+    p: sequence
+       (a, b, c, d, f) = p
+
+    Returns
+    -------
+    new_p: tuple
+        (axis_1, axis_2, theta_0, cntr_x, cntr_y)
+    '''
     a, b, c, d, f = p
     g = -1
 
@@ -48,6 +61,28 @@ def gen_to_parm(p):
 
 
 def gen_ellipse(a, b, t, x, y, theta):
+    '''Return the (x, y) coordinates for the ellipse with
+    the given parameters.
+
+    Parameters
+    ----------
+    a: float
+        major axis
+    b: float
+        minor axis
+    t: float
+        the angle between the x-axis and the major axis
+    x: float
+        x coordinate of center
+    y: float
+        y coordinate of center
+    theta: `np.ndarray` or float
+        the angles to compute the coordinates at
+
+    Returns: `np.ndarray`
+        A 2xN `np.ndarray` [x_vals, y_vals]
+
+    '''
     if a < b:
         a, b = b, a
         t = t + np.pi/2
@@ -58,7 +93,10 @@ def gen_ellipse(a, b, t, x, y, theta):
     return np.vstack((r * np.cos(theta) + x, r * np.sin(theta) + y))
 
 
-def e_funx(p, r):
+def _e_funx(p, r):
+    '''
+    private helper function for ellipse fitting
+    '''
     x, y = r
     a, b, c, d, f = p
     return (a * x * x) + (2 * b * x * y) + (c * y * y) + (2 * d * x) + (2 * f * y) - 1
@@ -66,7 +104,23 @@ def e_funx(p, r):
 
 def gap_filler(x, y, R, center, N=15):
     """
-    Takes in a set of x, y, R, center fits an ellipse to it
+    Returns N points to fill in a gap
+
+    Parameters
+    ----------
+    x: sequence
+        x = (x_left, x_right)
+    y: sequence
+        y = (y_left, y_right)
+    R: float
+        initial guess at average radius
+    center: `np.ndarray`
+        initial guess at the center of the ellipse
+    N: int
+        The number of points to return, defaults to 15
+
+    Returns: `np.ndarray`
+        A 2xN `np.ndarray` [x_vals, y_vals]
     """
     xl, xr = x
     yl, yr = y
@@ -80,18 +134,15 @@ def gap_filler(x, y, R, center, N=15):
 
     p0 = (a, b, c, d, f)
     data = sodr.Data((np.hstack(x), np.hstack(y)), 1)
-    model = sodr.Model(e_funx, implicit=1)
+    model = sodr.Model(_e_funx, implicit=1)
     worker = sodr.ODR(data, model, p0)
     out = worker.run()
     out = worker.restart()
 
     ap, bp, t0, x0, y0 = gen_to_parm(out.beta)
-    print out.beta
     theta_start = np.arctan2(yl[-1] - y0, xl[-1] - x0)
     theta_end = np.arctan2(yr[0] - y0, xr[0] - x0)
-    print theta_start, theta_end
-    print ap, bp, t0, x0, y0
-    print
+
     theta_list = np.linspace(theta_start, theta_end, N + 2)[1:-1]
 
     return gen_ellipse(ap, bp, t0, x0, y0, theta_list)
