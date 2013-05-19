@@ -534,7 +534,7 @@ class SplineCurve(object):
 
         STOP USING THIS
         '''
-        print "STOP USING THIS"
+        print "STOP USING THIS: GET_XY_SAMPLES"
         return self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, sample_count))
 
     def write_to_hdf(self, parent_group):
@@ -549,7 +549,7 @@ class SplineCurve(object):
         '''returns a rough estimate of the circumference
         DEPRECATED
         '''
-        print "STOP USING THIS"
+        print "STOP USING THIS: CIRCUMFERENCE"
         new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
         return np.sum(np.sqrt(np.sum(np.diff(new_pts, axis=1) ** 2, axis=0)))
 
@@ -566,7 +566,7 @@ class SplineCurve(object):
         '''returns a rough estimate of the circumference'''
         if self._cntr is None:
             new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
-            self._cntr = np.mean(new_pts)
+            self._cntr = np.mean(new_pts, 1)
         return self._cntr
 
     def q_phi_to_xy(self, q, phi, cross=None):
