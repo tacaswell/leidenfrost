@@ -87,7 +87,7 @@ def gen_ellipse(a, b, t, x, y, theta):
         a, b = b, a
         t = t + np.pi/2
 
-    assert a > b
+    assert a >= b
 
     r = 1 / np.sqrt((np.cos(theta - t) ** 2) / (a * a) + (np.sin(theta - t) ** 2) / (b * b))
     return np.vstack((r * np.cos(theta) + x, r * np.sin(theta) + y))
