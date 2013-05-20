@@ -35,6 +35,7 @@ import collections
 
 import leidenfrost.db as db
 import leidenfrost.infra as infra
+import leidenfrost.ellipse as ellipse
 from leidenfrost import FilePath
 
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
@@ -393,8 +394,9 @@ class MemBackendFrame(object):
                     .9 * np.min(y), 1.1 * np.max(y),
                     ]
 
-    def get_next_spline(self, mix_in_count=0, pix_err=0, **kwargs):
-        if self.next_curve is not None and self.mix_in_count == mix_in_count:
+    def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=np.pi/5, **kwargs):
+        print 'tester'
+        if self.next_curve is not None:
             return self.next_curve
 
         tim, tam = self.trk_lst
@@ -417,10 +419,64 @@ class MemBackendFrame(object):
         indx = t_phi.argsort()
         t_q = t_q[indx]
         t_phi = t_phi[indx]
-        # generate the new curve
+        # get x,y points
         x, y = self.curve.q_phi_to_xy(t_q, t_phi, cross=False)
 
-        new_curve = infra.SplineCurve.from_pts(np.vstack((x, y)),
+        # check for gaps
+        t_phi_diff = np.diff(t_phi)
+        R = self.curve.circ / (np.pi*2)
+        cntr = self.curve.cntr
+        N = 12                             # how much buffer to take
+
+        filler_data = []
+        for gap in np.where(t_phi_diff > max_gap)[0]:
+            #        print 'MIND THE GAP', gap, len(t_phi)
+            gap += 1
+
+            if gap < N:
+                # deal with wrap-around
+                _x_l = np.hstack((x[len(t_phi) - (N - gap):], x[:gap]))
+                _x_r = x[gap+1:gap+N]
+                _y_l = np.hstack((y[len(t_phi) - (N - gap):], y[:gap]))
+                _y_r = y[gap+1:gap+N]
+            elif gap >= len(t_phi) - N:
+                # deal with wrap-around
+                _x_l = x[gap-N:gap]
+                _x_r = np.hstack((x[gap+1:], x[:(N - (len(t_phi) - gap)) + 1]))
+                _y_l = y[gap-N:gap]
+                _y_r = np.hstack((y[gap+1:], y[:(N - (len(t_phi) - gap)) + 1]))
+            else:
+                _x_l = x[gap-N:gap]
+                _x_r = x[gap+1:gap+N]
+                _y_l = y[gap-N:gap]
+                _y_r = y[gap+1:gap+N]
+
+            filler_data.append((gap,
+                                ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+
+        # deal with gap between last and first points
+        if np.mod(t_phi[0] - t_phi[-1], 2 * np.pi) > max_gap:
+            gap = len(t_phi)
+            _x_l = x[-N:]
+            _x_r = x[:N+1]
+            _y_l = y[-N:]
+            _y_r = y[:N+1]
+
+            filler_data.append((gap,
+                                ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+
+        start_indx = 0
+        accum_lst = []
+        for gap, i_data in filler_data:
+            accum_lst.append(np.vstack((x[start_indx:gap], y[start_indx:gap])))
+            accum_lst.append(i_data)
+            start_indx = gap
+        accum_lst.append(np.vstack((x[start_indx:], y[start_indx:])))
+
+        pts = np.hstack(accum_lst)
+
+        # generate the new curve
+        new_curve = infra.SplineCurve.from_pts(pts,
                                                pix_err=pix_err,
                                                **kwargs)
 
@@ -453,16 +509,17 @@ class MemBackendFrame(object):
 
     def ax_draw_center_curves(self, ax, prev_c=True, next_c=True):
         if prev_c:
-            lo = ax.plot(*self.curve.get_xy_samples(1000), color='c', lw=1, linestyle='--')
+            lo = self.curve.draw_to_axes(ax, color='g',
+                                         lw=2, linestyle='--')
         else:
             lo = []
         if next_c:
             if self.next_curve is None:
                 self.get_next_spline()
-
+            print 'nxt_curve', self.next_curve
             new_curve = self.next_curve
-            ln = ax.plot(*new_curve.get_xy_samples(1000), color='m',
-                         lw=1, linestyle='--', zorder=-5)
+            ln = new_curve.draw_to_axes(ax, color='m',
+                                        lw=1, linestyle='--')
         else:
             ln = []
 
@@ -478,7 +535,7 @@ class MemBackendFrame(object):
         return None
 
     def write_to_hdf(self, parent_group):
-        print 'frame_%05d' % self.frame_number
+        #        print 'frame_%05d' % self.frame_number
         group = parent_group.create_group('frame_%05d' % self.frame_number)
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
@@ -490,7 +547,7 @@ class MemBackendFrame(object):
         ch, th = zip(*sorted([(t.charge, t.phi) for
                               t in itertools.chain(*self.trk_lst) if
                               t.charge and len(t) > 15],
-                            key=lambda x: x[-1]))
+                             key=lambda x: x[-1]))
 
         dh, th_new = infra.construct_corrected_profile((th, ch))
 
