@@ -7,18 +7,6 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
-def gen_ellipse(a, b, t, x, y, theta):
-    # a is always the major axis, x is always the major axis, can be rotated away by t
-    if b > a:
-            tmp = b
-            b = a
-            a = tmp
-
-    #t = np.mod(t, np.pi/2)
-    r = 1 / np.sqrt((np.cos(theta - t) ** 2) / (a * a) + (np.sin(theta - t) ** 2) / (b * b))
-    return np.vstack((r * np.cos(theta) + x, r * np.sin(theta) + y))
-
-
 def hash_file(fname):
     """for computing hash values of files.  This is to make it easy to
    run my data base scheme with files that are on external hard drives.
@@ -130,52 +118,6 @@ def plot_plst_data(p_lst):
     ax.legend(loc=0)
     ax.set_ylabel(r'arb')
     ax.set_xlabel('frame \#')
-
-
-def e_funx(p, r):
-    x, y = r
-    a, b, c, d, f = p
-
-    return (a * x * x) + (2 * b * x * y) + (c * y * y) + (2 * d * x) + (2 * f * y) - 1
-
-
-def fit_ellipse(r):
-    x, y = r
-    R2 = np.max(x - np.mean(x)) ** 2
-
-    a = c = 1 / R2
-    b = 0
-    d = -np.mean(x) / R2
-    f = -np.mean(y) / R2
-
-    p0 = (a, b, c, d, f)
-    data = sodr.Data(r, 1)
-    model = sodr.Model(e_funx, implicit=1)
-    worker = sodr.ODR(data, model, p0)
-    out = worker.run()
-    out = worker.restart()
-    return out
-
-
-# http://mathworld.wolfram.com/Ellipse.html
-def gen_to_parm(p):
-    a, b, c, d, f = p
-    g = -1
-
-    x0 = (c*d - b*f) / (b*b - a*c)
-    y0 = (a*f - b*d) / (b*b - a*c)
-    ap = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)) / ((b*b - a*c) * (np.sqrt((a-c) ** 2 + 4*b*b) - (a+c))))
-    bp = np.sqrt((2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)) / ((b*b - a*c) * (-np.sqrt((a-c) ** 2 + 4*b*b) - (a+c))))
-
-    t0 = (1/2) * np.arctan(2*b / (a-c))
-
-    if a > c:
-        t0 = (1 / 2) * np.arctan(2 * b / (a - c))
-
-    else:
-        t0 = np.pi / 2 + (1 / 2) * np.arctan(2 * b / (c - a))
-
-    return (ap, bp, t0, x0, y0)
 
 
 def do_comp():
