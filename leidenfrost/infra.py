@@ -186,7 +186,7 @@ class lf_Track(Track):
         Plots the track, in x-y  coordinates, onto `ax`
         '''
         q, phi = zip(*[(p.q, p.phi) for p in self.points])
-        x, y = curve.q_phi_to_xy(q, phi)
+        x, y = curve.q_phi_to_xy(q, phi) + 0.5
         mark_charge = False
         if mark_charge:
             if self.charge is None:
@@ -614,8 +614,8 @@ class SplineCurve(object):
             )
         else:
 
-            data_out = [(x + q * nx).reshape(phi_shape),
-                        (y + q * ny).reshape(phi_shape)]
+            data_out = np.vstack([(x + q * nx).reshape(phi_shape),
+                                  (y + q * ny).reshape(phi_shape)])
 
         return data_out
 
@@ -642,7 +642,7 @@ class SplineCurve(object):
         self.tck = tck
 
     def draw_to_axes(self, ax, N=1024, **kwargs):
-        return ax.plot(*(self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, N))), **kwargs)
+        return ax.plot(*(self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, N)) + 0.5), **kwargs)
 
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,

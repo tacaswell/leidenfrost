@@ -16,7 +16,7 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division, print_function
 
-import cine.cine
+
 from datetime import datetime
 import cPickle
 
@@ -66,10 +66,11 @@ class LFDbWrapper(object):
 
     def rm_background_img(self, cine_hash):
         '''
-        Deletes the background image for the data set of interest.  Does nothing if
-        entry does not exist.
+        Deletes the background image for the data set of interest.  Does
+        nothing if entry does not exist.
 
-        :param cine_hash: A unique identifier for the data set of interest.
+        :param cine_hash: A unique identifier for the data set of
+        interest.
 
         '''
         raise NotImplementedError('you must define this is a sub class')

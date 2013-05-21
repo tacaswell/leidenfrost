@@ -461,8 +461,12 @@ class MemBackendFrame(object):
                     _y_l = y[gap-N:gap]
                     _y_r = y[gap+1:gap+N]
 
-                filler_data.append((gap,
-                                    ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                try:
+                    filler_data.append((gap,
+                                        ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                except ellipse.EllipseException as e:
+                    print e
+                    pass
 
             # deal with gap between last and first points
             if np.mod(t_phi[0] - t_phi[-1], 2 * np.pi) > max_gap:
@@ -472,8 +476,12 @@ class MemBackendFrame(object):
                 _y_l = y[-N:]
                 _y_r = y[:N+1]
 
-                filler_data.append((gap,
-                                    ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                try:
+                    filler_data.append((gap,
+                                        ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                except ellipse.EllipseException as e:
+                    print e
+                    pass
 
             start_indx = 0
             accum_lst = []

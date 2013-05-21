@@ -21,6 +21,10 @@ import numpy as np
 import scipy.odr as sodr
 
 
+class EllipseException(Exception):
+    pass
+
+
 # http://mathworld.wolfram.com/Ellipse.html
 def gen_to_parm(p):
     '''
@@ -101,7 +105,7 @@ def _e_funx(p, r):
     return (a * x * x) + (2 * b * x * y) + (c * y * y) + (2 * d * x) + (2 * f * y) - 1
 
 
-def gap_filler(x, y, R, center, N=15):
+def gap_filler(x, y, R, center, fill_density=0.1):
     """
     Returns N points to fill in a gap
 
@@ -139,8 +143,21 @@ def gap_filler(x, y, R, center, N=15):
     out = worker.restart()
 
     ap, bp, t0, x0, y0 = gen_to_parm(out.beta)
-    theta_start = np.arctan2(yl[-1] - y0, xl[-1] - x0)
-    theta_end = np.arctan2(yr[0] - y0, xr[0] - x0)
+
+    if np.any(np.isnan([ap, bp, t0, x0, y0])):
+        print out.beta
+        print ap, bp, t0, x0, y0
+        raise EllipseException('parameters contain NaN')
+    theta_start = np.mod(np.arctan2(yl[-1] - y0, xl[-1] - x0), 2 * np.pi)
+    theta_end = np.mod(np.arctan2(yr[0] - y0, xr[0] - x0), 2 * np.pi)
+    if theta_end < theta_start:
+        theta_end += 2 * np.pi
+
+    N = int((theta_end - theta_start) * fill_density * (ap + bp) / 2)
+    #    print theta_start, theta_end, (ap + bp) / 2, N
+    if N < 1:
+        print 'gap_filler: under fill'
+        N = 1
 
     theta_list = np.linspace(theta_start, theta_end, N + 2)[1:-1]
 
