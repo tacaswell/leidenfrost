@@ -354,7 +354,7 @@ def animate_profile(data_iter):
     def update_lines(mbe, lines, txt, miss_txt):
         txt.set_text('%0.3e s' % (mbe.frame_number * 1 / 2900))
 
-        circ = mbe.curve.circumference() / (2 * np.pi) * 11
+        circ = mbe.curve.circ / (2 * np.pi) * 11
 
         min_t, max_t = mbe.res
         miss_min = ln_helper(min_t[:2], lines[0], yscale=.543 / 2, xscale=circ)
@@ -377,7 +377,7 @@ def animate_profile(data_iter):
     tmp_ch -= np.mean(tmp_ch)
 
     lim = np.max(np.abs(tmp_ch)) * (.543 / 4) * 2
-    circ = data_iter[0].curve.circumference() * 11
+    circ = data_iter[0].curve.circ * 11
     line1, = ax.plot([0, circ], [-lim, lim], 'o-r', label='mins')
     line2, = ax.plot([0, circ], [-lim, lim], 'o-b', label='maxes')
     line3, = ax.plot([0, circ], [-lim, lim], 'o-g', label='maxes')

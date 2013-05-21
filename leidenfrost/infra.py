@@ -383,8 +383,8 @@ class spline_fitter(object):
     def redraw(self):
         if len(self.pt_lst) > 5:
             SC = SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
-            new_pts = SC.get_xy_samples(1000)
-            center = np.mean(new_pts, 1).ravel()
+            new_pts = SC.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, 1000))
+            center = SC.cntr
             self.sp_plot.set_xdata(new_pts[0])
             self.sp_plot.set_ydata(new_pts[1])
             self.pt_lst.sort(key=lambda x:
@@ -408,7 +408,7 @@ class spline_fitter(object):
 
     def return_SplineCurve(self):
         curve = SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
-        print curve.circumference()
+        print curve.circ
         return curve
 
 
@@ -652,14 +652,13 @@ def find_rim_fringes(curve, lfimg, s_width, s_num,
     """
 
     # a really rough estimate of the circumference
-    C = curve.circumference()
+    C = curve.circ
 
     # sample points at ~ 2/pix
     sample_count = int(np.ceil(C * int(oversample)))
 
     # get center of curve
-    new_pts = curve.get_xy_samples(1000)
-    x0, y0 = np.mean(new_pts, 1).ravel()
+    x0, y0 = curve.cntr
 
     q_vec = np.linspace(-s_width, s_width, s_num).reshape(-1, 1)   # q sampling
     phi_vec = np.linspace(0, 2 * np.pi, sample_count)   # angular sampling
