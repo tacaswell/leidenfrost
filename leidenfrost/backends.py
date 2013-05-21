@@ -395,9 +395,9 @@ class MemBackendFrame(object):
                     .9 * np.min(y), 1.1 * np.max(y),
                     ]
 
-    def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=np.pi/5, **kwargs):
-        if self.next_curve is not None:
-            return self.next_curve
+    def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=np.pi/6, **kwargs):
+        # if self.next_curve is not None:
+        #     return self.next_curve
 
         tim, tam = self.trk_lst
 
@@ -514,10 +514,7 @@ class MemBackendFrame(object):
         else:
             lo = []
         if next_c:
-            if self.next_curve is None:
-                self.get_next_spline()
-
-            new_curve = self.next_curve
+            new_curve = self.get_next_spline(**self.prams)
             ln = new_curve.draw_to_axes(ax, color='m',
                                         lw=1, linestyle='--')
         else:
