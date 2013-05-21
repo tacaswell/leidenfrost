@@ -244,6 +244,11 @@ class LFmongodb(LFDbWrapper):
         config_record['proced'] = True
         self.coll_dict['config'].save(config_record)
 
+    def set_config_unproced(self, config_key):
+        config_record = self.coll_dict['config'].find_one({'_id': config_key})
+        config_record['proced'] = False
+        self.coll_dict['config'].save(config_record)
+
     def store_config(self, cine_hash, config_dict, curves_dict, **kwargs):
         record = {'cine': cine_hash}
         record['config'] = config_dict
