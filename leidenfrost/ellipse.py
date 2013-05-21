@@ -52,10 +52,9 @@ def gen_to_parm(p):
     else:
         if a < c:
             t0 = (1 / 2) * np.arctan(2 * b / (a - c))
-            print 'a'
+
         elif a > c:
             t0 = np.pi / 2 + (1 / 2) * np.arctan(2 * b / (a - c))
-            print 'b'
 
     return (ap, bp, t0, x0, y0)
 

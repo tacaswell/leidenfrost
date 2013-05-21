@@ -396,7 +396,6 @@ class MemBackendFrame(object):
                     ]
 
     def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=np.pi/5, **kwargs):
-        print 'tester'
         if self.next_curve is not None:
             return self.next_curve
 
@@ -517,7 +516,7 @@ class MemBackendFrame(object):
         if next_c:
             if self.next_curve is None:
                 self.get_next_spline()
-            print 'nxt_curve', self.next_curve
+
             new_curve = self.next_curve
             ln = new_curve.draw_to_axes(ax, color='m',
                                         lw=1, linestyle='--')
