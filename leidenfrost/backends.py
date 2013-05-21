@@ -276,7 +276,8 @@ class ProcessBackend(object):
                               frame_number,
                               res=trk_res,
                               trk_lst=[tim, tam],
-                              img=tmp_img)
+                              img=tmp_img,
+                              params=self.params)
         mbe.tm = tm
         next_curve = mbe.get_next_spline(**self.params)
         if 'fft_filter' in self.params:
@@ -368,8 +369,13 @@ class MemBackendFrame(object):
         self.res = res
         self.trk_lst = trk_lst
         self.frame_number = frame_number
-        self.params = params
+        if params is not None:
+            self.params = params
+        else:
+            self.params = {}
+
         self.next_curve = None
+        self._params_cache = None
         self.img = img
         self.mix_in_count = None
         self.pix_err = None
@@ -395,9 +401,13 @@ class MemBackendFrame(object):
                     .9 * np.min(y), 1.1 * np.max(y),
                     ]
 
-    def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=np.pi/6, **kwargs):
-        # if self.next_curve is not None:
-        #     return self.next_curve
+    def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=None, **kwargs):
+        print max_gap
+        _params_cache = (mix_in_count, pix_err, max_gap)
+        if _params_cache == self._params_cache and self.next_curve is not None:
+            return self.next_curve
+        else:
+            self._params_cache = _params_cache
 
         tim, tam = self.trk_lst
 
@@ -422,58 +432,62 @@ class MemBackendFrame(object):
         # get x,y points
         x, y = self.curve.q_phi_to_xy(t_q, t_phi, cross=False)
 
-        # check for gaps
-        t_phi_diff = np.diff(t_phi)
-        R = self.curve.circ / (np.pi*2)
-        cntr = self.curve.cntr
-        N = 12                             # how much buffer to take
+        if max_gap is not None:
+            # check for gaps
+            t_phi_diff = np.diff(t_phi)
+            R = self.curve.circ / (np.pi*2)
+            cntr = self.curve.cntr
+            N = 12                             # how much buffer to take
 
-        filler_data = []
-        for gap in np.where(t_phi_diff > max_gap)[0]:
-            #        print 'MIND THE GAP', gap, len(t_phi)
-            gap += 1
+            filler_data = []
+            for gap in np.where(t_phi_diff > max_gap)[0]:
+                #        print 'MIND THE GAP', gap, len(t_phi)
+                gap += 1
 
-            if gap < N:
-                # deal with wrap-around
-                _x_l = np.hstack((x[len(t_phi) - (N - gap):], x[:gap]))
-                _x_r = x[gap+1:gap+N]
-                _y_l = np.hstack((y[len(t_phi) - (N - gap):], y[:gap]))
-                _y_r = y[gap+1:gap+N]
-            elif gap >= len(t_phi) - N:
-                # deal with wrap-around
-                _x_l = x[gap-N:gap]
-                _x_r = np.hstack((x[gap+1:], x[:(N - (len(t_phi) - gap)) + 1]))
-                _y_l = y[gap-N:gap]
-                _y_r = np.hstack((y[gap+1:], y[:(N - (len(t_phi) - gap)) + 1]))
-            else:
-                _x_l = x[gap-N:gap]
-                _x_r = x[gap+1:gap+N]
-                _y_l = y[gap-N:gap]
-                _y_r = y[gap+1:gap+N]
+                if gap < N:
+                    # deal with wrap-around
+                    _x_l = np.hstack((x[len(t_phi) - (N - gap):], x[:gap]))
+                    _x_r = x[gap+1:gap+N]
+                    _y_l = np.hstack((y[len(t_phi) - (N - gap):], y[:gap]))
+                    _y_r = y[gap+1:gap+N]
+                elif gap >= len(t_phi) - N:
+                    # deal with wrap-around
+                    _x_l = x[gap-N:gap]
+                    _x_r = np.hstack((x[gap+1:], x[:(N - (len(t_phi) - gap)) + 1]))
+                    _y_l = y[gap-N:gap]
+                    _y_r = np.hstack((y[gap+1:], y[:(N - (len(t_phi) - gap)) + 1]))
+                else:
+                    _x_l = x[gap-N:gap]
+                    _x_r = x[gap+1:gap+N]
+                    _y_l = y[gap-N:gap]
+                    _y_r = y[gap+1:gap+N]
 
-            filler_data.append((gap,
-                                ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                filler_data.append((gap,
+                                    ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
 
-        # deal with gap between last and first points
-        if np.mod(t_phi[0] - t_phi[-1], 2 * np.pi) > max_gap:
-            gap = len(t_phi)
-            _x_l = x[-N:]
-            _x_r = x[:N+1]
-            _y_l = y[-N:]
-            _y_r = y[:N+1]
+            # deal with gap between last and first points
+            if np.mod(t_phi[0] - t_phi[-1], 2 * np.pi) > max_gap:
+                gap = len(t_phi)
+                _x_l = x[-N:]
+                _x_r = x[:N+1]
+                _y_l = y[-N:]
+                _y_r = y[:N+1]
 
-            filler_data.append((gap,
-                                ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                filler_data.append((gap,
+                                    ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
 
-        start_indx = 0
-        accum_lst = []
-        for gap, i_data in filler_data:
-            accum_lst.append(np.vstack((x[start_indx:gap], y[start_indx:gap])))
-            accum_lst.append(i_data)
-            start_indx = gap
-        accum_lst.append(np.vstack((x[start_indx:], y[start_indx:])))
+            start_indx = 0
+            accum_lst = []
+            for gap, i_data in filler_data:
+                accum_lst.append(np.vstack((x[start_indx:gap], y[start_indx:gap])))
+                accum_lst.append(i_data)
+                start_indx = gap
+            accum_lst.append(np.vstack((x[start_indx:], y[start_indx:])))
 
-        pts = np.hstack(accum_lst)
+            pts = np.hstack(accum_lst)
+        else:
+            # don't look for a gap
+            pts = np.vstack((x, y))
 
         # generate the new curve
         new_curve = infra.SplineCurve.from_pts(pts,
@@ -514,7 +528,7 @@ class MemBackendFrame(object):
         else:
             lo = []
         if next_c:
-            new_curve = self.get_next_spline(**self.prams)
+            new_curve = self.get_next_spline(**self.params)
             ln = new_curve.draw_to_axes(ax, color='m',
                                         lw=1, linestyle='--')
         else:
