@@ -402,7 +402,6 @@ class MemBackendFrame(object):
                     ]
 
     def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=None, **kwargs):
-        print max_gap
         _params_cache = (mix_in_count, pix_err, max_gap)
         if _params_cache == self._params_cache and self.next_curve is not None:
             return self.next_curve
