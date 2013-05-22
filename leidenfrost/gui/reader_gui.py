@@ -314,12 +314,23 @@ class LFReaderGui(QtGui.QMainWindow):
         self.frame_spinner.setRange(0, len(self.reader) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
         self.frame_spinner.setWrapping(True)
+        frame_selector_group = QtGui.QVBoxLayout()
         fs_form = QtGui.QHBoxLayout()
         fs_form.addWidget(QtGui.QLabel('frame #'))
         fs_form.addWidget(self.frame_spinner)
         fs_form.addWidget(QtGui.QLabel(' of '))
         self.max_frame_label = QtGui.QLabel(str(len(self.reader) - 1))
         fs_form.addWidget(self.max_frame_label)
+        fs_stepbox = QtGui.QGroupBox("Frame step")
+        fs_sb_rb = QtGui.QHBoxLayout()
+        for j in [1, 10, 100, 1000, 10000]:
+            tmp_rdo = QtGui.QRadioButton(str(j))
+            tmp_rdo.toggled.connect(lambda x, j=j: self.frame_spinner.setSingleStep(j) if x else None)
+            fs_sb_rb.addWidget(tmp_rdo)
+            pass
+        fs_stepbox.setLayout(fs_sb_rb)
+        frame_selector_group.addLayout(fs_form)
+        frame_selector_group.addWidget(fs_stepbox)
 
         self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
@@ -343,7 +354,7 @@ class LFReaderGui(QtGui.QMainWindow):
                 valid_fringes_rb.setChecked(True)
         self.set_all_fringes_acc.toggled.connect(rb_sync)
 
-        diag_layout.addLayout(fs_form)
+        diag_layout.addLayout(frame_selector_group)
 
         diag_layout.addWidget(self.fringe_grp_bx)
         path_box = QtGui.QGroupBox("paths")
