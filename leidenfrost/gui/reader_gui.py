@@ -100,6 +100,7 @@ class LFReaderGui(QtGui.QMainWindow):
     open_file_sig = QtCore.Signal(backends.FilePath, str, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
+    draw_done_sig = QtCore.Signal()
     cap_lst = ['hdf base path',
                'cine base path',
                'cine cache path',
@@ -132,6 +133,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.kill_thread.connect(self.thread.quit)
         self.open_file_sig.connect(self.reader.set_fname)
         self.redraw_sig.connect(self.on_draw)
+        self.draw_done_sig.connect(self._play)
 
         self.reader.frame_loaded.connect(self.on_draw)
         self.reader.file_loaded.connect(self.redraw)
@@ -157,8 +159,6 @@ class LFReaderGui(QtGui.QMainWindow):
     def on_draw(self, refresh_lines=True, refresh_img=True):
         """ Redraws the figure
         """
-
-
         mbe = self.reader.get_mbe()
         if mbe is None:
             #            self.clear()
@@ -191,14 +191,13 @@ class LFReaderGui(QtGui.QMainWindow):
                 self.im.set_data(img)
 
         self.canvas.draw()
+        self.draw_done_sig.emit()
         pass
 
     @QtCore.Slot(bool, bool)
     def redraw(self, draw_img, draw_tracks):
         if self.im is not None:
             self.im.remove()
-
-
 
         # clear the lines we have
         for ln in self.fringe_lines:
@@ -302,13 +301,6 @@ class LFReaderGui(QtGui.QMainWindow):
 
     def create_diag(self):
 
-        self.diag = QtGui.QDockWidget('controls', parent=self)
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
-        diag_widget = QtGui.QWidget(self.diag)
-        self.diag.setWidget(diag_widget)
-        diag_layout = QtGui.QVBoxLayout()
-        diag_widget.setLayout(diag_layout)
-
         # frame number lives on top
         self.frame_spinner = QtGui.QSpinBox()
         self.frame_spinner.setRange(0, len(self.reader) - 1)
@@ -332,6 +324,7 @@ class LFReaderGui(QtGui.QMainWindow):
         frame_selector_group.addLayout(fs_form)
         frame_selector_group.addWidget(fs_stepbox)
 
+        # box for setting if the fringes should be drawn
         self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
         self.fringe_grp_bx.setChecked(self.draw_fringes)
@@ -354,9 +347,7 @@ class LFReaderGui(QtGui.QMainWindow):
                 valid_fringes_rb.setChecked(True)
         self.set_all_fringes_acc.toggled.connect(rb_sync)
 
-        diag_layout.addLayout(frame_selector_group)
-
-        diag_layout.addWidget(self.fringe_grp_bx)
+        # box for path information
         path_box = QtGui.QGroupBox("paths")
         pb_layout = QtGui.QVBoxLayout()
         path_box.setLayout(pb_layout)
@@ -366,11 +357,34 @@ class LFReaderGui(QtGui.QMainWindow):
             self.directory_actions[c].triggered.connect(ds.select_path)
             ds.selected.connect(lambda x, c=c: self.paths_dict.__setitem__(c, x))
 
-        diag_layout.addWidget(path_box)
-        diag_layout.addStretch()
+        # set up over-all layout
+        self.diag = QtGui.QDockWidget('controls', parent=self)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
+        diag_widget = QtGui.QWidget(self.diag)
+        self.diag.setWidget(diag_widget)
+        diag_layout = QtGui.QVBoxLayout()
+        diag_widget.setLayout(diag_layout)
 
+        # play button
+        play_button = QtGui.QPushButton('Play')
+        self.play_button = play_button
+        play_button.setCheckable(True)
+        self.play_button.pressed.connect(self.frame_spinner.stepUp)
+        # track pickers
         self.graphs_window = GraphDialog((2, 1))
         self.show_track_graphs.toggled.connect(self.graphs_window.setVisible)
+
+        # add everything to the layout
+        diag_layout.addLayout(frame_selector_group)
+        diag_layout.addWidget(self.fringe_grp_bx)
+        diag_layout.addWidget(path_box)
+        diag_layout.addStretch()
+        diag_layout.addWidget(play_button)
+
+    @QtCore.Slot()
+    def _play(self):
+        if self.play_button.isChecked():
+            QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)
 
     def create_main_frame(self):
         self.main_frame = QtGui.QWidget()
