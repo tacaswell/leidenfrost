@@ -1,6 +1,7 @@
 from multiprocessing import Process, JoinableQueue
 import cine
 import argparse
+import signal
 
 import os
 from leidenfrost import FilePath
@@ -8,6 +9,14 @@ import leidenfrost.infra as li
 import leidenfrost.db as ldb
 import leidenfrost.backends as lfbe
 import h5py
+
+
+class TimeoutException(Exception):
+    pass
+
+
+def timeout_handler(signum, frame):
+    raise TimeoutException()
 
 
 class worker(Process):
@@ -46,6 +55,7 @@ class worker(Process):
 
 
 def proc_cine_fname(cine_fname, hdf_fname_template):
+
     db = ldb.LFmongodb()
 
     ch = cine.Cine(cine_fname.format).hash
@@ -63,19 +73,31 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
         stack = lfbe.ProcessBackend.from_args(cine_fname, **params)
         stack.gen_stub_h5(h5_fname.format, seed_curve)
 
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
         file_out = h5py.File(h5_fname.format, 'r+')
         try:
             for j in range(len(stack)):
                 if j % 5000 == 0:
                     print cine_fname.fname, j
+
+                # set a 10s window, if the frame does not finish on 10s, kill it
+                signal.alarm(10)
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
+                # set alarm to 0
+                signal.alarm(0)
                 mbe.write_to_hdf(file_out)
                 del mbe
                 file_out.flush()
+        except TimeoutException:
+            print 'timed out'
 
         finally:
             # make sure that no matter what the output file gets cleaned up
             file_out.close()
+            # reset the alarm
+            signal.alarm(0)
+            # rest the signal handler
+            signal.signal(signal.SIGALRM, old_handler)
 
     return None
 
