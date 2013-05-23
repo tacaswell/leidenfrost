@@ -81,7 +81,7 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
                     print cine_fname.fname, j
 
                 # set a 10s window, if the frame does not finish on 10s, kill it
-                signal.alarm(10)
+                signal.alarm(30)
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
                 # set alarm to 0
                 signal.alarm(0)
