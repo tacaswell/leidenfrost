@@ -500,6 +500,7 @@ class MemBackendFrame(object):
         # generate the new curve
         new_curve = infra.SplineCurve.from_pts(pts,
                                                pix_err=pix_err,
+                                               need_sort=False,
                                                **kwargs)
 
         self.next_curve = new_curve
