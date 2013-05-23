@@ -419,10 +419,11 @@ class MemBackendFrame(object):
                         and bool(t.charge)] +
                        [0] * int(mix_in_count))
 
-        t_phi = np.array([t.phi for t in tim + tam if
-                          t.q is not None
-                          and t.phi is not None
-                          and bool(t.charge)] +
+        # this mod can come out later if the track code is fixed
+        t_phi = np.array([np.mod(t.phi, 2 * np.pi) for t in tim + tam if
+                         t.q is not None
+                         and t.phi is not None
+                         and bool(t.charge)] +
                          list(np.linspace(0, 2 * np.pi, mix_in_count, endpoint=False)))
 
         indx = t_phi.argsort()
