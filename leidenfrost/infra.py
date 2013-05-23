@@ -286,7 +286,7 @@ class lf_Track(Track):
 
         self.charge = prop_c
         self.q = prop_q
-        self.phi = prop_phi - p_shift
+        self.phi = np.mod(prop_phi - p_shift, 2 * np.pi)
 
     def mean_phi(self):
         '''
