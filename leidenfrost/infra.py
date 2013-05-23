@@ -288,24 +288,6 @@ class lf_Track(Track):
         self.q = prop_q
         self.phi = np.mod(prop_phi - p_shift, 2 * np.pi)
 
-    def mean_phi(self):
-        '''
-        Sets :py:attr:`phi` to be the average :py:attr:`phi` of the track
-
-        :deprecated: this is a stupid way of doing this.
-        '''
-        self.phi = np.mean([p.phi for p in self.points])
-        raise PendingDeprecationWarning()
-
-    def mean_q(self):
-        '''
-        Sets :py:attr:`q` to be the average :py:attr:`q` of the track
-
-        :deprecated: this is a stupid way of doing this.
-        '''
-        self.q = np.mean([p.q for p in self.points])
-        raise PendingDeprecationWarning()
-
     def merge_track(self, to_merge_track):
         '''
         :param to_merge_track: track to merge with this one
