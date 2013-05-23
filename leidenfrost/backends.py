@@ -447,20 +447,20 @@ class MemBackendFrame(object):
                 if gap < N:
                     # deal with wrap-around
                     _x_l = np.hstack((x[len(t_phi) - (N - gap):], x[:gap]))
-                    _x_r = x[gap+1:gap+N]
+                    _x_r = x[gap:gap+N+1]
                     _y_l = np.hstack((y[len(t_phi) - (N - gap):], y[:gap]))
-                    _y_r = y[gap+1:gap+N]
+                    _y_r = y[gap:gap+N+1]
                 elif gap >= len(t_phi) - N:
                     # deal with wrap-around
                     _x_l = x[gap-N:gap]
-                    _x_r = np.hstack((x[gap+1:], x[:(N - (len(t_phi) - gap)) + 1]))
+                    _x_r = np.hstack((x[gap:], x[:(N - (len(t_phi) - gap)) + 1]))
                     _y_l = y[gap-N:gap]
-                    _y_r = np.hstack((y[gap+1:], y[:(N - (len(t_phi) - gap)) + 1]))
+                    _y_r = np.hstack((y[gap:], y[:(N - (len(t_phi) - gap)) + 1]))
                 else:
                     _x_l = x[gap-N:gap]
-                    _x_r = x[gap+1:gap+N]
+                    _x_r = x[gap:gap+N+1]
                     _y_l = y[gap-N:gap]
-                    _y_r = y[gap+1:gap+N]
+                    _y_r = y[gap:gap+N+1]
 
                 try:
                     filler_data.append((gap,
