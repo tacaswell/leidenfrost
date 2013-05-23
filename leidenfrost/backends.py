@@ -465,8 +465,8 @@ class MemBackendFrame(object):
                 try:
                     filler_data.append((gap,
                                         ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
-                except ellipse.EllipseException as e:
-                    print e
+                except ellipse.EllipseException:  # as e:
+                    #                    print e
                     pass
 
             # deal with gap between last and first points
@@ -480,8 +480,8 @@ class MemBackendFrame(object):
                 try:
                     filler_data.append((gap,
                                         ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
-                except ellipse.EllipseException as e:
-                    print e
+                except ellipse.EllipseException:  # as e:
+                    #                    print e
                     pass
 
             start_indx = 0

@@ -145,8 +145,8 @@ def gap_filler(x, y, R, center, fill_density=0.1):
     ap, bp, t0, x0, y0 = gen_to_parm(out.beta)
 
     if np.any(np.isnan([ap, bp, t0, x0, y0])):
-        print out.beta
-        print ap, bp, t0, x0, y0
+        #        print out.beta
+        #        print ap, bp, t0, x0, y0
         raise EllipseException('parameters contain NaN')
     theta_start = np.mod(np.arctan2(yl[-1] - y0, xl[-1] - x0), 2 * np.pi)
     theta_end = np.mod(np.arctan2(yr[0] - y0, xr[0] - x0), 2 * np.pi)
