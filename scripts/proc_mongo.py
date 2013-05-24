@@ -2,6 +2,8 @@ from multiprocessing import Process, JoinableQueue
 import cine
 import argparse
 import signal
+import logging
+import time
 
 import os
 from leidenfrost import FilePath
@@ -55,6 +57,10 @@ class worker(Process):
 
 
 def proc_cine_fname(cine_fname, hdf_fname_template):
+    logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
+    logger.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
     db = ldb.LFmongodb()
 
@@ -67,6 +73,11 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
         h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
         db.store_proc(ch, config_dict['_id'], h5_fname)
 
+        lh = logging.FileHandler(hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'log')).format)
+
+        lh.setFormatter(formatter)
+        logger.addHandler(lh)
+
         seed_curve = li.SplineCurve.from_pickle_dict(config_dict['curves']['0'])
 
         params = config_dict['config']
@@ -77,19 +88,21 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
         file_out = h5py.File(h5_fname.format, 'r+')
         try:
             for j in range(len(stack)):
-                if j % 5000 == 0:
-                    print cine_fname.fname, j
 
                 # set a 10s window, if the frame does not finish on 10s, kill it
                 signal.alarm(30)
+                start = time.time()
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
-                # set alarm to 0
                 signal.alarm(0)
+                elapsed = time.time() - start
+                logger.info('completed frame %d in %fs', j, elapsed)
+                # set alarm to 0
+
                 mbe.write_to_hdf(file_out)
                 del mbe
                 file_out.flush()
         except TimeoutException:
-            print 'timed out'
+            logger.warn('timed out')
 
         finally:
             # make sure that no matter what the output file gets cleaned up
@@ -98,6 +111,7 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
             signal.alarm(0)
             # rest the signal handler
             signal.signal(signal.SIGALRM, old_handler)
+            logger.removeHandler(lh)
 
     return None
 
