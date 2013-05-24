@@ -4,6 +4,7 @@ import argparse
 import signal
 import logging
 import time
+import itertools
 
 import os
 from leidenfrost import FilePath
@@ -117,46 +118,45 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("cine_base_path", help="The base path for where the (cine) data files are located")
     parser.add_argument("hdf_path", help="path, relative to base path of hdf file")
-    parser.add_argument("--cine_search_path", help="The path to search for cine to process.  If not given, assumed to be cine_base_path")
+    parser.add_argument("cine_base_path",
+                        help="The base path for where the (cine) data files are located",
+                        nargs='*')
     parser.add_argument("--hdf_base_path", help="The base path for where the hdf data file are located.  If not given, assumed to be the same as cine_base_path")
     parser.add_argument("--N", help="number of files to process simultaneously")
 
     args = parser.parse_args()
-
-    cine_base_path = args.cine_base_path
-    if args.hdf_base_path:
-        hdf_base_path = args.hdf_base_path
-    else:
-        hdf_base_path = cine_base_path
-
-    if args.cine_search_path:
-        search_path = cine_base_path + '/' + args.cine_search_path
-    else:
-        search_path = cine_base_path + '/' + 'leidenfrost'
 
     if args.N:
         N = args.N
     else:
         N = 8
 
-    # template for the output file names
-    hdf_fname_template = FilePath(hdf_base_path, args.hdf_path, '')
-
     cine_fnames = []
-    for dirpath, dirnames, fnames in os.walk(search_path):
-        cine_fnames.extend([FilePath(cine_base_path, dirpath[len(cine_base_path) + 1:], f) for f in fnames if 'cine' in f])
+    for cine_base_path in args.cine_base_path:
 
-    # special check
-    cine_fnames = [cf for cf in cine_fnames if '320C_round_mode1.cine' != cf.fname]
+        if args.hdf_base_path:
+            hdf_base_path = args.hdf_base_path
+        else:
+            hdf_base_path = cine_base_path
+
+        if args.cine_search_path:
+            search_path = cine_base_path + '/' + args.cine_search_path
+        else:
+            search_path = cine_base_path + '/' + 'leidenfrost'
+
+        # template for the output file names
+
+        for dirpath, dirnames, fnames in os.walk(search_path):
+            cine_fnames.extend(zip([FilePath(cine_base_path, dirpath[len(cine_base_path) + 1:], f) for f in fnames if 'cine' in f],
+                                   itertools.repeat(FilePath(hdf_base_path, args.hdf_path, ''))))
 
     WORK_QUEUE = JoinableQueue()
     PROCS = [worker(WORK_QUEUE) for j in range(N)]
     for p in PROCS:
         p.start()
 
-    for cf in cine_fnames:
+    for cf, hdf_fname_template in cine_fnames:
         print 'adding', cf
         WORK_QUEUE.put((cf, hdf_fname_template))
 
