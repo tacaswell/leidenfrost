@@ -547,6 +547,7 @@ class Region_map(object):
 
     def display_height_resampled(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
         height_img = self.resample_height_img()
+        print np.min(height_img), np.max(height_img)
         if ax is None:
             # make this smarter
             ax = plt.gca()
