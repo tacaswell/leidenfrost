@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import h5py
 from bisect import bisect
+from scipy.interpolate import griddata
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
@@ -456,14 +457,15 @@ class Region_map(object):
         self.structure = structure
         self.size_cut = size_cut
 
-        for FR, region_list in izip(self.fringe_rings, self.label_regions.T):
+        self.region_edges = [_segment_labels(region_list) for region_list in self.label_regions.T]
+
+        for FR, (region_starts, region_labels, region_ends) in izip(self.fringe_rings, self.region_edges):
             # build list of regions
-            region_starts, region_labels, region_ends = _segment_labels(region_list)
             for fr_b, fr_f in pairwise_periodic(FR):
 
                 fr_b.abs_height = np.nan
 
-                b_b, b_f = [_bin_region(int((np.mod(_fr.phi, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0]),
+                b_b, b_f = [_bin_region(int((np.mod(_fr.phi, 2*np.pi) / (2*np.pi)) * self.label_regions.shape[0]),
                                         region_starts,
                                         region_ends)
                             for _fr in (fr_b, fr_f)]
@@ -476,7 +478,6 @@ class Region_map(object):
                 fr_b.region = label
                 self.region_fringes[label].append(fr_b)
                 fr_b.abs_height = np.nan
-                self.region_fringes[label].append(fr_b)
 
                 # handle the linking
                 if b_b is None or b_f is None:
@@ -517,6 +518,63 @@ class Region_map(object):
                       interpolation='none',
                       cmap='gray',
                       extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                      aspect='auto',
+                      origin='bottom',
+                      alpha=alpha)
+
+        ax.figure.canvas.draw()
+
+    def resample_height_img(self, th_step=1000, tau_step=5000):
+        scale = 2 * np.pi / self.label_regions.shape[0]
+        tmp_pts = []
+
+        print 'started'
+        for j, (region_start, region_label, region_ends) in enumerate(self.region_edges):
+            tmp_pts.extend(((j, scale * (re + rs) / 2), self.height_map[rl])
+                           for rs, re, rl in izip(region_start, region_ends, region_label)
+                           if not np.isnan(self.height_map[rl]))
+
+        print 'mapped'
+        print len(tmp_pts)
+        points, vals = zip(*tmp_pts)
+        points = np.vstack(points)
+        grid_y, grid_x = np.mgrid[0:2 * np.pi:th_step*1j, 0:self.label_regions.shape[1]:tau_step*1j]
+
+        print 'gridding'
+        grid_z2 = griddata(points, vals, (grid_x, grid_y), method='cubic')
+        print 'gridded'
+        return grid_z2
+
+    def display_height_resampled(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
+        height_img = self.resample_height_img()
+        if ax is None:
+            # make this smarter
+            ax = plt.gca()
+
+        my_cmap = cm.get_cmap(cmap)
+        my_cmap.set_bad('k', alpha=.5)
+
+        frac_size = 4
+        step = fractions.Fraction(1, frac_size)
+        ax.set_yticks([np.pi * j * step for j in range(2 * frac_size + 1)])
+        ax.set_yticklabels([format_frac(j * step) + '$\pi$'
+                            for j in range(2 * frac_size + 1)])
+
+        ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]))
+        ax.set_ylabel(r'$\theta$')
+
+        ax.imshow(height_img,
+                  interpolation='none',
+                  cmap=my_cmap,
+                  extent=[0, (self.working_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                  aspect='auto',
+                  origin='bottom',
+                  )
+        if bckgnd:
+            ax.imshow(self.working_img,
+                      interpolation='none',
+                      cmap='gray',
+                      extent=[0, (self.working_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
