@@ -437,7 +437,11 @@ class Region_map(object):
 
     @classmethod
     def from_RM(cls, RM):
-        return cls(RM.working_img, RM.fringe_rings, RM.thresh, RM.size_cut, RM.structure)
+        return cls(RM.working_img,
+                   RM.fringe_rings,
+                   RM.thresh,
+                   RM.size_cut,
+                   RM.structure)
 
     def __init__(self, working_img, FRs, thresh=0,
                  size_cut=100, structure=None):
