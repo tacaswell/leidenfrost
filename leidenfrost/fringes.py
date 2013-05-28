@@ -439,16 +439,22 @@ class Region_map(object):
     def from_RM(cls, RM):
         return cls(RM.working_img, RM.fringe_rings, RM.thresh, RM.size_cut, RM.structure)
 
-    def __init__(self, working_img, FRs, thresh=0, size_cut=100, structure=None):
+    def __init__(self, working_img, FRs, thresh=0,
+                 size_cut=100, structure=None):
         up_mask = working_img > 1 + thresh
         down_mask = working_img < 1 - thresh
 
-        lab_bright_regions, nb_br = self._label_regions(up_mask, size_cut, structure)
-        lab_dark_regions, nb_dr = self._label_regions(down_mask, size_cut, structure)
+        lab_bright_regions, nb_br = self._label_regions(up_mask,
+                                                        size_cut,
+                                                        structure)
+        lab_dark_regions, nb_dr = self._label_regions(down_mask,
+                                                      size_cut,
+                                                      structure)
         lab_dark_regions[lab_dark_regions > 0] += nb_br
 
         self.fringe_rings = FRs
-        self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions, dtype=np.uint32)
+        self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
+                                        dtype=np.uint32)
         self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
         self.region_fringes = [[] for j in range(nb_br + nb_dr)]
         self.working_img = working_img
@@ -457,15 +463,20 @@ class Region_map(object):
         self.structure = structure
         self.size_cut = size_cut
 
-        self.region_edges = [_segment_labels(region_list) for region_list in self.label_regions.T]
+        self.region_edges = [_segment_labels(region_list)
+                             for region_list in self.label_regions.T]
 
-        for FR, (region_starts, region_labels, region_ends) in izip(self.fringe_rings, self.region_edges):
+        for FR, (region_starts,
+                 region_labels,
+                 region_ends) in izip(self.fringe_rings, self.region_edges):
             # build list of regions
             for fr_b, fr_f in pairwise_periodic(FR):
 
                 fr_b.abs_height = np.nan
 
-                b_b, b_f = [_bin_region(int((np.mod(_fr.phi, 2*np.pi) / (2*np.pi)) * self.label_regions.shape[0]),
+                b_b, b_f = [_bin_region(int((np.mod(_fr.phi, 2*np.pi) /
+                                             (2*np.pi)) *
+                                             self.label_regions.shape[0]),
                                         region_starts,
                                         region_ends)
                             for _fr in (fr_b, fr_f)]
@@ -482,11 +493,14 @@ class Region_map(object):
                 # handle the linking
                 if b_b is None or b_f is None:
                     continue
-                if (b_b + 1 == b_f) or (b_f == 0 and b_b == len(region_labels) - 1):
+                if (b_b + 1 == b_f) or (b_f == 0 and
+                                        b_b == len(region_labels) - 1):
                     fr_b.insert_ahead(fr_f)
 
-    def display_height(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
-        height_img = np.ones(self.label_regions.shape, dtype=np.float32) * np.nan
+    def display_height(self, ax=None, cmap='jet', bckgnd=True,
+                       alpha=.65, t_scale=1, t_units=''):
+        height_img = np.ones(self.label_regions.shape,
+                             dtype=np.float32) * np.nan
         for j in range(1, len(self.height_map)):
             height_img[self.label_regions == j] = self.height_map[j]
 
@@ -509,7 +523,8 @@ class Region_map(object):
         ax.imshow(height_img,
                   interpolation='none',
                   cmap=my_cmap,
-                  extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                  extent=[0, (height_img.shape[1] - 1) * t_scale,
+                          0, 2 * np.pi],
                   aspect='auto',
                   origin='bottom',
                   )
@@ -517,7 +532,8 @@ class Region_map(object):
             ax.imshow(self.working_img,
                       interpolation='none',
                       cmap='gray',
-                      extent=[0, (height_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                      extent=[0, (height_img.shape[1] - 1) * t_scale,
+                              0, 2 * np.pi],
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
