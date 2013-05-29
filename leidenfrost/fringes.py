@@ -851,7 +851,7 @@ def _segment_labels(region_list, zero_thresh=2):
             region_starts.append(j)
             cur_region = lab
     if cur_region is not None:
-        region_ends.append(len(region_list))
+        region_ends.append(len(region_list) - 1)
 
     return region_starts, region_labels, region_ends
 
