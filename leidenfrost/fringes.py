@@ -505,8 +505,13 @@ class Region_map(object):
                        alpha=.65, t_scale=1, t_units=''):
         height_img = np.ones(self.label_regions.shape,
                              dtype=np.float32) * np.nan
-        for j in range(1, len(self.height_map)):
-            height_img[self.label_regions == j] = self.height_map[j]
+        for j, (region_start,
+                region_label,
+                region_ends) in enumerate(self.region_edges):
+            for l_start, label, l_end in izip(region_start,
+                                            region_label,
+                                            region_ends):
+                height_img[l_start:l_end-1, j] = self.height_map[label]
 
         if ax is None:
             # make this smarter
@@ -549,23 +554,29 @@ class Region_map(object):
         tmp_pts = []
 
         print 'started'
-        for j, (region_start, region_label, region_ends) in enumerate(self.region_edges):
+        for j, (region_start,
+                region_label,
+                region_ends) in enumerate(self.region_edges):
             tmp_pts.extend(((j, scale * (re + rs) / 2), self.height_map[rl])
-                           for rs, re, rl in izip(region_start, region_ends, region_label)
+                           for rs, re, rl in izip(region_start,
+                                                  region_ends, region_label)
                            if not np.isnan(self.height_map[rl]))
 
         print 'mapped'
         print len(tmp_pts)
         points, vals = zip(*tmp_pts)
         points = np.vstack(points)
-        grid_y, grid_x = np.mgrid[0:2 * np.pi:th_step*1j, 0:self.label_regions.shape[1]:tau_step*1j]
+        grid_y, grid_x = np.mgrid[0:2 * np.pi:th_step*1j,
+                                  0:self.label_regions.shape[1]:tau_step*1j]
 
         print 'gridding'
         grid_z2 = griddata(points, vals, (grid_x, grid_y), method='cubic')
         print 'gridded'
         return grid_z2
 
-    def display_height_resampled(self, ax=None, cmap='jet', bckgnd=True, alpha=.65, t_scale=1, t_units=''):
+    def display_height_resampled(self, ax=None, cmap='jet',
+                                 bckgnd=True, alpha=.65,
+                                 t_scale=1, t_units=''):
         height_img = self.resample_height_img()
         print np.min(height_img), np.max(height_img)
         if ax is None:
@@ -587,7 +598,8 @@ class Region_map(object):
         ax.imshow(height_img,
                   interpolation='none',
                   cmap=my_cmap,
-                  extent=[0, (self.working_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                  extent=[0, (self.working_img.shape[1] - 1) * t_scale,
+                          0, 2 * np.pi],
                   aspect='auto',
                   origin='bottom',
                   )
@@ -595,7 +607,8 @@ class Region_map(object):
             ax.imshow(self.working_img,
                       interpolation='none',
                       cmap='gray',
-                      extent=[0, (self.working_img.shape[1] - 1) * t_scale, 0, 2 * np.pi],
+                      extent=[0, (self.working_img.shape[1] - 1) * t_scale,
+                              0, 2 * np.pi],
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
@@ -610,7 +623,8 @@ class Region_map(object):
 
         data = self.label_regions
 
-        norm_br = matplotlib.colors.Normalize(vmin=.5, vmax=np.max(data), clip=False)
+        norm_br = matplotlib.colors.Normalize(vmin=.5,
+                                              vmax=np.max(data), clip=False)
         my_cmap = cm.get_cmap('jet')
         my_cmap.set_under(alpha=0)
 
@@ -630,7 +644,8 @@ class Region_map(object):
 
         data = self.label_regions
 
-        norm_br = matplotlib.colors.Normalize(vmin=.5, vmax=np.max(data), clip=False)
+        norm_br = matplotlib.colors.Normalize(vmin=.5,
+                                              vmax=np.max(data), clip=False)
         my_cmap = cm.get_cmap('jet')
         my_cmap.set_under(alpha=0)
         tmp = np.zeros(data.shape, dtype='uint32')
@@ -647,7 +662,8 @@ class Region_map(object):
         ax.figure.canvas.draw()
 
     def get_height(self, frame_num, theta):
-        theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) * self.label_regions.shape[0])
+        theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) *
+                         self.label_regions.shape[0])
         label = self.label_regions[theta_indx, frame_num]
         return self.height_map[label]
 
@@ -655,7 +671,8 @@ class Region_map(object):
         """An improved boot-strap operation
         """
         valid_connections = deque()
-        for dd in izip(self.connection_network('f'), self.connection_network('r')):
+        for dd in izip(self.connection_network('f'),
+                       self.connection_network('r')):
             tmp_dict = {}
             for _dd in dd:
                 for k, v in _dd.items():
@@ -663,7 +680,8 @@ class Region_map(object):
                     if dh is not None:
                         if k in tmp_dict and tmp_dict[k] != dh:
                             print 'conflict'
-                            # if we have inconsistent linking, throw everything out
+                            # if we have inconsistent linking, throw
+                            # everything out
                             del tmp_dict[k]
                             continue
                         tmp_dict[k] = dh
@@ -691,7 +709,8 @@ class Region_map(object):
                 set_by[b] = a
             else:
                 if self.height_map[b] != prop_height:
-                    print a, b, prop_height, self.height_map[b], valid_connections[a][b]
+                    print a, b, prop_height, \
+                          self.height_map[b], valid_connections[a][b]
                     fails.append((a, b))
 
         return set_by, fails
@@ -739,7 +758,9 @@ class Region_map(object):
                 frame_number = fr.frame_number
                 dset_names = ["f_class_{frn:02}".format(frn=frame_number),
                               "f_loc_{frn:02}".format(frn=frame_number)]
-                for n, v, t in izip(dset_names, [f_cls, f_loc], [np.int8, np.float]):
+                for n, v, t in izip(dset_names,
+                                    [f_cls, f_loc],
+                                    [np.int8, np.float]):
                     fr_grp.create_dataset(n,
                                           v.shape,
                                           t)
@@ -756,7 +777,9 @@ class Region_map(object):
             for fr in FR:
                 fdh = fr.forward_dh
 
-                if (not np.isnan(fdh)) and (not np.isnan(fr.abs_height)) and (not np.isnan(fr.next_P.abs_height)):
+                if (not np.isnan(fdh)) and \
+                        (not np.isnan(fr.abs_height)) and \
+                        (not np.isnan(fr.next_P.abs_height)):
                     if int(fr.next_P.abs_height - fr.abs_height) != fdh:
 
                         error_count += 1
@@ -780,13 +803,16 @@ class Region_map(object):
                 return "x:{x}, y:{y}, r:{reg}, h:{h}".format(x=col * xscale,
                                                              y=row * yscale,
                                                              reg=region,
-                                                             h=self.height_map[region])
+                                                    h=self.height_map[region])
             else:
                 return 'x=%1.4f, y=%1.4f' % (x, y)
         return format_coord
 
     def connection_network(self, dirc='f'):
-        """ Sets up the network between the regions based on what fringes fall in them.
+        """
+        Sets up the network between the regions based on what fringes fall in
+        them.
+
 
         """
         inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
@@ -798,7 +824,8 @@ class Region_map(object):
         ln_str = link_dict[dirc]
 
         # main data structure
-        connections = [defaultdict(inner_dict) for j in range(len(self.height_map))]
+        connections = [defaultdict(inner_dict)
+                       for j in range(len(self.height_map))]
         for FR in self.fringe_rings:
             for fr in FR:
                 if fr is None:
@@ -836,10 +863,13 @@ def _segment_labels(region_list, zero_thresh=2):
         elif lab == 0:
             if cur_region is not None:
                 zero_count += 1
-                # if we hit enough zeros in a row, start looking for a new region
+                # if we hit enough zeros in a row, start looking for a
+                # new region
                 if zero_count > zero_thresh:
-                    region_ends.append(j - zero_count)  # add end of previous label
-                    cur_region = None  # reset current label
+                    region_ends.append(j - zero_count)
+                    # add end of previous label
+                    cur_region = None
+                    # reset current label
                     zero_count = 0  #
             continue
         elif lab != cur_region:
@@ -869,7 +899,9 @@ def _bin_region(N, region_starts, region_ends):
 def _dict_to_dh(input_d, threshold=15):
     """Converts a (-1, 0, 1) dict -> a single dh.  Returns `None` if
     the conversion is ambiguous.  The conversion in ambiguous if a)
-    more than one bin has counts b) the number of counts is less than `threshold`
+    more than one bin has counts b) the number of counts is less than
+    `threshold`.
+
 
     Parameters
     ----------
