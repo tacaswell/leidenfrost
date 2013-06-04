@@ -16,6 +16,7 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 import os
+import cine
 from leidenfrost import FilePath
 
 
@@ -23,7 +24,20 @@ def get_h5_lst(base_path, search_path):
     '''Recursively returns all h5 files below base_path/search_path'''
     h5names = []
     for dirpath, dirnames, fnames in os.walk(base_path + '/' + search_path):
-        h5names.extend([FilePath(base_path, dirpath[len(base_path) + 1:], f) for f in fnames if 'h5' in f])
+        h5names.extend([FilePath(base_path, dirpath[len(base_path) + 1:], f)
+                        for f in fnames if 'h5' in f])
     h5names.sort(key=lambda x: x[-1])
 
     return h5names
+
+
+def get_cine_hash(base_path, search_path):
+    '''returs all paths and cine hash values under the search path'''
+    cine_fnames = []
+    for dirpath, dirnames, fnames in os.walk(base_path + '/' + search_path):
+        cine_fnames.extend([FilePath(base_path, dirpath[len(base_path)+1:], f)
+                        for f in fnames if 'cine' in f])
+    cine_fnames.sort(key=lambda x: x[-1])
+    cine_hash = [cine.Cine(cn.format).hash for cn in cine_fnames]
+
+    return zip(cine_fnames, cine_hash)
