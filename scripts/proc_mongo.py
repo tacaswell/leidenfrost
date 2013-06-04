@@ -1,5 +1,5 @@
 from multiprocessing import Process, JoinableQueue
-import cine
+from itertools import izip
 import argparse
 import signal
 import logging
@@ -9,6 +9,7 @@ import itertools
 import os
 from leidenfrost import FilePath
 import leidenfrost.infra as li
+import leidenfrost.file_help as lffh
 import leidenfrost.db as ldb
 import leidenfrost.backends as lfbe
 import h5py
@@ -31,7 +32,9 @@ class worker(Process):
     def __init__(self,
                  work_queue):
         """
-        Work queue is a joinable queue, res_queue can be any sort of thing that supports put()
+        Work queue is a joinable queue, res_queue can be any sort of
+        thing that supports put()
+
         """
         # background set up that must be done
         Process.__init__(self)
@@ -40,7 +43,9 @@ class worker(Process):
 
     def run(self):
         """
-        The assumption is that these will be run daemonic and reused for multiple work sessions
+        The assumption is that these will be run daemonic and reused for
+        multiple work sessions
+
         """
         while True:
             work_arg = self.work_queue.get()
@@ -48,16 +53,18 @@ class worker(Process):
                 self.work_queue.task_done()
                 return
             try:
-                cine_fname, hdf_fname_template = work_arg
-                proc_cine_fname(cine_fname, hdf_fname_template)
+                cine_fname, cine_hash, hdf_fname_template = work_arg
+                proc_cine_fname(cine_fname, cine_hash, hdf_fname_template)
             except Exception as E:
-                # we want to catch _EVERYTHING_ so errors don't blow up the other computations with it
+                # we want to catch _EVERYTHING_ so errors don't blow
+                # up the other computations with it
+                print "on file {}".format(cine_fname.fname)
                 print E
 
             self.work_queue.task_done()
 
 
-def proc_cine_fname(cine_fname, hdf_fname_template):
+def proc_cine_fname(cine_fname, ch, hdf_fname_template):
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
 
@@ -65,14 +72,12 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
 
     db = ldb.LFmongodb()
 
-    ch = cine.Cine(cine_fname.format).hash
     config_dict_lst = db.get_unproced_configs(ch)
 
     for config_dict in config_dict_lst:
         print cine_fname
 
         h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
-        db.store_proc(ch, config_dict['_id'], h5_fname)
 
         lh = logging.FileHandler(hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'log')).format)
 
@@ -89,8 +94,7 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
         file_out = h5py.File(h5_fname.format, 'r+')
         try:
             for j in range(len(stack)):
-
-                # set a 10s window, if the frame does not finish on 10s, kill it
+                # set a 30s window, if the frame does not finish on 30s, kill it
                 signal.alarm(30)
                 start = time.time()
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
@@ -104,6 +108,8 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
                 file_out.flush()
         except TimeoutException:
             logger.warn('timed out')
+        else:
+            db.store_proc(ch, config_dict['_id'], h5_fname)
 
         finally:
             # make sure that no matter what the output file gets cleaned up
@@ -118,12 +124,22 @@ def proc_cine_fname(cine_fname, hdf_fname_template):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("hdf_path", help="path, relative to base path of hdf file")
+    parser.add_argument("hdf_path",
+                        help="path, relative to base path of hdf file")
     parser.add_argument("cine_base_path",
-                        help="The base path for where the (cine) data files are located",
+                        help="The base path for where the (cine) " +
+                              "data files are located",
                         nargs='*')
-    parser.add_argument("--hdf_base_path", help="The base path for where the hdf data file are located.  If not given, assumed to be the same as cine_base_path")
-    parser.add_argument("--N", help="number of files to process simultaneously")
+    parser.add_argument("--hdf_base_path",
+                        help="The base path for " +
+                        "where the hdf data file are located.  If " +
+                        "not given, assumed to be the " +
+                        "same as cine_base_path")
+    parser.add_argument("--cine_search_path",
+                        help="Path relative to cine_base_path to " +
+                        "look for cine files")
+    parser.add_argument("--N",
+                        help="number of files to process simultaneously")
 
     args = parser.parse_args()
 
@@ -134,31 +150,35 @@ if __name__ == '__main__':
 
     cine_fnames = []
     for cine_base_path in args.cine_base_path:
-
         if args.hdf_base_path:
             hdf_base_path = args.hdf_base_path
         else:
             hdf_base_path = cine_base_path
 
         if args.cine_search_path:
-            search_path = cine_base_path + '/' + args.cine_search_path
+            search_path = args.cine_search_path
         else:
-            search_path = cine_base_path + '/' + 'leidenfrost'
+            search_path = 'leidenfrost'
 
-        # template for the output file names
+        cines = lffh.get_cine_hashes(cine_base_path, search_path)
+        cine_fnames.extend(zip(cines,
+                                itertools.repeat(FilePath(hdf_base_path,
+                                                          args.hdf_path, ''))))
 
-        for dirpath, dirnames, fnames in os.walk(search_path):
-            cine_fnames.extend(zip([FilePath(cine_base_path, dirpath[len(cine_base_path) + 1:], f) for f in fnames if 'cine' in f],
-                                   itertools.repeat(FilePath(hdf_base_path, args.hdf_path, ''))))
+    # don't start more processes than we could ever use
+    N = max(N, len(cine_fnames))
 
+    # stet up queues
     WORK_QUEUE = JoinableQueue()
     PROCS = [worker(WORK_QUEUE) for j in range(N)]
+    # start workers
     for p in PROCS:
         p.start()
 
-    for cf, hdf_fname_template in cine_fnames:
-        print 'adding', cf
-        WORK_QUEUE.put((cf, hdf_fname_template))
+    # put the work in the queue
+    for (cf, ch), hdf_fname_template in cine_fnames:
+        print 'adding {}/{} to work queue'.format(cf.path, cf.fname)
+        WORK_QUEUE.put((cf, ch, hdf_fname_template))
 
     # poison the worker processes
     for j in range(len(PROCS)):
