@@ -31,7 +31,7 @@ def get_h5_lst(base_path, search_path):
     return h5names
 
 
-def get_cine_hash(base_path, search_path):
+def get_cine_hashes(base_path, search_path):
     '''returs all paths and cine hash values under the search path'''
     cine_fnames = []
     for dirpath, dirnames, fnames in os.walk(base_path + '/' + search_path):
