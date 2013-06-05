@@ -345,12 +345,6 @@ class ProcessBackend(object):
 
         if seed_curve is not None:
             seed_curve.write_to_hdf(file_out)
-        if self.bck_img is not None:
-            file_out.create_dataset('bck_img',
-                                    self.bck_img.shape,
-                                    np.float,
-                                    compression='szip')
-            file_out['bck_img'][:] = self.bck_img
 
         file_out.close()
 
