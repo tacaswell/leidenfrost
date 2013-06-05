@@ -307,13 +307,20 @@ class ProcessBackend(object):
         self._verify_params(params)
         self.params = params
 
-    def write_config(self, seed_curve):
+    def write_config(self, seed_curve, cur_frame=None):
         if self.db is None:
             raise RuntimeError("need a valid db object to do this")
         tmpcurve_dict = dict((lab, cPickle.dumps(_tck))
-                             for lab, _tck in zip(['tck0', 'tck1', 'tck2'], seed_curve.tck))
+                             for lab, _tck in zip(['tck0', 'tck1', 'tck2'],
+                                                  seed_curve.tck))
 
-        self.db.store_config(self.cine_.hash, self.params, {str(0): tmpcurve_dict})
+        tmp_params = copy(self.params)
+        if cur_frame is not None:
+            tmp_params['start_frame'] = cur_frame
+
+        conf_id = self.db.store_config(self.cine_.hash, tmp_params,
+                                       {str(0): tmpcurve_dict})
+        return conf_id
 
     def gen_stub_h5(self, h5_fname, seed_curve):
         '''Generates a h5 file that can be read back in for later
