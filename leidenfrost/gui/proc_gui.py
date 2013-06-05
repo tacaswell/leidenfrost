@@ -378,7 +378,7 @@ class LFGui(QtGui.QMainWindow):
         self.diag.show()
 
     def save_config(self):
-        self.worker.process_backend.write_config(self.cur_curve)
+        self.worker.process_backend.write_config(self.cur_curve, self.cur_frame)
 
     def open_file(self):
 
