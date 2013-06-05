@@ -314,7 +314,7 @@ class ProcessBackend(object):
                              for lab, _tck in zip(['tck0', 'tck1', 'tck2'],
                                                   seed_curve.tck))
 
-        tmp_params = copy(self.params)
+        tmp_params = copy.copy(self.params)
         if cur_frame is not None:
             tmp_params['start_frame'] = cur_frame
 
