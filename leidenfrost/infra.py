@@ -519,13 +519,17 @@ class SplineCurve(object):
         print "STOP USING THIS: GET_XY_SAMPLES"
         return self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, sample_count))
 
-    def write_to_hdf(self, parent_group):
+    def write_to_hdf(self, parent_group, name=None):
         '''
         Writes out the essential data (spline of central curve) to hdf file.
         '''
-        parent_group.attrs['tck0'] = self.tck[0]
-        parent_group.attrs['tck1'] = np.vstack(self.tck[1])
-        parent_group.attrs['tck2'] = self.tck[2]
+        if name is not None:
+            curve_group = parent_group.create_group(name)
+        else:
+            curve_group = parent_group
+        curve_group.attrs['tck0'] = self.tck[0]
+        curve_group.attrs['tck1'] = np.vstack(self.tck[1])
+        curve_group.attrs['tck2'] = self.tck[2]
 
     def circumference(self):
         '''returns a rough estimate of the circumference
