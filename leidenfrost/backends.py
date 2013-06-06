@@ -48,6 +48,7 @@ class HdfBackend(object):
                  cine_base_path=None,
                  h5_buffer_base_path=None,
                  cine_buffer_base_path=None,
+                 mode='r',
                  *args,
                  **kwargs):
         """
@@ -70,17 +71,17 @@ class HdfBackend(object):
         if h5_buffer_base_path is not None:
             fname = copy_to_buffer_disk(fname, h5_buffer_base_path)
             self.buffers.append(fname)
-        self.file = h5py.File(fname.format, 'r')
+        if mode == 'rw':
+            self.file = h5py.File(fname.format, 'r+')
+            self.writeable = True
+        else:
+            self.file = h5py.File(fname.format, 'r')
+            self.writeable = False
+
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
         self.prams = HdfBEPram(True, True)
         self.proc_prams = dict(self.file.attrs)
-        if 'bck_img' in self.file.keys():
-            try:
-                self.bck_img = self.file['bck_img'][:]
-            except:
-                self.bck_img = None
-        else:
-            self.bck_img = None
+
         if cine_base_path is not None:
             self.cine_fname = FilePath(cine_base_path,
                                        self.file.attrs['cine_path'],
@@ -100,16 +101,15 @@ class HdfBackend(object):
             # this eats _ALL_ exceptions
             self.db = None
 
-        if self.bck_img is None:
-            # not passed in, try the data base
-            if self.db is not None:
-                self.bck_img = self.db.get_background_img(self.cine_.hash)
-            # if that fails too, run it
-            if self.bck_img is None and self.cine is not None:
-                self.gen_back_img()
-                # if we have a data base, shove in the data
-                if self.db is not None and self.bck_img is not None:
-                    self.db.store_background_img(self.cine.hash, self.bck_img)
+        self.bck_img = None
+        if self.db is not None:
+            self.bck_img = self.db.get_background_img(self.cine_.hash)
+        # if that fails too, run it
+        if self.bck_img is None and self.cine is not None:
+            self.gen_back_img()
+            # if we have a data base, shove in the data
+            if self.db is not None and self.bck_img is not None:
+                self.db.store_background_img(self.cine.hash, self.bck_img)
 
         if self.file.attrs['ver'] < '1.1.5':
             self._frame_str = 'frame_{:05}'
@@ -129,7 +129,18 @@ class HdfBackend(object):
             the frame to delete
 
         """
-        del self.file[self._frame_str.format(j)]
+        if self.contains_frame(j):
+            del self.file[self._frame_str.format(j)]
+
+    def contains_frame(self, j):
+        '''Returns if frame `j` is saved in the hdf file
+
+        Parameters
+        ----------
+        j : int
+            The frame to check
+        '''
+        return self._frame_str.format(j) in self.file
 
     def __len__(self):
         return self.num_frames
