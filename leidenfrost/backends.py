@@ -111,7 +111,25 @@ class HdfBackend(object):
                 if self.db is not None and self.bck_img is not None:
                     self.db.store_background_img(self.cine.hash, self.bck_img)
 
+        if self.file.attrs['ver'] < '1.1.5':
+            self._frame_str = 'frame_{:05}'
+        else:
+            self._frame_str = 'frame_{:07}'
+
         pass
+
+    def _del_frame(self, j):
+        """Deletes frame j.
+
+        *THIS BLOODY DELETES DATA!!!*
+
+        Parameters
+        ----------
+        j : int
+            the frame to delete
+
+        """
+        del self.file[self._frame_str.format(j)]
 
     def __len__(self):
         return self.num_frames
@@ -126,7 +144,7 @@ class HdfBackend(object):
     def get_frame(self, frame_num, raw=None, get_img=None, *args, **kwargs):
         trk_lst = None
         img = None
-        g = self.file['frame_%05d' % frame_num]
+        g = self.file[self._frame_str.format(frame_num)]
         if raw is None:
             raw = self.prams.raw
         if raw:
@@ -140,13 +158,20 @@ class HdfBackend(object):
                     img /= self.bck_img
 
         res = _read_frame_tracks_from_file_res(g)
-        curve = infra.SplineCurve.from_hdf(g)
-        return MemBackendFrame(curve,
+        next_curve = None
+        if self.file['ver'] < '1.1.5':
+            seed_curve = infra.SplineCurve.from_hdf(g)
+        else:
+            seed_curve = infra.SplineCurve.from_hdf(g['seed_curve'])
+            if 'next_curve' in g:
+                next_curve = infra.SplineCurve.from_hdf(g['next_curve'])
+        return MemBackendFrame(seed_curve,
                                frame_num,
                                res,
                                trk_lst=trk_lst,
                                img=img,
-                               params=self.proc_prams)
+                               params=self.proc_prams,
+                               next_curve=next_curve)
 
     def gen_back_img(self):
         if self.cine_fname is not None:
@@ -179,7 +204,7 @@ class ProcessBackend(object):
         else:
             return 0
 
-    def __init__(self):
+    def __init__(self, ver='1.1.5'):
         self.params = {}        # the parameters to feed to proc_frame
 
         self.cine_fname = None               # file name
@@ -192,6 +217,7 @@ class ProcessBackend(object):
             print 'gave up and DB'
             # this eats _ALL_ exceptions
             self.db = None
+        self.ver = ver
 
     @classmethod
     def _verify_params(cls, param, extra_req=None):
@@ -328,7 +354,7 @@ class ProcessBackend(object):
         valid'''
 
         file_out = h5py.File(h5_fname, 'w-')   # open file
-        file_out.attrs['ver'] = '0.1.4'       # set meta-data
+        file_out.attrs['ver'] = '0.1.5'       # set meta-data
         for key, val in self.params.items():
             try:
                 file_out.attrs[key] = val
@@ -358,15 +384,16 @@ class MemBackendFrame(object):
      - add visualization code to this object
     """
     def __init__(self,
-                 curve,
+                 seed_curve,
                  frame_number,
-                 res,
+                 res=None,
                  trk_lst=None,
                  img=None,
                  params=None,
+                 next_curve=None,
                  *args,
                  **kwarg):
-        self.curve = copy.copy(curve)
+        self.curve = copy.copy(seed_curve)
         self.res = res
         self.trk_lst = trk_lst
         self.frame_number = frame_number
@@ -375,22 +402,28 @@ class MemBackendFrame(object):
         else:
             self.params = {}
 
-        self.next_curve = None
+        self.next_curve = copy.copy(next_curve)
         self._params_cache = None
         self.img = img
         self.mix_in_count = None
         self.pix_err = None
 
-        new_res = []
-        for t_ in self.res:
-            if len(t_) == 0:
-                print t_
-                continue
-            tmp = ~np.isnan(t_[0])
-            tmp_lst = [np.array(r)[tmp] for r in t_]
-            new_res.append(tuple(tmp_lst))
-        self.res = new_res
+        if self.res is not None:
+            new_res = []
+            for t_ in self.res:
+                if len(t_) == 0:
+                    print t_
+                    continue
+                tmp = ~np.isnan(t_[0])
+                tmp_lst = [np.array(r)[tmp] for r in t_]
+                new_res.append(tuple(tmp_lst))
+            self.res = new_res
 
+        self._frame_str = 'frame_{:07}'
+        if 'ver' in kwarg:
+            ver = kwarg.pop('ver')
+            if ver < '1.1.5':
+                self._frame_str = 'frame_{:05}'
         pass
 
     def get_extent(self, curve_extent=True):
@@ -557,7 +590,8 @@ class MemBackendFrame(object):
 
     def write_to_hdf(self, parent_group):
         #        print 'frame_%05d' % self.frame_number
-        group = parent_group.create_group('frame_%05d' % self.frame_number)
+
+        group = parent_group.create_group(self._frame_str.format(5))
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
                                     self.trk_lst[1],
@@ -673,11 +707,18 @@ def _read_frame_tracks_from_file_res(parent_group):
     name_mod = ('min', 'max')
     res_lst = []
     for n_mod in name_mod:
-        tmp_trk_res = parent_group[trk_res_name + n_mod][:]
-        tmp_charge = tmp_trk_res[:, 0]
-        tmp_phi = tmp_trk_res[:, 1]
-        tmp_q = tmp_trk_res[:, 2]
-        res_lst.append((tmp_charge, tmp_phi, tmp_q))
+        try:
+            tmp_trk_res = parent_group[trk_res_name + n_mod][:]
+            tmp_charge = tmp_trk_res[:, 0]
+            tmp_phi = tmp_trk_res[:, 1]
+            tmp_q = tmp_trk_res[:, 2]
+            res_lst.append((tmp_charge, tmp_phi, tmp_q))
+        except Exception as E:
+            print E
+            print n_mod
+
+    if len(res_lst) != 2:
+        res_lst = None
 
     return res_lst
 
@@ -685,8 +726,9 @@ def _read_frame_tracks_from_file_res(parent_group):
 def _write_frame_tracks_to_file(parent_group,
                                 t_min_lst,
                                 t_max_lst,
-                                curve,
-                                md_args={}):
+                                orig_curve,
+                                next_curve=None,
+                                md_args=None):
     '''
     Takes in an hdf object and creates the following data sets in
     `parent_group`
@@ -719,6 +761,13 @@ def _write_frame_tracks_to_file(parent_group,
     `t_max_lst`
         an iterable of the tracks for the minimums in the frame
 
+    `orig_curve`
+        the curve for this frame that all the positions are based on
+
+    'next_curve`
+       the curve found from the centers of the fringes in this
+        frame
+
     `md_args`
         a dictionary of meta-data to be attached to the group
     '''
@@ -730,7 +779,15 @@ def _write_frame_tracks_to_file(parent_group,
     name_mod = ('min', 'max')
     write_raw_data = True
     write_res = True
-    curve.write_to_hdf(parent_group)
+    # this is here to not have to convert mixed files
+    orig_curve.write_to_hdf(parent_group)
+    orig_curve.write_to_hdf(parent_group, 'seed_curve')
+    if next_curve is not None:
+        next_curve.write_to_hdf(parent_group, 'next_curve')
+
+    if md_args is None:
+        md_args = {}
+
     for key, val in md_args.items():
         try:
             parent_group.attrs[key] = val
@@ -758,17 +815,22 @@ def _write_frame_tracks_to_file(parent_group,
                 tmp_indx += t_len
 
             # create dataset and shove in data
-            parent_group.create_dataset(raw_data_name + n_mod,
-                                        tmp_raw_data.shape,
-                                        np.float,
-                                        compression='szip')
-            parent_group[raw_data_name + n_mod][:] = tmp_raw_data
+            try:
+                parent_group.create_dataset(raw_data_name + n_mod,
+                                            tmp_raw_data.shape,
+                                            np.float,
+                                            compression='szip')
+                parent_group[raw_data_name + n_mod][:] = tmp_raw_data
 
-            parent_group.create_dataset(raw_track_md_name + n_mod,
-                                        tmp_raw_track_data.shape,
-                                        np.float,
-                                        compression='szip')
-            parent_group[raw_track_md_name + n_mod][:] = tmp_raw_track_data
+                parent_group.create_dataset(raw_track_md_name + n_mod,
+                                            tmp_raw_track_data.shape,
+                                            np.float,
+                                            compression='szip')
+                parent_group[raw_track_md_name + n_mod][:] = tmp_raw_track_data
+            except Exception as E:
+                print E
+                print raw_data_name + n_mod, tmp_raw_data.shape
+                print raw_track_md_name + n_mod, tmp_raw_track_data.shape
 
         if write_res:
             good_t_lst = [t for t in t_lst if
@@ -778,9 +840,12 @@ def _write_frame_tracks_to_file(parent_group,
             # shove in results data
             for i, t in enumerate(good_t_lst):
                 tmp_track_res[i, :] = (t.charge, t.phi, t.q)
-
-            parent_group.create_dataset(trk_res_name + n_mod,
-                                        tmp_track_res.shape,
-                                        np.float,
-                                        compression='szip')
-            parent_group[trk_res_name + n_mod][:] = tmp_track_res
+            try:
+                parent_group.create_dataset(trk_res_name + n_mod,
+                                            tmp_track_res.shape,
+                                            np.float,
+                                            compression='szip')
+                parent_group[trk_res_name + n_mod][:] = tmp_track_res
+            except Exception as E:
+                print E
+                print trk_res_name + n_mod, tmp_track_res.shape
