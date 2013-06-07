@@ -170,7 +170,7 @@ class HdfBackend(object):
 
         res = _read_frame_tracks_from_file_res(g)
         next_curve = None
-        if self.file['ver'] < '1.1.5':
+        if self.file.attrs['ver'] < '1.1.5':
             seed_curve = infra.SplineCurve.from_hdf(g)
         else:
             seed_curve = infra.SplineCurve.from_hdf(g['seed_curve'])

@@ -549,7 +549,38 @@ class Region_map(object):
 
         ax.figure.canvas.draw()
 
-    def resample_height_img(self, th_step=1000, tau_step=5000):
+    def display_all_regions(self, ax=None, cmap='jet',
+                            t_scale=1, t_units=''):
+        if ax is None:
+            # make this smarter
+            ax = plt.gca()
+
+        my_cmap = cm.get_cmap(cmap)
+        my_cmap.set_under('w', alpha=0)
+
+        frac_size = 4
+        step = fractions.Fraction(1, frac_size)
+        ax.set_yticks([np.pi * j * step for j in range(2 * frac_size + 1)])
+        ax.set_yticklabels([format_frac(j * step) + '$\pi$'
+                            for j in range(2 * frac_size + 1)])
+
+        ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]))
+        ax.set_ylabel(r'$\theta$')
+
+        im = ax.imshow(self.label_regions,
+                  interpolation='none',
+                  cmap=my_cmap,
+                  extent=[0, (self.label_regions.shape[1]) * t_scale,
+                          0, 2 * np.pi],
+                  aspect='auto',
+                  origin='bottom',
+                  )
+        im.set_clim([1, len(self.height_map)])
+        ax.figure.canvas.draw()
+
+    def resample_height_img(self, th_step=1000, tau_step=5000, method='cubic'):
+        assert method in ['linear', 'cubic', 'nearest']
+
         scale = 2 * np.pi / self.label_regions.shape[0]
         tmp_pts = []
 
@@ -570,7 +601,7 @@ class Region_map(object):
                                   0:self.label_regions.shape[1]:tau_step*1j]
 
         print 'gridding'
-        grid_z2 = griddata(points, vals, (grid_x, grid_y), method='cubic')
+        grid_z2 = griddata(points, vals, (grid_x, grid_y), method=method)
         print 'gridded'
         return grid_z2
 
