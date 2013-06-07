@@ -181,7 +181,6 @@ class ZProfile(object):
         return (self.prof_ln, )
 
 
-
 class RProfile(object):
     def __init__(self, ax):
         self.ax = ax
