@@ -103,7 +103,7 @@ class HdfBackend(object):
 
         self.bck_img = None
         if self.db is not None:
-            self.bck_img = self.db.get_background_img(self.cine_.hash)
+            self.bck_img = self.db.get_background_img(self.cine.hash)
         # if that fails too, run it
         if self.bck_img is None and self.cine is not None:
             self.gen_back_img()
