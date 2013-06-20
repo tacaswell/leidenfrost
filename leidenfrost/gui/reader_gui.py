@@ -286,7 +286,6 @@ class LFReaderGui(QtGui.QMainWindow):
         if self.label_block is not None:
             diag_layout.removeWidget(self.label_block)
             self.label_block.setVisible(False)
-        self.label_block = QtGui.QGroupBox("Parameters")
 
         param_form_layout = QtGui.QFormLayout()
         ignore_lst = ['tck0', 'tck1', 'tck2', 'center',
@@ -296,7 +295,26 @@ class LFReaderGui(QtGui.QMainWindow):
                 continue
             param_form_layout.addRow(QtGui.QLabel(k + ':'), QtGui.QLabel(str(v)))
 
-        self.label_block.setLayout(param_form_layout)
+        def print_parameters():
+            '''
+            Print the parameters out to stdout in a form that will play nice
+            with org-mode
+
+            '''
+            ignore_lst = ['tck0', 'tck1', 'tck2', 'center']
+            for k, v in prams.iteritems():
+                if k in ignore_lst:
+                    continue
+                print "| {key} | {val} |".format(key=k, val=v)
+
+        print_button = QtGui.QPushButton('Print')
+        print_button.pressed.connect(print_parameters)
+
+        self.label_block = QtGui.QGroupBox("Parameters")
+        lb_layout = QtGui.QVBoxLayout()
+        lb_layout.addLayout(param_form_layout)
+        lb_layout.addWidget(print_button)
+        self.label_block.setLayout(lb_layout)
         diag_layout.addWidget(self.label_block)
 
     def create_diag(self):
