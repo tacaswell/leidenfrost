@@ -34,6 +34,8 @@ from scipy.interpolate import griddata
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
 
+region_edges = namedtuple('region_edges', ['start', 'label', 'end'])
+
 # set up all the look-up dictionaries
 # list of the needed combinations
 fringe_type_list = [fringe_cls(1, 0, 1),
@@ -443,6 +445,12 @@ class Region_map(object):
                    RM.size_cut,
                    RM.structure)
 
+    def __len__(self):
+        '''
+        Returns number of frames in this region map
+        '''
+        return self.label_regions.shape[1]
+
     def __init__(self, working_img, FRs, thresh=0,
                  size_cut=100, structure=None):
         up_mask = working_img > 1 + thresh
@@ -466,6 +474,8 @@ class Region_map(object):
         self.thresh = thresh
         self.structure = structure
         self.size_cut = size_cut
+
+        self._scale = self.working_img.shape[0] / (2 * np.pi)
 
         self.region_edges = [_segment_labels(region_list)
                              for region_list in self.label_regions.T]
@@ -800,6 +810,45 @@ class Region_map(object):
     def from_hdf(cls, in_file):
         pass
 
+    def get_frame_profile(self, j):
+        '''
+        return a list of tuples (center, dh) for identified regions in frame j
+
+        units of center set by `Region_map._scale`
+
+        Parameters
+        ----------
+        j : int
+            frame number
+
+        Returns
+        -------
+        ret : list
+             list of (center, dh)
+        '''
+        return list(self.get_frame_profile_gen(j))
+
+    def get_frame_profile_gen(self, j):
+        '''
+        return a generator of tuples (center, dh) for identified regions
+        in frame j.
+
+        units of center set by `Region_map._scale`
+
+        Parameters
+        ----------
+        j : int frame number
+
+        Returns
+        -------
+        ret : generator
+            yields tuples of form of (center, dh)
+
+        '''
+        return (((start + end) / (2 * self._scale), self.height_map[label])
+                  for start, label, end in izip(*self.region_edges[j])
+                  if not np.isnan(self.height_map[label]))
+
     def error_check(self):
         error_count = 0
         correct_count = 0
@@ -914,7 +963,7 @@ def _segment_labels(region_list, zero_thresh=2):
     if cur_region is not None:
         region_ends.append(len(region_list) - 1)
 
-    return region_starts, region_labels, region_ends
+    return region_edges(region_starts, region_labels, region_ends)
 
 
 def _bin_region(N, region_starts, region_ends):
