@@ -319,6 +319,8 @@ class LFReaderGui(QtGui.QMainWindow):
             tmp_rdo = QtGui.QRadioButton(str(j))
             tmp_rdo.toggled.connect(lambda x, j=j: self.frame_spinner.setSingleStep(j) if x else None)
             fs_sb_rb.addWidget(tmp_rdo)
+            if j == 1:
+                tmp_rdo.toggle()
             pass
         fs_stepbox.setLayout(fs_sb_rb)
         frame_selector_group.addLayout(fs_form)
