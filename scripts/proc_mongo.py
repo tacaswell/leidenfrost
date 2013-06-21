@@ -108,6 +108,10 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
                 file_out.flush()
         except TimeoutException:
             logger.warn('timed out')
+        except Exception as e:
+            logger.warn(str(e))
+        except:
+            logger.warn('raised exception not derived from Exception')
         else:
             db.store_proc(ch, config_dict['_id'], h5_fname)
 
