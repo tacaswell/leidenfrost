@@ -261,7 +261,8 @@ class LFReaderGui(QtGui.QMainWindow):
             cine_bp = hdf_bp
 
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
-                                                     caption='Select File')
+                                                     caption='Select File',
+                                                     filter='hdf (*.h5 *.hdf)')
         if len(fname) == 0:
             return
 
