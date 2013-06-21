@@ -827,22 +827,20 @@ def _write_frame_tracks_to_file(parent_group,
                 tmp_indx += t_len
 
             # create dataset and shove in data
-            try:
-                parent_group.create_dataset(raw_data_name + n_mod,
-                                            tmp_raw_data.shape,
-                                            np.float,
-                                            compression='szip')
+
+            parent_group.create_dataset(raw_data_name + n_mod,
+                                        tmp_raw_data.shape,
+                                        np.float)
+
+            if tmp_raw_data.shape[0] > 0:
                 parent_group[raw_data_name + n_mod][:] = tmp_raw_data
 
-                parent_group.create_dataset(raw_track_md_name + n_mod,
-                                            tmp_raw_track_data.shape,
-                                            np.float,
-                                            compression='szip')
+            parent_group.create_dataset(raw_track_md_name + n_mod,
+                                        tmp_raw_track_data.shape,
+                                        np.float)
+
+            if tmp_raw_track_data.shape[0] > 0:
                 parent_group[raw_track_md_name + n_mod][:] = tmp_raw_track_data
-            except Exception as E:
-                print E
-                print raw_data_name + n_mod, tmp_raw_data.shape
-                print raw_track_md_name + n_mod, tmp_raw_track_data.shape
 
         if write_res:
             good_t_lst = [t for t in t_lst if
@@ -852,12 +850,9 @@ def _write_frame_tracks_to_file(parent_group,
             # shove in results data
             for i, t in enumerate(good_t_lst):
                 tmp_track_res[i, :] = (t.charge, t.phi, t.q)
-            try:
-                parent_group.create_dataset(trk_res_name + n_mod,
-                                            tmp_track_res.shape,
-                                            np.float,
-                                            compression='szip')
+
+            parent_group.create_dataset(trk_res_name + n_mod,
+                                        tmp_track_res.shape,
+                                        np.float)
+            if tmp_track_res.shape[0] > 0:
                 parent_group[trk_res_name + n_mod][:] = tmp_track_res
-            except Exception as E:
-                print E
-                print trk_res_name + n_mod, tmp_track_res.shape
