@@ -603,7 +603,7 @@ class MemBackendFrame(object):
     def write_to_hdf(self, parent_group):
         #        print 'frame_%05d' % self.frame_number
 
-        group = parent_group.create_group(self._frame_str.format(5))
+        group = parent_group.create_group(self._frame_str.format(self.frame_number))
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
                                     self.trk_lst[1],
