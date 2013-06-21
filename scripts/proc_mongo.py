@@ -87,14 +87,33 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
         seed_curve = li.SplineCurve.from_pickle_dict(config_dict['curves']['0'])
 
         params = config_dict['config']
-        stack = lfbe.ProcessBackend.from_args(cine_fname, **params)
-        stack.gen_stub_h5(h5_fname.format, seed_curve)
+        start_frame = params.pop('start_frame', 0)
+        if not os.path.isfile(h5_fname.format):
+            stack = lfbe.ProcessBackend.from_args(cine_fname, **params)
+            stack.gen_stub_h5(h5_fname.format, seed_curve)
+            hfb = lfbe.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
+            file_out = hfb.file
+            logger.info('created file')
+        else:
+            hfb = lfbe.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
+            logger.info('opened file')
+            file_out = hfb.file
+            # make sure that we continue with the same parameters
+            params = dict((k, hfb.proc_prams[k]) for k in params)
+            stack = lfbe.ProcessBackend.from_args(cine_fname, **params)
 
+        db.store_proc(ch, config_dict['_id'], h5_fname)
         old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        file_out = h5py.File(h5_fname.format, 'r+')
+
+        # move the logging to the top
+
         try:
-            for j in range(len(stack)):
+            for j in xrange(start_frame, len(stack)):
                 # set a 30s window, if the frame does not finish on 30s, kill it
+                if hfb.contains_frame(j):
+                    logger.warn('deleting existing frame {0}'.format(j))
+                    hfb._del_frame(j)
+
                 signal.alarm(30)
                 start = time.time()
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
@@ -104,6 +123,7 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
                 # set alarm to 0
 
                 mbe.write_to_hdf(file_out)
+
                 del mbe
                 file_out.flush()
         except TimeoutException:
@@ -112,8 +132,6 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
             logger.warn(str(e))
         except:
             logger.warn('raised exception not derived from Exception')
-        else:
-            db.store_proc(ch, config_dict['_id'], h5_fname)
 
         finally:
             # make sure that no matter what the output file gets cleaned up
