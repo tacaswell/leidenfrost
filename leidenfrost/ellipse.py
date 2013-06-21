@@ -140,7 +140,7 @@ def gap_filler(x, y, R, center, fill_density=0.1):
     model = sodr.Model(_e_funx, implicit=1)
     worker = sodr.ODR(data, model, p0)
     out = worker.run()
-    out = worker.restart()
+    #out = worker.restart()
 
     ap, bp, t0, x0, y0 = gen_to_parm(out.beta)
 
