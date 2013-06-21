@@ -131,6 +131,7 @@ class HdfBackend(object):
         """
         if self.contains_frame(j):
             del self.file[self._frame_str.format(j)]
+        self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
 
     def contains_frame(self, j):
         '''Returns if frame `j` is saved in the hdf file
