@@ -30,6 +30,7 @@ import numpy as np
 import h5py
 from bisect import bisect
 from scipy.interpolate import griddata
+from numba.decorators import jit, autojit
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
@@ -376,7 +377,9 @@ def _get_fc_lists(mbe, reclassify):
 
 
 class Region_map(object):
+
     @staticmethod
+    @autojit
     def _label_regions(mask, size_cut, structure):
 
         if structure is not None:

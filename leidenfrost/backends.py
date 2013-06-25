@@ -111,12 +111,16 @@ class HdfBackend(object):
             if self.db is not None and self.bck_img is not None:
                 self.db.store_background_img(self.cine.hash, self.bck_img)
 
-        if self.file.attrs['ver'] < '1.1.5':
+        if self.file.attrs['ver'] < '0.1.5':
             self._frame_str = 'frame_{:05}'
         else:
             self._frame_str = 'frame_{:07}'
 
         pass
+
+    @property
+    def ver(self):
+        return self.file.attrs['ver']
 
     def _del_frame(self, j):
         """Deletes frame j.

@@ -122,7 +122,7 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
                 logger.info('completed frame %d in %fs', j, elapsed)
                 # set alarm to 0
 
-                mbe.write_to_hdf(file_out)
+                mbe.write_to_hdf(file_out, ver=hfb.ver)
 
                 del mbe
                 file_out.flush()
