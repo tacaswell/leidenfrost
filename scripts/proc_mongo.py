@@ -5,6 +5,7 @@ import signal
 import logging
 import time
 import itertools
+import gc
 
 import os
 from leidenfrost import FilePath
@@ -106,7 +107,7 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
         old_handler = signal.signal(signal.SIGALRM, timeout_handler)
 
         # move the logging to the top
-
+        ver = ver=hfb.ver
         try:
             for j in xrange(start_frame, len(stack)):
                 # set a 30s window, if the frame does not finish on 30s, kill it
@@ -114,7 +115,7 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
                     logger.warn('deleting existing frame {0}'.format(j))
                     hfb._del_frame(j)
 
-                signal.alarm(30)
+                signal.alarm(45)
                 start = time.time()
                 mbe, seed_curve = stack.process_frame(j, seed_curve)
                 signal.alarm(0)
@@ -122,10 +123,11 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
                 logger.info('completed frame %d in %fs', j, elapsed)
                 # set alarm to 0
 
-                mbe.write_to_hdf(file_out, ver=hfb.ver)
+                mbe.write_to_hdf(file_out)
 
                 del mbe
                 file_out.flush()
+                gc.collect()
         except TimeoutException:
             logger.warn('timed out')
         except Exception as e:

@@ -319,6 +319,7 @@ class ProcessBackend(object):
                               res=trk_res,
                               trk_lst=[tim, tam],
                               img=tmp_img,
+                              ver=self.ver,
                               params=self.params)
         mbe.tm = tm
         next_curve = mbe.get_next_spline(**self.params)
