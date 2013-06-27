@@ -190,7 +190,7 @@ if __name__ == '__main__':
                                                           args.hdf_path, ''))))
 
     # don't start more processes than we could ever use
-    N = max(N, len(cine_fnames))
+    N = min(N, len(cine_fnames))
 
     # stet up queues
     WORK_QUEUE = JoinableQueue()
