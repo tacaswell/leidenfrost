@@ -150,6 +150,10 @@ class HdfBackend(object):
     def __len__(self):
         return self.num_frames
 
+    @property
+    def cine_len(self):
+        return len(self.cine)
+
     def __del__(self):
         if self.file:
             self.file.close()

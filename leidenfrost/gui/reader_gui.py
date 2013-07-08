@@ -77,6 +77,12 @@ class LFReader(QtCore.QObject):
         else:
             return 0
 
+    def cine_len(self):
+        if self.backend:
+            return self.backend.cine_len
+        else:
+            return 0
+
     @QtCore.Slot(backends.FilePath, str, dict)
     def set_fname(self, fname, cbp, kwargs):
         print 'entered set_fname'
@@ -240,6 +246,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.frame_spinner.setRange(0, len(self.reader) - 1)
         self.frame_spinner.setValue(0)
         self.max_frame_label.setText(str(len(self.reader) - 1))
+        self.max_cine_label.setText(str(self.reader.cine_len() - 1))
         self.redraw_sig.emit(False, False)
 
     @QtCore.Slot(int)
@@ -332,6 +339,9 @@ class LFReaderGui(QtGui.QMainWindow):
         fs_form.addWidget(QtGui.QLabel(' of '))
         self.max_frame_label = QtGui.QLabel(str(len(self.reader) - 1))
         fs_form.addWidget(self.max_frame_label)
+        fs_form.addWidget(QtGui.QLabel(' cine '))
+        self.max_cine_label = QtGui.QLabel(str(self.reader.cine_len() - 1))
+        fs_form.addWidget(self.max_cine_label)
         fs_stepbox = QtGui.QGroupBox("Frame step")
         fs_sb_rb = QtGui.QHBoxLayout()
         for j in [1, 10, 100, 1000, 10000]:
