@@ -30,7 +30,7 @@ import numpy as np
 import h5py
 from bisect import bisect
 from scipy.interpolate import griddata
-from numba.decorators import jit, autojit
+
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
