@@ -496,7 +496,7 @@ class Region_map(object):
         return cls.from_raw_data(working_img, FRs=fringe_rings, **kwargs)
 
     @classmethod
-    def connection_network(cls, N, fringe_rings, dirc='f'):
+    def _connection_network(cls, N, fringe_rings, dirc='f'):
         """
         Sets up the network between the regions based on what fringes fall in
         them.
@@ -565,8 +565,57 @@ class Region_map(object):
                             working_img.shape[0])
 
         # boot strap up the heights
-        height_map, set_by, fails = cls.boot_strap(N, fringe_rings)
+        height_map, set_by, fails = cls._boot_strap(N, fringe_rings)
         return cls(fringe_rings, region_edges, working_img, height_map, **kwargs)
+
+    @classmethod
+    def _boot_strap(cls, N, FRs):
+        """An improved boot-strap operation
+        """
+        valid_connections = deque()
+        for dd in izip(cls._connection_network(N, FRs, 'f'),
+                       cls._connection_network(N, FRs, 'r')):
+            tmp_dict = {}
+            for _dd in dd:
+                for k, v in _dd.items():
+                    dh = _dict_to_dh(v, threshold=5)
+                    if dh is not None:
+                        if k in tmp_dict and tmp_dict[k] != dh:
+                            print 'conflict'
+                            # if we have inconsistent linking, throw
+                            # everything out
+                            del tmp_dict[k]
+                            continue
+                        tmp_dict[k] = dh
+            valid_connections.append(tmp_dict)
+
+        valid_connections = list(valid_connections)
+
+        # pick the one with the most forward connections
+        start = np.argmax([len(r) for r in valid_connections])
+        # clear height map
+        height_map = np.ones(N, dtype=np.float32) * np.nan
+        #set first height
+        height_map[start] = 0
+
+        set_by = dict()
+        fails = deque()
+        work_list = deque()
+        work_list.extend([(start, k) for k in valid_connections[start].keys()])
+        while len(work_list) > 0:
+            a, b = work_list.pop()
+            prop_height = height_map[a] + valid_connections[a][b]
+            if np.isnan(height_map[b]):
+                height_map[b] = prop_height
+                work_list.extend([(b, k) for k in valid_connections[b].keys()])
+                set_by[b] = a
+            else:
+                if height_map[b] != prop_height:
+                    print a, b, prop_height, \
+                          height_map[b], valid_connections[a][b]
+                    fails.append((a, b))
+
+        return height_map, set_by, fails
 
     def __init__(self, fringe_rings, region_edges, working_img, height_map):
         self.fringe_rings = fringe_rings      # fringes group by a per-time basis
@@ -777,55 +826,6 @@ class Region_map(object):
                          self.label_regions.shape[0])
         label = self.label_regions[theta_indx, frame_num]
         return self.height_map[label]
-
-    @classmethod
-    def boot_strap(cls, N, FRs):
-        """An improved boot-strap operation
-        """
-        valid_connections = deque()
-        for dd in izip(cls.connection_network(N, FRs, 'f'),
-                       cls.connection_network(N, FRs, 'r')):
-            tmp_dict = {}
-            for _dd in dd:
-                for k, v in _dd.items():
-                    dh = _dict_to_dh(v, threshold=5)
-                    if dh is not None:
-                        if k in tmp_dict and tmp_dict[k] != dh:
-                            print 'conflict'
-                            # if we have inconsistent linking, throw
-                            # everything out
-                            del tmp_dict[k]
-                            continue
-                        tmp_dict[k] = dh
-            valid_connections.append(tmp_dict)
-
-        valid_connections = list(valid_connections)
-
-        # pick the one with the most forward connections
-        start = np.argmax([len(r) for r in valid_connections])
-        # clear height map
-        height_map = np.ones(N, dtype=np.float32) * np.nan
-        #set first height
-        height_map[start] = 0
-
-        set_by = dict()
-        fails = deque()
-        work_list = deque()
-        work_list.extend([(start, k) for k in valid_connections[start].keys()])
-        while len(work_list) > 0:
-            a, b = work_list.pop()
-            prop_height = height_map[a] + valid_connections[a][b]
-            if np.isnan(height_map[b]):
-                height_map[b] = prop_height
-                work_list.extend([(b, k) for k in valid_connections[b].keys()])
-                set_by[b] = a
-            else:
-                if height_map[b] != prop_height:
-                    print a, b, prop_height, \
-                          height_map[b], valid_connections[a][b]
-                    fails.append((a, b))
-
-        return height_map, set_by, fails
 
     def write_to_hdf(self, out_file, md_dict):
 
