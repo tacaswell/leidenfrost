@@ -987,13 +987,14 @@ class Region_map(object):
         return error_count, error_regions
 
     def format_factory(self, xscale=1, yscale=1):
-        numrows, numcols = self.label_regions.shape
+        numrows, numcols = self.working_img.shape
 
         def format_coord(x, y):
             col = int(x / xscale)
             row = int(y / yscale)
             if col >= 0 and col < numcols and row >= 0 and row < numrows:
-                region = self.label_regions[row, col]
+                r_start, r_labels, r_end = self.region_edges[row]
+                region = r_labels[_bin_region(col, r_start, r_end)]
                 return "x:{x}, y:{y}, r:{reg}, h:{h}".format(x=col * xscale,
                                                              y=row * yscale,
                                                              reg=region,
