@@ -561,7 +561,7 @@ class Region_map(object):
         for FR, (region_starts,
                  region_labels,
                  region_ends) in izip(fringe_rings, region_edges):
-            FR.link_fringes(region_starts, region_labels, region_edges,
+            FR.link_fringes(region_starts, region_labels, region_ends,
                             working_img.shape[0])
 
         # boot strap up the heights
