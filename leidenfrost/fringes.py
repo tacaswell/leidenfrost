@@ -622,25 +622,35 @@ class Region_map(object):
         self.region_edges = region_edges      # edges of the regions on a per-time basis
         self.working_img = working_img        # the raw image not sure why we are carrying this around)
         self.height_map = height_map          # the mapping between regions and heights
+
+        self._height_img = None           # image of the heights
+        self._label_img = None            # image of the labeled regions
         pass
 
     def __len__(self):
         '''
         Returns number of frames in this region map
         '''
-        return self.label_regions.shape[1]
+        return self.working_img.shape[1]
+
+    # only make this if we _need_ it
+    @property
+    def height_img(self):
+        if self._height_img is None:
+            self._height_img = self.reconstruct_height_img()
+        return self._height_img
+
+    # only make this if we _need_ it
+    @property
+    def label_img(self):
+        if self._label_img is None:
+            self._label_img = self.reconstruct_label_img()
+        return self._label_img
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True,
                        alpha=.65, t_scale=1, t_units=''):
-        height_img = np.ones(self.label_regions.shape,
-                             dtype=np.float32) * np.nan
-        for j, (region_start,
-                region_label,
-                region_ends) in enumerate(self.region_edges):
-            for l_start, label, l_end in izip(region_start,
-                                            region_label,
-                                            region_ends):
-                height_img[l_start:l_end-1, j] = self.height_map[label]
+
+        height_img = self.height_img
 
         if ax is None:
             # make this smarter
@@ -696,10 +706,10 @@ class Region_map(object):
         ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]))
         ax.set_ylabel(r'$\theta$')
 
-        im = ax.imshow(self.label_regions,
+        im = ax.imshow(self.label_img,
                   interpolation='none',
                   cmap=my_cmap,
-                  extent=[0, (self.label_regions.shape[1]) * t_scale,
+                  extent=[0, (self.working_img.shape[1]) * t_scale,
                           0, 2 * np.pi],
                   aspect='auto',
                   origin='bottom',
@@ -707,10 +717,48 @@ class Region_map(object):
         im.set_clim([1, len(self.height_map)])
         ax.figure.canvas.draw()
 
+    def reconstruct_height_img(self):
+        '''
+        Reconstructs the height image
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        tmp : ndarray
+            ndarray of the same shape
+        '''
+        tmp = np.zeros(self.working_img.shape) * np.nan
+        for j, edges in enumerate(self.region_edges):
+            for (r_start, r_label, r_stop) in zip(*edges):
+                tmp[r_start:r_stop, j] = self.height_map[r_label]
+
+        return tmp
+
+    def reconstruct_label_img(self):
+        '''
+        Reconstructs the label image
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        tmp : ndarray
+            ndarray of the same shape
+        '''
+        tmp = np.zeros(self.working_img.shape) * np.nan
+        for j, edges in enumerate(self.region_edges):
+            for (r_start, r_label, r_stop) in zip(*edges):
+                tmp[r_start:r_stop, j] = r_label
+
+        return tmp
+
     def resample_height_img(self, th_step=1000, tau_step=5000, method='cubic'):
         assert method in ['linear', 'cubic', 'nearest']
 
-        scale = 2 * np.pi / self.label_regions.shape[0]
+        scale = 2 * np.pi / self.working_img.shape[0]
         tmp_pts = []
 
         print 'started'
@@ -727,7 +775,7 @@ class Region_map(object):
         points, vals = zip(*tmp_pts)
         points = np.vstack(points)
         grid_y, grid_x = np.mgrid[0:2 * np.pi:th_step*1j,
-                                  0:self.label_regions.shape[1]:tau_step*1j]
+                                  0:self.working_img.shape[1]:tau_step*1j]
 
         print 'gridding'
         grid_z2 = griddata(points, vals, (grid_x, grid_y), method=method)
@@ -781,7 +829,7 @@ class Region_map(object):
             # make this smarter
             ax = plt.gca()
 
-        data = self.label_regions
+        data = self.label_img
 
         norm_br = matplotlib.colors.Normalize(vmin=.5,
                                               vmax=np.max(data), clip=False)
@@ -802,7 +850,7 @@ class Region_map(object):
             # make this smarter
             ax = plt.gca()
 
-        data = self.label_regions
+        data = self.label_img
 
         norm_br = matplotlib.colors.Normalize(vmin=.5,
                                               vmax=np.max(data), clip=False)
@@ -823,8 +871,8 @@ class Region_map(object):
 
     def get_height(self, frame_num, theta):
         theta_indx = int((np.mod(theta, 2 * np.pi) / (2 * np.pi)) *
-                         self.label_regions.shape[0])
-        label = self.label_regions[theta_indx, frame_num]
+                         self.working_img.shape[0])
+        label = self.label_img[theta_indx, frame_num]
         return self.height_map[label]
 
     def write_to_hdf(self, out_file, md_dict):
