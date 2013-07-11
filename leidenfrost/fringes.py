@@ -318,6 +318,54 @@ class FringeRing(object):
         self.fringes = [Fringe(fcls, floc, frame_number) for fcls, floc in izip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
 
+    def link_fringes(self, region_starts, region_labels, region_ends,
+                    N_samples, length=2*np.pi):
+        '''
+        Given the region edges, properly link the fringes which are adjacent.
+
+        Parameters
+        ----------
+        region_starts : list-like
+            the sample where the regions start
+
+        region_labels : list-like
+            The labels on the regions
+
+        region_ends : list_like
+            The sample where the regions end
+
+        N_samples : int
+            The number of samples
+
+        length : float
+            The length of the region sampled in the 'natural' units
+
+        '''
+
+        for fr_b, fr_f in pairwise_periodic(self.fringes):
+
+            fr_b.abs_height = np.nan
+
+            b_b, b_f = [_bin_region(int((np.mod(_fr.phi, length)/(length)) * N_samples),
+                                    region_starts,
+                                    region_ends)
+                        for _fr in (fr_b, fr_f)]
+
+            # handle the other mapping
+            if b_b is None:
+                label = 0
+            else:
+                label = region_labels[b_b]
+            fr_b.region = label
+            fr_b.abs_height = np.nan
+
+            # handle the linking
+            if b_b is None or b_f is None:
+                continue
+            if (b_b + 1 == b_f) or (b_f == 0 and
+                                    b_b == len(region_labels) - 1):
+                fr_b.insert_ahead(fr_f)
+
     def __iter__(self):
         return self.fringes.__iter__()
 
@@ -384,12 +432,6 @@ class Region_map(object):
         #    mask = ndi.binary_propagation(mask)
 
         lab_regions, nb = ndi.label(mask)
-        sizes = ndi.sum(mask, lab_regions, range(nb + 1))
-        print len(sizes)
-        mask_sizes = sizes < size_cut
-        print sum(mask_sizes)
-        remove_pix = mask_sizes[lab_regions]
-        lab_regions[remove_pix] = 0
         # loop to make periodic
         for j in range(lab_regions.shape[1]):
             top_lab = lab_regions[0, j]
@@ -397,6 +439,12 @@ class Region_map(object):
             if top_lab != bot_lab and top_lab != 0 and bot_lab != 0:
                 lab_regions[lab_regions == bot_lab] = top_lab
 
+        sizes = ndi.sum(mask, lab_regions, range(nb + 1))
+        mask_sizes = sizes < size_cut
+        print len(sizes), sum(mask_sizes)
+
+        remove_pix = mask_sizes[lab_regions]
+        lab_regions[remove_pix] = 0
         labels = np.unique(lab_regions)
         lab_regions = np.searchsorted(labels, lab_regions)
         return lab_regions, len(labels)
@@ -435,81 +483,93 @@ class Region_map(object):
 
         working_img = np.vstack(img_bck_grnd_slices).T
 
-        return cls(working_img, FRs=fringe_rings, **kwargs)
+        return cls.from_raw_data(working_img, FRs=fringe_rings, **kwargs)
 
     @classmethod
-    def from_RM(cls, RM):
-        return cls(RM.working_img,
-                   RM.fringe_rings,
-                   RM.thresh,
-                   RM.size_cut,
-                   RM.structure)
+    def connection_network(cls, N, fringe_rings, dirc='f'):
+        """
+        Sets up the network between the regions based on what fringes fall in
+        them.
+
+
+        """
+        inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
+
+        link_dict = {'f': 'next_P', 'r': 'prev_P'}
+        dh_dict = {'f': 'forward_dh', 'r': 'reverse_dh'}
+
+        dh_str = dh_dict[dirc]
+        ln_str = link_dict[dirc]
+
+        # main data structure
+        connections = [defaultdict(inner_dict)
+                    for j in range(N)]
+        for FR in fringe_rings:
+            for fr in FR:
+                if fr is None:
+                    print 'WTF mate'
+                    continue
+                if fr.region == 0:
+                    continue
+                ln_fr = getattr(fr, ln_str)
+                if ln_fr is None:
+                    continue
+                ln_region = ln_fr.region
+                if ln_region == 0:
+                    continue
+
+                dh = getattr(fr, dh_str)
+                if not np.isnan(dh):
+                    dh = int(dh)
+                    connections[fr.region][ln_region][dh] += 1
+
+        return connections
+
+    @classmethod
+    def from_raw_data(cls, working_img, FRs, thresh=0,
+                 size_cut=100, structure=None, **kwargs):
+
+        up_mask = working_img > 1 + thresh
+        down_mask = working_img < 1 - thresh
+
+        lab_bright_regions, nb_br = cls._label_regions(up_mask,
+                                                        size_cut,
+                                                        structure)
+        lab_dark_regions, nb_dr = cls._label_regions(down_mask,
+                                                      size_cut,
+                                                      structure)
+        lab_dark_regions[lab_dark_regions > 0] += nb_br
+
+        fringe_rings = FRs
+        label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
+                                        dtype=np.uint32)
+        N = nb_br + nb_dr
+
+        region_edges = [_segment_labels(region_list)
+                             for region_list in label_regions.T]
+
+        for FR, (region_starts,
+                 region_labels,
+                 region_ends) in izip(fringe_rings, region_edges):
+            FR.link_fringes(region_starts, region_labels, region_edges,
+                            working_img.shape[0])
+
+        # boot strap up the heights
+        height_map, set_by, fails = cls.boot_strap(N, fringe_rings)
+        return cls(fringe_rings, region_edges, working_img, height_map, **kwargs)
+
+    def __init__(self, fringe_rings, region_edges, working_img, height_map):
+        self.fringe_rings = fringe_rings      # fringes group by a per-time basis
+        self.region_edges = region_edges      # edges of the regions on a per-time basis
+        self.working_img = working_img        # the raw image not sure why we are carrying this around)
+        self.height_map = height_map          # the mapping between regions and heights
+        pass
 
     def __len__(self):
         '''
         Returns number of frames in this region map
         '''
         return self.label_regions.shape[1]
-
-    def __init__(self, working_img, FRs, thresh=0,
-                 size_cut=100, structure=None):
-        up_mask = working_img > 1 + thresh
-        down_mask = working_img < 1 - thresh
-
-        lab_bright_regions, nb_br = self._label_regions(up_mask,
-                                                        size_cut,
-                                                        structure)
-        lab_dark_regions, nb_dr = self._label_regions(down_mask,
-                                                      size_cut,
-                                                      structure)
-        lab_dark_regions[lab_dark_regions > 0] += nb_br
-
-        self.fringe_rings = FRs
-        self.label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
-                                        dtype=np.uint32)
-        self.height_map = np.ones(nb_br + nb_dr, dtype=np.float32) * np.nan
-        self.region_fringes = [[] for j in range(nb_br + nb_dr)]
-        self.working_img = working_img
-
-        self.thresh = thresh
-        self.structure = structure
-        self.size_cut = size_cut
-
-        self._scale = self.working_img.shape[0] / (2 * np.pi)
-
-        self.region_edges = [_segment_labels(region_list)
-                             for region_list in self.label_regions.T]
-
-        for FR, (region_starts,
-                 region_labels,
-                 region_ends) in izip(self.fringe_rings, self.region_edges):
-            # build list of regions
-            for fr_b, fr_f in pairwise_periodic(FR):
-
-                fr_b.abs_height = np.nan
-
-                b_b, b_f = [_bin_region(int((np.mod(_fr.phi, 2*np.pi) /
-                                             (2*np.pi)) *
-                                             self.label_regions.shape[0]),
-                                        region_starts,
-                                        region_ends)
-                            for _fr in (fr_b, fr_f)]
-
-                # handle the other mapping
-                if b_b is None:
-                    label = 0
-                else:
-                    label = region_labels[b_b]
-                fr_b.region = label
-                self.region_fringes[label].append(fr_b)
-                fr_b.abs_height = np.nan
-
-                # handle the linking
-                if b_b is None or b_f is None:
-                    continue
-                if (b_b + 1 == b_f) or (b_f == 0 and
-                                        b_b == len(region_labels) - 1):
-                    fr_b.insert_ahead(fr_f)
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True,
                        alpha=.65, t_scale=1, t_units=''):
@@ -708,12 +768,13 @@ class Region_map(object):
         label = self.label_regions[theta_indx, frame_num]
         return self.height_map[label]
 
-    def boot_strap(self):
+    @classmethod
+    def boot_strap(cls, N, FRs):
         """An improved boot-strap operation
         """
         valid_connections = deque()
-        for dd in izip(self.connection_network('f'),
-                       self.connection_network('r')):
+        for dd in izip(cls.connection_network(N, FRs, 'f'),
+                       cls.connection_network(N, FRs, 'r')):
             tmp_dict = {}
             for _dd in dd:
                 for k, v in _dd.items():
@@ -733,9 +794,9 @@ class Region_map(object):
         # pick the one with the most forward connections
         start = np.argmax([len(r) for r in valid_connections])
         # clear height map
-        self.height_map *= np.nan
+        height_map = np.ones(N, dtype=np.float32) * np.nan
         #set first height
-        self.height_map[start] = 0
+        height_map[start] = 0
 
         set_by = dict()
         fails = deque()
@@ -743,18 +804,18 @@ class Region_map(object):
         work_list.extend([(start, k) for k in valid_connections[start].keys()])
         while len(work_list) > 0:
             a, b = work_list.pop()
-            prop_height = self.height_map[a] + valid_connections[a][b]
-            if np.isnan(self.height_map[b]):
-                self.height_map[b] = prop_height
+            prop_height = height_map[a] + valid_connections[a][b]
+            if np.isnan(height_map[b]):
+                height_map[b] = prop_height
                 work_list.extend([(b, k) for k in valid_connections[b].keys()])
                 set_by[b] = a
             else:
-                if self.height_map[b] != prop_height:
+                if height_map[b] != prop_height:
                     print a, b, prop_height, \
-                          self.height_map[b], valid_connections[a][b]
+                          height_map[b], valid_connections[a][b]
                     fails.append((a, b))
 
-        return set_by, fails
+        return height_map, set_by, fails
 
     def write_to_hdf(self, out_file, md_dict):
 
@@ -887,45 +948,6 @@ class Region_map(object):
             else:
                 return 'x=%1.4f, y=%1.4f' % (x, y)
         return format_coord
-
-    def connection_network(self, dirc='f'):
-        """
-        Sets up the network between the regions based on what fringes fall in
-        them.
-
-
-        """
-        inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
-
-        link_dict = {'f': 'next_P', 'r': 'prev_P'}
-        dh_dict = {'f': 'forward_dh', 'r': 'reverse_dh'}
-
-        dh_str = dh_dict[dirc]
-        ln_str = link_dict[dirc]
-
-        # main data structure
-        connections = [defaultdict(inner_dict)
-                       for j in range(len(self.height_map))]
-        for FR in self.fringe_rings:
-            for fr in FR:
-                if fr is None:
-                    print 'WTF mate'
-                    continue
-                if fr.region == 0:
-                    continue
-                ln_fr = getattr(fr, ln_str)
-                if ln_fr is None:
-                    continue
-                ln_region = ln_fr.region
-                if ln_region == 0:
-                    continue
-
-                dh = getattr(fr, dh_str)
-                if not np.isnan(dh):
-                    dh = int(dh)
-                    connections[fr.region][ln_region][dh] += 1
-
-        return connections
 
 
 def _segment_labels(region_list, zero_thresh=2):
