@@ -426,7 +426,17 @@ class Region_map(object):
 
     @staticmethod
     def _label_regions(mask, size_cut, structure):
+        '''
+        Labels the regions
 
+        Parameters
+        ----------
+        mask : binary ndarray
+            The array to identify regions in
+
+        size_cut : int
+            Maximum number of pixels to be in a
+        '''
         if structure is not None:
             mask = ndi.binary_erosion(mask, structure=structure, border_value=1)
         #    mask = ndi.binary_propagation(mask)
@@ -989,6 +999,20 @@ def _segment_labels(region_list, zero_thresh=2):
 
 
 def _bin_region(N, region_starts, region_ends):
+    '''
+    Returns what region an index is in given a list of the region edges
+
+    Parameters
+    ----------
+    N : int
+        The index of interest
+
+    region_starts : list
+        The index of the first position in the region
+
+    region_ends : list
+        The index of the last position in the region
+    '''
     n = bisect(region_starts, N) - 1
     if n == -1:
         return None
