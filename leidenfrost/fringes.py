@@ -880,7 +880,7 @@ class Region_map(object):
         # this will blow up if the file exists
         with closing(h5py.File(out_file.format, 'w-')) as h5file:
 
-            h5file.attrs['ver'] = '0.1'
+            h5file.attrs['ver'] = '0.2'
             # store all the md passed in
             for key, val in md_dict:
                 try:
@@ -888,10 +888,10 @@ class Region_map(object):
                 except TypeError:
                     print 'key: ' + key + ' can not be gracefully shoved into'
                     print ' an hdf object, please reconsider your life choices'
-            h5file.attrs['thresh'] = self.thresh
-            h5file.attrs['size_cut'] = self.size_cut
-            if self.structure is not None:
-                h5file.attrs['structure'] = np.asarray(self.structure)
+            #            h5file.attrs['thresh'] = self.thresh
+            #h5file.attrs['size_cut'] = self.size_cut
+            #if self.structure is not None:
+            #    h5file.attrs['structure'] = np.asarray(self.structure)
 
             # the kymograph extracted from the image series
             h5file.create_dataset('working_img',
@@ -904,17 +904,12 @@ class Region_map(object):
                                   self.height_map.shape,
                                   self.height_map.dtype)
             h5file['height_map'][:] = self.height_map
-            # the regions of space
-            h5file.create_dataset('label_regions',
-                                  self.label_regions.shape,
-                                  self.label_regions.dtype,
-                                  compression='szip')
-            h5file['label_regions'][:] = self.label_regions
 
             fr_grp = h5file.create_group('fringe_rings')
-            for FR in self.fringe_rings:
+            for FR, region_edegs in izip(self.fringe_rings, self.region_edegs):
                 f_cls = np.vstack([fr.f_cls for fr in FR])
-                f_loc = np.vstack([fr.f_cls for fr in FR])
+                f_loc = np.vstack([fr.f_loc for fr in FR])
+                #TODO finish this
                 frame_number = fr.frame_number
                 dset_names = ["f_class_{frn:02}".format(frn=frame_number),
                               "f_loc_{frn:02}".format(frn=frame_number)]
