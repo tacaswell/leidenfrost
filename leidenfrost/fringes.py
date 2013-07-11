@@ -1005,6 +1005,17 @@ class Region_map(object):
 
 
 def _segment_labels(region_list, zero_thresh=2):
+    '''
+    Segments the regions.  Returns list of where contiguous regions begin and end
+
+    parameters
+    ----------
+    region_list : list
+        a list indicating what region each position is in
+
+    zero_thresh : int
+        how many zeros are needed to trigger the end of a region
+    '''
     region_starts = []
     region_labels = []
     region_ends = []
