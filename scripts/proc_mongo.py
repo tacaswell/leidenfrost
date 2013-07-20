@@ -65,7 +65,7 @@ class worker(Process):
             self.work_queue.task_done()
 
 
-def proc_cine_fname(cine_fname, ch, hdf_fname_template):
+def proc_cine_fname(cine_fname, ch, hdf_fname_template, max_circ_change_frac=None):
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
 
@@ -117,7 +117,21 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template):
 
                 signal.alarm(45)
                 start = time.time()
-                mbe, seed_curve = stack.process_frame(j, seed_curve)
+                mbe, new_seed_curve = stack.process_frame(j, seed_curve)
+                if max_circ_change_frac is not None:
+                    # check if we are limiting how much the circumference can change
+                    # between frames
+                    old_circ = seed_curve.circ
+                    new_circ = new_seed_curve
+                    # if it changes little enough, adopt the new seed curve
+                    if np.abs(old_circ - new_circ) / old_circ < max_circ_change_frac:
+                        seed_curve = new_seed_curve
+                    # if we get here that means we are re-using the
+                    # curve from n-m for frame n.  We are hitting this
+                    # because the run is already going off the rails.  Hopefully we
+                    # get enough fringes back to start being good again.
+                else:
+                    seed_curve = new_seed_curve
                 signal.alarm(0)
                 elapsed = time.time() - start
                 logger.info('completed frame %d in %fs', j, elapsed)
