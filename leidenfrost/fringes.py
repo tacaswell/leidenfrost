@@ -35,7 +35,12 @@ from scipy.interpolate import griddata
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
 
-Region_Edges = namedtuple('Region_Edges', ['starts', 'labels', 'ends'])
+
+class Region_Edges(namedtuple('Region_Edges', ['starts', 'labels', 'ends'])):
+    __slots__ = ()
+
+    def __eq__(self, other):
+        return all(np.all(_s == _o) for _s, _o in izip(self, other))
 
 # set up all the look-up dictionaries
 # list of the needed combinations
@@ -214,6 +219,35 @@ class Fringe(object):
         self.region = np.nan     #: region of the khymograph
         self.abs_height = None   #: the height of this fringe as given by tracking in time
 
+    def __eq__(self, other):
+        # test the object like things
+        for k in ['f_class',
+                  'f_loc']:
+            if not getattr(self, k) == getattr(other, k):
+                return False
+        # test links
+        for k in ['next_P',
+                  'prev_P']:
+            _s = getattr(self, k)
+            _o = getattr(other, k)
+            if _s is None and _o is None:
+                continue
+            try:
+                if not ((_s.f_class == _o.f_class) and
+                        (_s.f_loc == _o.f_loc)):
+                    return False
+            except:
+                return False
+        # test the numpy-like things
+        for k in ['forward_dh', 'reverse_dh', 'abs_height', 'frame_number',
+                  'region']:
+            try:
+                np.testing.assert_equal(getattr(self, k), getattr(other, k))
+            except AssertionError:
+                print k
+                return False
+        return True
+
     @property
     def q(self):
         return self.f_loc.q
@@ -375,6 +409,11 @@ class FringeRing(object):
     def __getitem__(self, key):
         return self.fringes[key]
 
+    def __eq__(self, other):
+        if self.frame_number != other.frame_number:
+            return False
+        return all(_f1 == _f2 for _f1, _f2 in izip(self.fringes, other.fringes))
+
 
 def _get_fc_lists(mbe, reclassify):
     """ Generate `f_class` and `f_loc` lists from a backend object
@@ -423,6 +462,22 @@ def _get_fc_lists(mbe, reclassify):
 
 
 class Region_map(object):
+    def __eq__(self, other):
+        # test numpy like things
+        try:
+            np.testing.assert_equal(self.label_img, other.label_img)
+            np.testing.assert_equal(self.height_map, other.height_map)
+            np.testing.assert_equal(self.working_img, other.working_img)
+        except AssertionError:
+            return False
+        # test fringe rings
+        if not all(_fr1 == _fr2 for _fr1, _fr2 in izip(self.fringe_rings, other.fringe_rings)):
+            return False
+        # test region edges
+        if not all(_r1 == _r2 for _r1, _r2 in izip(self.region_edges, other.region_edges)):
+            return False
+
+        return True
 
     @staticmethod
     def _label_regions(mask, size_cut, structure):
@@ -875,24 +930,27 @@ class Region_map(object):
         label = self.label_img[theta_indx, frame_num]
         return self.height_map[label]
 
-    def write_to_hdf(self, out_file, md_dict):
+    def write_to_hdf(self, out_file, md_dict=None, mode='w-'):
 
         # this will blow up if the file exists
-        with closing(h5py.File(out_file.format, 'w-')) as h5file:
+        with closing(h5py.File(out_file.format, mode)) as h5file:
 
             h5file.attrs['ver'] = '0.2'
             # store all the md passed in
-            kwarg_grp = h5file.create_group('kwargs')
-            for key, val in md_dict:
-                try:
-                    kwarg_grp.attrs[key] = val
-                except TypeError:
-                    print 'key: ' + key + ' can not be gracefully shoved into'
-                    print ' an hdf object, please reconsider your life choices'
-            #            h5file.attrs['thresh'] = self.thresh
-            #h5file.attrs['size_cut'] = self.size_cut
-            #if self.structure is not None:
-            #    h5file.attrs['structure'] = np.asarray(self.structure)
+
+            if md_dict is not None:
+                for key, val in md_dict:
+                    try:
+                        h5file.attrs[key] = val
+                    except TypeError:
+                        print 'key: ' + key + ' can not be gracefully shoved into'
+                        print ' an hdf object, please reconsider your life choices'
+
+            # kwarg_grp = h5file.create_group('kwargs')
+            # kwarg_grp.attrs['thresh'] = self.thresh
+            # kwarg_grp.attrs['size_cut'] = self.size_cut
+            # if self.structure is not None:
+            #     kwarg_grp.attrs['structure'] = np.asarray(self.structure)
 
             # the kymograph extracted from the image series
             h5file.create_dataset('working_img',
@@ -910,14 +968,14 @@ class Region_map(object):
             fr_l_grp = h5file.create_group('fringe_locs')
             re_grp = h5file.create_group('region_edges')
             for FR, region_edges in izip(self.fringe_rings, self.region_edges):
-                f_cls = np.vstack([fr.f_cls for fr in FR])
+                f_class = np.vstack([fr.f_class for fr in FR])
                 f_loc = np.vstack([fr.f_loc for fr in FR])
                 re_data = np.vstack(region_edges)
                 frame_number = fr.frame_number
                 dset_names = ["f_class_{frn:07}".format(frn=frame_number),
                               "f_loc_{frn:07}".format(frn=frame_number)]
                 for n, v, t, _g in izip(dset_names,
-                                    [f_cls, f_loc],
+                                    [f_class, f_loc],
                                     [np.int8, np.float],
                                     [fr_c_grp, fr_l_grp]):
                     fr_ds = _g.create_dataset(n,
@@ -937,7 +995,7 @@ class Region_map(object):
 
         with closing(h5py.File(in_file.format, 'r')) as h5file:
             ver = h5file.attrs['ver']
-            if ver not in cls.VER_DICT:
+            if ver not in VER_DICT:
                 raise Exception("unsupported serialization version")
             return VER_DICT[ver](h5file)
 
@@ -945,7 +1003,7 @@ class Region_map(object):
     def _from_hdf_0_2(cls, h5file):
 
         # extract parameters
-        kwargs = dict(h5file['kwargs'].attrs)
+        #        md = dict(h5file.attrs)
         # get working image
         working_img = h5file['working_img'][:]
         # get the height map
@@ -961,8 +1019,8 @@ class Region_map(object):
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
         fringe_rings = [FringeRing(int(_cn.split('_')[-1]),
-                                   fr_c_grp[_cn][:],
-                                   fr_l_grp[_ln][:])
+                                   [fringe_cls(*_c) for _c in fr_c_grp[_cn]],
+                                   [fringe_loc(*_l) for _l in fr_l_grp[_ln]])
                                    for _cn, _ln in izip(fr_c_grp, fr_l_grp)
                                    ]
 
@@ -973,7 +1031,7 @@ class Region_map(object):
             FR.link_fringes(region_starts, region_labels, region_ends,
                             working_img.shape[0])
 
-        return cls(fringe_rings, region_edges, working_img, height_map, **kwargs)
+        return cls(fringe_rings, region_edges, working_img, height_map)
 
     def get_frame_profile(self, j):
         '''
