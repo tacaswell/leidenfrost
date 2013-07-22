@@ -476,7 +476,7 @@ class Region_map(object):
         # test region edges
         if not all(_r1 == _r2 for _r1, _r2 in izip(self.region_edges, other.region_edges)):
             return False
-
+        # don't bother to test the parameters
         return True
 
     @staticmethod
@@ -548,7 +548,7 @@ class Region_map(object):
 
         working_img = np.vstack(img_bck_grnd_slices).T
 
-        return cls.from_raw_data(working_img, FRs=fringe_rings, **kwargs)
+        return cls._from_raw_data(working_img, FRs=fringe_rings, **kwargs)
 
     @classmethod
     def _connection_network(cls, N, fringe_rings, dirc='f'):
@@ -591,7 +591,7 @@ class Region_map(object):
         return connections
 
     @classmethod
-    def from_raw_data(cls, working_img, FRs, thresh=0,
+    def _from_raw_data(cls, working_img, FRs, thresh=0,
                  size_cut=100, structure=None, **kwargs):
 
         up_mask = working_img > 1 + thresh
@@ -621,7 +621,9 @@ class Region_map(object):
 
         # boot strap up the heights
         height_map, set_by, fails = cls._boot_strap(N, fringe_rings)
-        return cls(fringe_rings, region_edges, working_img, height_map, **kwargs)
+        return cls(fringe_rings, region_edges, working_img, height_map,
+                   thresh=thresh, size_cut=size_cut, structure=structure,
+                   **kwargs)
 
     @classmethod
     def _boot_strap(cls, N, FRs):
@@ -672,7 +674,8 @@ class Region_map(object):
 
         return height_map, set_by, fails
 
-    def __init__(self, fringe_rings, region_edges, working_img, height_map):
+    def __init__(self, fringe_rings, region_edges, working_img, height_map,
+                 **kwargs):
         self.fringe_rings = fringe_rings      # fringes group by a per-time basis
         self.region_edges = region_edges      # edges of the regions on a per-time basis
         self.working_img = working_img        # the raw image not sure why we are carrying this around)
@@ -680,6 +683,7 @@ class Region_map(object):
 
         self._height_img = None           # image of the heights
         self._label_img = None            # image of the labeled regions
+        self.params = kwargs              # dict to hold parameters
         pass
 
     def __len__(self):
@@ -939,18 +943,25 @@ class Region_map(object):
             # store all the md passed in
 
             if md_dict is not None:
-                for key, val in md_dict:
+                for key, val in md_dict.iteritems():
+                    if val is None:
+                        continue
                     try:
                         h5file.attrs[key] = val
                     except TypeError:
                         print 'key: ' + key + ' can not be gracefully shoved into'
                         print ' an hdf object, please reconsider your life choices'
 
-            # kwarg_grp = h5file.create_group('kwargs')
-            # kwarg_grp.attrs['thresh'] = self.thresh
-            # kwarg_grp.attrs['size_cut'] = self.size_cut
-            # if self.structure is not None:
-            #     kwarg_grp.attrs['structure'] = np.asarray(self.structure)
+            # save the parametrs
+            param_grp = h5file.create_group('params')
+            for key, val in self.params.iteritems():
+                if val is None:
+                    continue
+                try:
+                    param_grp.attrs[key] = val
+                except TypeError:
+                    print 'key: ' + key + ' can not be gracefully shoved into'
+                    print ' an hdf object, please reconsider your life choices'
 
             # the kymograph extracted from the image series
             h5file.create_dataset('working_img',
@@ -1031,7 +1042,9 @@ class Region_map(object):
             FR.link_fringes(region_starts, region_labels, region_ends,
                             working_img.shape[0])
 
-        return cls(fringe_rings, region_edges, working_img, height_map)
+        params = dict(h5file['params'].attrs)
+
+        return cls(fringe_rings, region_edges, working_img, height_map, **params)
 
     def get_frame_profile(self, j):
         '''
