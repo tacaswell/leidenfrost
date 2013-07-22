@@ -35,7 +35,7 @@ from scipy.interpolate import griddata
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
 
-region_edges = namedtuple('region_edges', ['start', 'label', 'end'])
+Region_Edges = namedtuple('Region_Edges', ['starts', 'labels', 'ends'])
 
 # set up all the look-up dictionaries
 # list of the needed combinations
@@ -882,9 +882,10 @@ class Region_map(object):
 
             h5file.attrs['ver'] = '0.2'
             # store all the md passed in
+            kwarg_grp = h5file.create_group('kwargs')
             for key, val in md_dict:
                 try:
-                    h5file.attrs[key] = val
+                    kwarg_grp.attrs[key] = val
                 except TypeError:
                     print 'key: ' + key + ' can not be gracefully shoved into'
                     print ' an hdf object, please reconsider your life choices'
@@ -905,24 +906,74 @@ class Region_map(object):
                                   self.height_map.dtype)
             h5file['height_map'][:] = self.height_map
 
-            fr_grp = h5file.create_group('fringe_rings')
-            for FR, region_edegs in izip(self.fringe_rings, self.region_edegs):
+            fr_c_grp = h5file.create_group('fringe_classes')
+            fr_l_grp = h5file.create_group('fringe_locs')
+            re_grp = h5file.create_group('region_edges')
+            for FR, region_edges in izip(self.fringe_rings, self.region_edges):
                 f_cls = np.vstack([fr.f_cls for fr in FR])
                 f_loc = np.vstack([fr.f_loc for fr in FR])
-                #TODO finish this
+                re_data = np.vstack(region_edges)
                 frame_number = fr.frame_number
-                dset_names = ["f_class_{frn:02}".format(frn=frame_number),
-                              "f_loc_{frn:02}".format(frn=frame_number)]
-                for n, v, t in izip(dset_names,
+                dset_names = ["f_class_{frn:07}".format(frn=frame_number),
+                              "f_loc_{frn:07}".format(frn=frame_number)]
+                for n, v, t, _g in izip(dset_names,
                                     [f_cls, f_loc],
-                                    [np.int8, np.float]):
-                    fr_grp.create_dataset(n,
+                                    [np.int8, np.float],
+                                    [fr_c_grp, fr_l_grp]):
+                    fr_ds = _g.create_dataset(n,
                                           v.shape,
                                           t)
+                    if v.shape[0] > 0:
+                        fr_ds[:] = v
+                re_ds = re_grp.create_dataset("region_edges_{frn:07}".format(frn=frame_number),
+                                      re_data.shape,
+                                      np.uint32)
+                re_ds[:] = re_data
 
     @classmethod
     def from_hdf(cls, in_file):
-        pass
+        VER_DICT = {'0.2': cls._from_hdf_0_2,
+                    }
+
+        with closing(h5py.File(in_file.format, 'r')) as h5file:
+            ver = h5file.attrs['ver']
+            if ver not in cls.VER_DICT:
+                raise Exception("unsupported serialization version")
+            return VER_DICT[ver](h5file)
+
+    @classmethod
+    def _from_hdf_0_2(cls, h5file):
+
+        # extract parameters
+        kwargs = dict(h5file['kwargs'].attrs)
+        # get working image
+        working_img = h5file['working_img'][:]
+        # get the height map
+        height_map = h5file['height_map'][:]
+        # pull out the edges of the regions
+        re_grp = h5file['region_edges']
+        # this relies on the iterator in h5py returning things sorted
+        # and the padding being sufficient to always sort correctly
+        region_edges = [Region_Edges(*re_grp[k]) for k in re_grp]
+        # extract the fringe properties
+        fr_c_grp = h5file['fringe_classes']
+        fr_l_grp = h5file['fringe_locs']
+        # this relies on the iterator in h5py returning things sorted
+        # and the padding being sufficient to always sort correctly
+        fringe_rings = [FringeRing(int(_cn.split('_')[-1]),
+                                   fr_c_grp[_cn][:],
+                                   fr_l_grp[_ln][:])
+                                   for _cn, _ln in izip(fr_c_grp, fr_l_grp)
+                                   ]
+
+        # link the fringes.  This is simpler than storing the linking information
+        for FR, (region_starts,
+                 region_labels,
+                 region_ends) in izip(fringe_rings, region_edges):
+            FR.link_fringes(region_starts, region_labels, region_ends,
+                            working_img.shape[0])
+
+        return cls(fringe_rings, region_edges, working_img, height_map, **kwargs)
 
     def get_frame_profile(self, j):
         '''
@@ -1050,7 +1101,7 @@ def _segment_labels(region_list, zero_thresh=2):
     if cur_region is not None:
         region_ends.append(len(region_list) - 1)
 
-    return region_edges(region_starts, region_labels, region_ends)
+    return Region_Edges(region_starts, region_labels, region_ends)
 
 
 def _bin_region(N, region_starts, region_ends):
