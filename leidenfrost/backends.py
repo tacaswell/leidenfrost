@@ -210,7 +210,8 @@ class HdfBackend(object):
 
     def __getitem__(self, key):
         if type(key) == slice:
-            return map(self.get_frame, range(self.num_frames)[key])
+            for k in xrange(*key.indices(self.num_frames)):
+                yield self.get_frame(k)
 
         return self.get_frame(key)
 
