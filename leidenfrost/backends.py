@@ -210,10 +210,13 @@ class HdfBackend(object):
 
     def __getitem__(self, key):
         if type(key) == slice:
-            for k in xrange(*key.indices(self.num_frames)):
-                yield self.get_frame(k)
+            def tmp():
+                for k in xrange(*key.indices(self.num_frames)):
+                    yield self.get_frame(k)
+            return tmp()
 
-        return self.get_frame(key)
+        else:
+            return self.get_frame(key)
 
 
 class ProcessBackend(object):
