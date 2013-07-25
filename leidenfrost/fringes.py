@@ -811,6 +811,8 @@ class Region_map(object):
             for (r_start, r_label, r_stop) in zip(*edges):
                 tmp[r_start:r_stop, j] = r_label
 
+        # hack to deal with obob
+        tmp[-1, :] = tmp[-2, :]
         return tmp
 
     def resample_height_img(self, th_step=1000, tau_step=5000, method='cubic'):
@@ -1171,7 +1173,7 @@ def _segment_labels(region_list, zero_thresh=2):
             region_starts.append(j)
             cur_region = lab
     if cur_region is not None:
-        region_ends.append(len(region_list) - 1)
+        region_ends.append(len(region_list))
 
     return Region_Edges(region_starts, region_labels, region_ends)
 
