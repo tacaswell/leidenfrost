@@ -1012,7 +1012,7 @@ class Region_map(object):
 
     @classmethod
     def _from_hdf_0_2(cls, h5file):
-
+        print 'starting read'
         # extract parameters
         #        md = dict(h5file.attrs)
         # get working image
@@ -1021,20 +1021,22 @@ class Region_map(object):
         height_map = h5file['height_map'][:]
         # pull out the edges of the regions
         re_grp = h5file['region_edges']
+        print 'starting region edges'
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
-        region_edges = [Region_Edges(*re_grp[k]) for k in re_grp]
+        region_edges = [Region_Edges(*re_grp[k][:]) for k in re_grp]
         # extract the fringe properties
         fr_c_grp = h5file['fringe_classes']
         fr_l_grp = h5file['fringe_locs']
+        print 'starting fringe rings'
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
         fringe_rings = [FringeRing(int(_cn.split('_')[-1]),
-                                   [fringe_cls(*_c) for _c in fr_c_grp[_cn]],
-                                   [fringe_loc(*_l) for _l in fr_l_grp[_ln]])
+                                   [fringe_cls(*_c) for _c in fr_c_grp[_cn][:]],
+                                   [fringe_loc(*_l) for _l in fr_l_grp[_ln][:]])
                                    for _cn, _ln in izip(fr_c_grp, fr_l_grp)
                                    ]
-
+        print 'starting linking'
         # link the fringes.  This is simpler than storing the linking information
         for FR, (region_starts,
                  region_labels,
