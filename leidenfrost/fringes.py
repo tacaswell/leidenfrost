@@ -1023,7 +1023,7 @@ class Region_map(object):
         print 'starting region edges'
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
-        region_edges = [Region_Edges(*re_grp[k][:]) for k in re_grp]
+        region_edges = [Region_Edges(*(re_grp[k][:])) for k in re_grp]
         # extract the fringe properties
         fr_c_grp = h5file['fringe_classes']
         fr_l_grp = h5file['fringe_locs']
