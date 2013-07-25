@@ -375,15 +375,14 @@ class FringeRing(object):
             The length of the region sampled in the 'natural' units
 
         '''
+        # figure out which bin each fringe goes into just once
+        bins = [_bin_region(int((np.mod(_fr.phi, length)/(length)) * N_samples),
+                                    region_starts,
+                                    region_ends) for _fr in self.fringes]
 
-        for fr_b, fr_f in pairwise_periodic(self.fringes):
+        for (fr_b, b_b), (fr_f, b_f) in pairwise_periodic(izip(self.fringes, bins)):
 
             fr_b.abs_height = np.nan
-
-            b_b, b_f = [_bin_region(int((np.mod(_fr.phi, length)/(length)) * N_samples),
-                                    region_starts,
-                                    region_ends)
-                        for _fr in (fr_b, fr_f)]
 
             # handle the other mapping
             if b_b is None:
