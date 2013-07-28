@@ -509,16 +509,6 @@ class SplineCurve(object):
         self._cntr = None
         self._circ = None
 
-    def get_xy_samples(self, sample_count):
-        '''
-        Returns the x-y coordinates of uniformly sampled points on the
-        spline.
-
-        STOP USING THIS
-        '''
-        print "STOP USING THIS: GET_XY_SAMPLES"
-        return self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, sample_count))
-
     def write_to_hdf(self, parent_group, name=None):
         '''
         Writes out the essential data (spline of central curve) to hdf file.
@@ -530,14 +520,6 @@ class SplineCurve(object):
         curve_group.attrs['tck0'] = self.tck[0]
         curve_group.attrs['tck1'] = np.vstack(self.tck[1])
         curve_group.attrs['tck2'] = self.tck[2]
-
-    def circumference(self):
-        '''returns a rough estimate of the circumference
-        DEPRECATED
-        '''
-        print "STOP USING THIS: CIRCUMFERENCE"
-        new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
-        return np.sum(np.sqrt(np.sum(np.diff(new_pts, axis=1) ** 2, axis=0)))
 
     @property
     def circ(self):
