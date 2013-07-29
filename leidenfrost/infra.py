@@ -18,7 +18,7 @@ from __future__ import division
 
 
 import time
-
+from collections import namedtuple
 import numpy as np
 import cPickle
 
@@ -423,6 +423,9 @@ def l_smooth(values, window_len=2, window='flat'):
 
 
 class SplineCurve(object):
+    mode_param = namedtuple('mode_param', ['n', 'x', 'y'])
+    abs_angle = namedtuple('abs_angle', ['abs', 'angle'])
+
     '''
     A class that wraps the scipy.interpolation objects
     '''
@@ -611,6 +614,29 @@ class SplineCurve(object):
 
     def draw_to_axes(self, ax, N=1024, **kwargs):
         return ax.plot(*(self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, N)) + 0.5), **kwargs)
+
+    def curve_shape_fft(self, N=3):
+        '''
+        Returns the amplitude and phase of the components of the rim curve
+
+        Parameters
+        ----------
+        self : SplineCurve
+            The curve to extract the data from
+
+        n : int
+            The maximum mode to extract data for
+
+        Returns
+        -------
+        ret : list
+            [mode_param(n=n, x=abs_angle(x_amp, x_phase), y=abs_angle(y_amp, y_phase)), ...]
+        '''
+        curve_data = self.q_phi_to_xy(1, np.linspace(0, 2*np.pi, 1000))
+        curve_fft = [np.fft.fft(_d) / len(_d) for _d in curve_data]
+        return [self.mode_param(n, *[self.abs_angle(2 * np.abs(_cfft[n]), np.angle(_cfft[n]))
+                               for _cfft in curve_fft])
+                for n in range(1, N + 1)]
 
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
