@@ -65,6 +65,8 @@ class HdfBackend(object):
         """
 
         print fname
+
+        self.fname = fname
         self._iter_cur_item = -1
         self.buffers = []
         self.file = None
@@ -217,6 +219,41 @@ class HdfBackend(object):
 
         else:
             return self.get_frame(key)
+
+    def circumference_vs_time_ax(self, ax, t_scale=1, t_offset=0, f_slice=None, **kwargs):
+        '''
+        Plots the circumference vs time onto the given ax.
+
+        Extra `**kwargs` are passed to `plot`
+
+        Parameters
+        ----------
+        ax : `matplotlib.Axes`
+            The axes to plot the data to
+        t_scale : float
+            Scale factor to apply the frame number for plotting.
+
+            The displayed time will be :math:`(frame_number - t_offset) * t_scale`
+        t_offset : int
+            off set to apply to the frame number before scaling.
+
+            The displayed time will be :math:`(frame_number - t_offset) * t_scale`
+
+        f_slice : `slice` or None
+            which frames to plot
+
+        '''
+        old_params = self.prams
+        self.prams = HdfBEPram(False, False)
+
+        if f_slice is None:
+            f_slice = slice(None)
+
+        t = (np.arange(*f_slice.indices(len(self))) - t_offset) * t_scale
+        c = np.array([mbe.curve.circ for mbe in self[f_slice]])
+        self.prams = old_params
+
+        return ax.plot(t, c, **kwargs)
 
 
 class ProcessBackend(object):
