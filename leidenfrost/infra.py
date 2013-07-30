@@ -638,6 +638,21 @@ class SplineCurve(object):
                                for _cfft in curve_fft])
                 for n in range(1, N + 1)]
 
+    def cum_length(self, N=1024):
+        '''Returns the cumulative length at N evenly sampled points in parameter space
+
+        Parameters
+        ----------
+        N : int
+            Number of points to sample
+
+        Returns
+        -------
+        ret : ndarray
+            An ndarray of length N which is the cumulative distance around the rim
+        '''
+        return np.concatenate(([0], np.cumsum(np.sqrt(np.sum(np.diff(si.splev(np.linspace(0, 1, N), self.tck, ext=2), axis=1) ** 2, axis=0)))))
+
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
                      smooth_rng=2, oversample=4, *args, **kwargs):
