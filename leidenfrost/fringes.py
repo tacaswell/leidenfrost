@@ -479,43 +479,37 @@ class Region_map(object):
         # don't bother to test the parameters
         return True
 
-    @staticmethod
-    def _label_regions(mask, size_cut, structure):
+    @classmethod
+    def from_backend(cls, backend, n_frames=None, reclassify=False, thresh=0,
+                 size_cut=100, structure=None, **kwargs):
         '''
-        Labels the regions
+        Constructor style class method
+
+        extra kwrags are passed through to `__init__`.
 
         Parameters
         ----------
-        mask : binary ndarray
-            The array to identify regions in
+        backend : HdfBackend
+            Data source
+
+        n_frames : None or int
+            The number of frames to process
+            TODO: change this to a slice object
+
+        reclassify : bool
+            If the fringes should be reclassified
+
+        thresh : float
+            threshold for labeling dark/light regions.  1 \pm thresh
 
         size_cut : int
-            Maximum number of pixels to be in a
+            The minimum size of a segmented region
+
+        structure : None or ndarray
+            Structure for eroding the segmented data
+
         '''
-        if structure is not None:
-            mask = ndi.binary_erosion(mask, structure=structure, border_value=1)
-        #    mask = ndi.binary_propagation(mask)
 
-        lab_regions, nb = ndi.label(mask)
-        # loop to make periodic
-        for j in range(lab_regions.shape[1]):
-            top_lab = lab_regions[0, j]
-            bot_lab = lab_regions[-1, j]
-            if top_lab != bot_lab and top_lab != 0 and bot_lab != 0:
-                lab_regions[lab_regions == bot_lab] = top_lab
-
-        sizes = ndi.sum(mask, lab_regions, range(nb + 1))
-        mask_sizes = sizes < size_cut
-        print len(sizes), sum(mask_sizes)
-
-        remove_pix = mask_sizes[lab_regions]
-        lab_regions[remove_pix] = 0
-        labels = np.unique(lab_regions)
-        lab_regions = np.searchsorted(labels, lab_regions)
-        return lab_regions, len(labels)
-
-    @classmethod
-    def from_backend(cls, backend, n_frames=None, reclassify=False, **kwargs):
         if n_frames is None:
             n_frames = len(backend)
         img_bck_grnd_slices = []
@@ -534,7 +528,7 @@ class Region_map(object):
 
             # convert the curve to X,Y
             XY = np.vstack(curve.q_phi_to_xy(0,
-                                             np.linspace(0, 2 * np.pi, 2 ** 10)))
+                                             np.linspace(0, 2 * np.pi, 2 ** 12)))
             # get center
             center = np.mean(XY, 1)
             # get relative position of first point
@@ -548,52 +542,6 @@ class Region_map(object):
 
         working_img = np.vstack(img_bck_grnd_slices).T
 
-        return cls._from_raw_data(working_img, FRs=fringe_rings, **kwargs)
-
-    @classmethod
-    def _connection_network(cls, N, fringe_rings, dirc='f'):
-        """
-        Sets up the network between the regions based on what fringes fall in
-        them.
-
-
-        """
-        inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
-
-        link_dict = {'f': 'next_P', 'r': 'prev_P'}
-        dh_dict = {'f': 'forward_dh', 'r': 'reverse_dh'}
-
-        dh_str = dh_dict[dirc]
-        ln_str = link_dict[dirc]
-
-        # main data structure
-        connections = [defaultdict(inner_dict)
-                    for j in range(N)]
-        for FR in fringe_rings:
-            for fr in FR:
-                if fr is None:
-                    print 'WTF mate'
-                    continue
-                if fr.region == 0:
-                    continue
-                ln_fr = getattr(fr, ln_str)
-                if ln_fr is None:
-                    continue
-                ln_region = ln_fr.region
-                if ln_region == 0:
-                    continue
-
-                dh = getattr(fr, dh_str)
-                if not np.isnan(dh):
-                    dh = int(dh)
-                    connections[fr.region][ln_region][dh] += 1
-
-        return connections
-
-    @classmethod
-    def _from_raw_data(cls, working_img, FRs, thresh=0,
-                 size_cut=100, structure=None, **kwargs):
-
         up_mask = working_img > 1 + thresh
         down_mask = working_img < 1 - thresh
 
@@ -605,7 +553,6 @@ class Region_map(object):
                                                       structure)
         lab_dark_regions[lab_dark_regions > 0] += nb_br
 
-        fringe_rings = FRs
         label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
                                         dtype=np.uint32)
         N = nb_br + nb_dr
@@ -624,55 +571,6 @@ class Region_map(object):
         return cls(fringe_rings, region_edges, working_img, height_map,
                    thresh=thresh, size_cut=size_cut, structure=structure,
                    **kwargs)
-
-    @classmethod
-    def _boot_strap(cls, N, FRs):
-        """An improved boot-strap operation
-        """
-        valid_connections = deque()
-        for dd in izip(cls._connection_network(N, FRs, 'f'),
-                       cls._connection_network(N, FRs, 'r')):
-            tmp_dict = {}
-            for _dd in dd:
-                for k, v in _dd.items():
-                    dh = _dict_to_dh(v, threshold=5)
-                    if dh is not None:
-                        if k in tmp_dict and tmp_dict[k] != dh:
-                            print 'conflict'
-                            # if we have inconsistent linking, throw
-                            # everything out
-                            del tmp_dict[k]
-                            continue
-                        tmp_dict[k] = dh
-            valid_connections.append(tmp_dict)
-
-        valid_connections = list(valid_connections)
-
-        # pick the one with the most forward connections
-        start = np.argmax([len(r) for r in valid_connections])
-        # clear height map
-        height_map = np.ones(N, dtype=np.float32) * np.nan
-        #set first height
-        height_map[start] = 0
-
-        set_by = dict()
-        fails = deque()
-        work_list = deque()
-        work_list.extend([(start, k) for k in valid_connections[start].keys()])
-        while len(work_list) > 0:
-            a, b = work_list.pop()
-            prop_height = height_map[a] + valid_connections[a][b]
-            if np.isnan(height_map[b]):
-                height_map[b] = prop_height
-                work_list.extend([(b, k) for k in valid_connections[b].keys()])
-                set_by[b] = a
-            else:
-                if height_map[b] != prop_height:
-                    print a, b, prop_height, \
-                          height_map[b], valid_connections[a][b]
-                    fails.append((a, b))
-
-        return height_map, set_by, fails
 
     def __init__(self, fringe_rings, region_edges, working_img, height_map,
                  **kwargs):
@@ -1262,12 +1160,20 @@ class Region_map(object):
             col = int(x / xscale)
             row = int(y / yscale)
             if col >= 0 and col < numcols and row >= 0 and row < numrows:
-                r_start, r_labels, r_end = self.region_edges[row]
-                region = r_labels[_bin_region(col, r_start, r_end)]
+                r_start, r_labels, r_end = self.region_edges[col]
+                region_indx =  _bin_region(row, r_start, r_end)
+                print region_indx, len(r_labels)
+                if region_indx is not None:
+                    #region = r_labels[region_indx]
+                    region = 1
+                else:
+                    region = 0
+
+                print region, len(self.height_map) #self.height_map[region],
                 return "x:{x}, y:{y}, r:{reg}, h:{h}".format(x=col * xscale,
                                                              y=row * yscale,
                                                              reg=region,
-                                                    h=self.height_map[region])
+                                                    h=0)
             else:
                 return 'x=%1.4f, y=%1.4f' % (x, y)
         return format_coord
@@ -1389,3 +1295,130 @@ def _height_interpolate(phi, h, steps, min_range, max_range, intep_func):
         new_h = np.nan * np.ones(new_phi.shape)
     # return new values
     return new_phi, new_h
+
+
+def _connection_network(N, fringe_rings, dirc='f'):
+    """
+    Sets up the network between the regions based on what fringes fall in
+    them.
+
+
+    """
+    inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
+
+    link_dict = {'f': 'next_P', 'r': 'prev_P'}
+    dh_dict = {'f': 'forward_dh', 'r': 'reverse_dh'}
+
+    dh_str = dh_dict[dirc]
+    ln_str = link_dict[dirc]
+
+    # main data structure
+    connections = [defaultdict(inner_dict)
+                for j in range(N)]
+    for FR in fringe_rings:
+        for fr in FR:
+            if fr is None:
+                print 'WTF mate'
+                continue
+            if fr.region == 0:
+                continue
+            ln_fr = getattr(fr, ln_str)
+            if ln_fr is None:
+                continue
+            ln_region = ln_fr.region
+            if ln_region == 0:
+                continue
+
+            dh = getattr(fr, dh_str)
+            if not np.isnan(dh):
+                dh = int(dh)
+                connections[fr.region][ln_region][dh] += 1
+
+    return connections
+
+
+def _boot_strap(N, FRs):
+    """An improved boot-strap operation
+    """
+    valid_connections = deque()
+    for dd in izip(_connection_network(N, FRs, 'f'),
+                   _connection_network(N, FRs, 'r')):
+        tmp_dict = {}
+        for _dd in dd:
+            for k, v in _dd.items():
+                dh = _dict_to_dh(v, threshold=5)
+                if dh is not None:
+                    if k in tmp_dict and tmp_dict[k] != dh:
+                        print 'conflict'
+                        # if we have inconsistent linking, throw
+                        # everything out
+                        del tmp_dict[k]
+                        continue
+                    tmp_dict[k] = dh
+        valid_connections.append(tmp_dict)
+
+    valid_connections = list(valid_connections)
+
+    # pick the one with the most forward connections
+    start = np.argmax([len(r) for r in valid_connections])
+    # clear height map
+    height_map = np.ones(N, dtype=np.float32) * np.nan
+    #set first height
+    height_map[start] = 0
+
+    set_by = dict()
+    fails = deque()
+    work_list = deque()
+    work_list.extend([(start, k) for k in valid_connections[start].keys()])
+    while len(work_list) > 0:
+        a, b = work_list.pop()
+        prop_height = height_map[a] + valid_connections[a][b]
+        if np.isnan(height_map[b]):
+            height_map[b] = prop_height
+            work_list.extend([(b, k) for k in valid_connections[b].keys()])
+            set_by[b] = a
+        else:
+            if height_map[b] != prop_height:
+                print a, b, prop_height, \
+                      height_map[b], valid_connections[a][b]
+                fails.append((a, b))
+
+    return height_map, set_by, fails
+
+
+def _label_regions(mask, size_cut, structure):
+    '''
+    Labels the regions
+
+    Parameters
+    ----------
+    mask : binary ndarray
+        The array to identify regions in
+
+    size_cut : int
+        Maximum number of pixels to be in a
+
+    structure : None or ndarray
+        passed to `numpy.ndimage.binary_erosion`
+    '''
+    if structure is not None:
+        mask = ndi.binary_erosion(mask, structure=structure, border_value=1)
+    #    mask = ndi.binary_propagation(mask)
+
+    lab_regions, nb = ndi.label(mask)
+    # loop to make periodic
+    for j in range(lab_regions.shape[1]):
+        top_lab = lab_regions[0, j]
+        bot_lab = lab_regions[-1, j]
+        if top_lab != bot_lab and top_lab != 0 and bot_lab != 0:
+            lab_regions[lab_regions == bot_lab] = top_lab
+
+    sizes = ndi.sum(mask, lab_regions, range(nb + 1))
+    mask_sizes = sizes < size_cut
+    print len(sizes), sum(mask_sizes)
+
+    remove_pix = mask_sizes[lab_regions]
+    lab_regions[remove_pix] = 0
+    labels = np.unique(lab_regions)
+    lab_regions = np.searchsorted(labels, lab_regions)
+    return lab_regions, len(labels)
