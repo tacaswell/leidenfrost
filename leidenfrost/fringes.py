@@ -29,8 +29,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import h5py
 from bisect import bisect
-from scipy.interpolate import griddata
+import scipy
 
+from leidenfrost.backends import HdfBEPram
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
@@ -682,6 +683,7 @@ class Region_map(object):
 
         self._height_img = None           # image of the heights
         self._label_img = None            # image of the labeled regions
+        self._resampled_height = None     # re-sampled height image
         self.params = kwargs              # dict to hold parameters
         pass
 
@@ -704,6 +706,13 @@ class Region_map(object):
         if self._label_img is None:
             self._label_img = self.reconstruct_label_img()
         return self._label_img
+
+    # make getting resampled height easy
+    @property
+    def resampled_height(self):
+        if self._resampled_height is None:
+            self._resampled_height = self.resample_height()
+        return self._resampled_height
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True,
                        alpha=.65, t_scale=1, t_units=''):
@@ -815,37 +824,132 @@ class Region_map(object):
         tmp[-1, :] = tmp[-2, :]
         return tmp
 
-    def resample_height_img(self, th_step=1000, tau_step=5000, method='cubic'):
-        assert method in ['linear', 'cubic', 'nearest']
+    def resample_height(self,
+                        N=1024,
+                        intep_func=scipy.interpolate.InterpolatedUnivariateSpline,
+                        min_range=0,
+                        max_range=2*np.pi):
+        '''
+        Returns a re-sampled and interpolated version of the height map.
 
-        scale = 2 * np.pi / self.working_img.shape[0]
+        Stashes the result in `self._resampled_height`
+
+        Parameters
+        ----------
+             N : int
+                The number of spatial sample points
+            intep_func : function
+                The function to use for interpolation. Must match specs of
+                functions in `scipy.interpolate`
+            min_range : float
+                minimum value of the interpolation range
+            max_range : float
+                maximum value of the interpolation range
+
+        Returns
+        -------
+        img : np.ndarray
+            Re-sampled image
+        '''
+        tmp = []
+        for j in xrange(len(self)):
+            regions = self.get_region_centers(j)
+            if len(regions) > 3:
+                frame_numer, phi, h = zip(*[(a, b, c) for (a, b), c in regions])
+
+                phi_new, h_new = _height_interpolate(phi, h, N, min_range, max_range, intep_func=intep_func)
+
+                tmp.append(-h_new)
+            else:
+                tmp.append(np.nan * np.ones(N))
+
+        self._resampled_height = np.vstack(tmp).T
+
+        return self._resampled_height
+
+    def get_region_centers(self, f_slice=None, scale=2*np.pi):
+        '''
+        Turns the region edges -> points for their centers
+
+        Parameters
+        ----------
+        f_slice : slice or int or None
+            The frames to get the centers for
+
+        scale : float
+            How to scale the bin numbers -> real units.  Will return
+            fringe position in range [0, scale]
+
+        Returns
+        -------
+        Rte : list
+            list of [((frame_number, phi), h), ... ]
+
+        '''
+        if f_slice is None:
+            f_slice = slice(None)
+
+        if type(f_slice) is int:
+            f_slice = slice(f_slice, f_slice + 1)
+
+        scale = scale / self.working_img.shape[0]
+
         tmp_pts = []
+        last_pt = None
+        for j, (region_starts,
+                region_labels,
+                region_ends) in izip(xrange(*f_slice.indices(len(self.region_edges))), self.region_edges[f_slice]):
+            if len(region_starts) < 3:
+                continue
+            if (region_starts[0] == 0 and
+                  region_ends[-1] == self.working_img.shape[0] and
+                  region_labels[0] == region_labels[-1] and
+                  not np.isnan(self.height_map[region_labels[0]])):
+                # if the first region starts at zero and the last region ends on the last bin
+                # then this is the same region
+                rs = region_starts[-1] - self.working_img.shape[0]
+                re = region_ends[0]
+                rl = region_labels[0]
+                r_center = (re + rs) / 2
+                # if the center is positive, it is the first fringe
+                if r_center >= 0:
+                    tmp_pts.append(((j, scale * r_center),
+                                    self.height_map[rl]))
+                    # no last fringe
+                    last_pt = None
+                # if it is negative it will be the last fringe
+                else:
 
-        print 'started'
-        for j, (region_start,
-                region_label,
-                region_ends) in enumerate(self.region_edges):
+                    last_pt = ((j, scale * (r_center + self.working_img.shape[0])),
+                               self.height_map[rl])
+            # or it's not one fringe
+            else:
+                # first fringe
+                if not np.isnan(self.height_map[region_labels[0]]):
+                    tmp_pts.append(((j,
+                                    scale * (region_starts[0] + region_ends[0])/2),
+                                    self.height_map[region_labels[0]]))
+                # last fringe
+                if not np.isnan(self.height_map[region_labels[-1]]):
+                    last_pt = ((j,
+                               scale * (region_starts[-1] + region_ends[-1])/2),
+                               self.height_map[region_labels[-1]])
+
+            # deal with all the fringes in the middle
             tmp_pts.extend(((j, scale * (re + rs) / 2), self.height_map[rl])
-                           for rs, re, rl in izip(region_start,
-                                                  region_ends, region_label)
+                           for rs, re, rl in izip(region_starts[1:-1],
+                                                  region_ends[1:-1],
+                                                  region_labels[1:-1])
                            if not np.isnan(self.height_map[rl]))
-
-        print 'mapped'
-        print len(tmp_pts)
-        points, vals = zip(*tmp_pts)
-        points = np.vstack(points)
-        grid_y, grid_x = np.mgrid[0:2 * np.pi:th_step*1j,
-                                  0:self.working_img.shape[1]:tau_step*1j]
-
-        print 'gridding'
-        grid_z2 = griddata(points, vals, (grid_x, grid_y), method=method)
-        print 'gridded'
-        return grid_z2
+            # if there is a last fringe, tack it on the end
+            if last_pt is not None:
+                tmp_pts.append(last_pt)
+        return tmp_pts
 
     def display_height_resampled(self, ax=None, cmap='jet',
                                  bckgnd=True, alpha=.65,
                                  t_scale=1, t_units=''):
-        height_img = self.resample_height_img()
+        height_img = self.resampled_height
         print np.min(height_img), np.max(height_img)
         if ax is None:
             # make this smarter
@@ -934,6 +1038,46 @@ class Region_map(object):
                          self.working_img.shape[0])
         label = self.label_img[theta_indx, frame_num]
         return self.height_map[label]
+
+    def display_height_taper(self, h5_backend, ax, f_slice=None, t_scale=1, c_scale=1, **kwargs):
+        '''
+        Displays the height map with the vertical dimension as distance around the rim
+        instead of angle.
+
+        Extra kwargs are passed to `pcolormesh`
+
+        Parameters
+        ----------
+        h5_backend : HdfBackend
+            Data source to pull the rim distance from
+        ax : Axes
+           axes to plot to
+        t_scale : float
+           Scaling factor for time
+        c_scale : float
+           Scaling factor for distance
+
+
+        '''
+        assert len(h5_backend) == self.resampled_height.shape[1]
+        if f_slice is None:
+            f_slice = slice(None)
+        # make sure we don't load stuff we don't need
+        h5_backend.prams = HdfBEPram(False, False)
+        # get the cumulative lengths
+        Y = np.vstack([mbe.curve.cum_length(self.resampled_height.shape[0]) for mbe in h5_backend[f_slice]]).T
+        # shift
+        Y -= np.mean(Y, axis=0)
+        # scale
+        Y *= c_scale
+        # generate X array via tricksy outer product
+        X = (np.ones((1, self.resampled_height.shape[0])) *
+             (np.arange(*f_slice.indices(self.resampled_height.shape[1])).reshape(-1, 1) *
+              (t_scale / h5_backend.cine.frame_rate))).T
+        # create pcolormesh
+        ax.pcolormesh(X, Y, self.resampled_height[:, f_slice], **kwargs)
+        # force re-draw
+        ax.figure.canvas.draw()
 
     def write_to_hdf(self, out_file, md_dict=None, mode='w-'):
 
@@ -1229,3 +1373,19 @@ def _dict_to_dh(input_d, threshold=15):
         if input_d[k] > threshold:
             return k
     return None
+
+
+def _height_interpolate(phi, h, steps, min_range, max_range, intep_func):
+    # make periodic
+    phi = np.hstack((phi[-1] - max_range, phi, phi[0] + max_range))
+    h = np.hstack((h[-1], h, h[0]))
+    # generate even sampling
+    new_phi = np.linspace(min_range, max_range, steps)
+    # set up interpolation
+    try:
+        f = intep_func(phi, h)
+        new_h = f(new_phi)
+    except:
+        new_h = np.nan * np.ones(new_phi.shape)
+    # return new values
+    return new_phi, new_h
