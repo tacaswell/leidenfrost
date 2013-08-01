@@ -480,8 +480,8 @@ class Region_map(object):
         return True
 
     @classmethod
-    def from_backend(cls, backend, n_frames=None, reclassify=False, thresh=0,
-                 size_cut=100, structure=None, **kwargs):
+    def from_backend(cls, backend, mask_fun, n_frames=None, reclassify=False, thresh=0,
+                     size_cut=100, mask_filter=None, N=2**12, **kwargs):
         '''
         Constructor style class method
 
@@ -505,8 +505,12 @@ class Region_map(object):
         size_cut : int
             The minimum size of a segmented region
 
-        structure : None or ndarray
-            Structure for eroding the segmented data
+        mask_filter : None or function
+            Used to filter the light/dark masks.  Must take one argument
+            of an `ndarray` and return an  `ndarray` of the same size
+
+        N : int
+            Number of sample to take around rim
 
         '''
 
@@ -537,20 +541,19 @@ class Region_map(object):
             th_offset = np.arctan2(first_pt[1], first_pt[0])
 
             XY = np.vstack(curve.q_phi_to_xy(0,
-                                             -th_offset + np.linspace(0, 2 * np.pi, 2 ** 12)))
+                                             -th_offset + np.linspace(0, 2 * np.pi, N)))
             img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
 
         working_img = np.vstack(img_bck_grnd_slices).T
 
-        up_mask = working_img > 1 + thresh
-        down_mask = working_img < 1 - thresh
+        up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
-        lab_bright_regions, nb_br = cls._label_regions(up_mask,
+        lab_bright_regions, nb_br = _label_regions(up_mask_dt,
                                                         size_cut,
-                                                        structure)
-        lab_dark_regions, nb_dr = cls._label_regions(down_mask,
+                                                        mask_filter)
+        lab_dark_regions, nb_dr = _label_regions(down_mask_dt,
                                                       size_cut,
-                                                      structure)
+                                                      mask_filter)
         lab_dark_regions[lab_dark_regions > 0] += nb_br
 
         label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
@@ -567,9 +570,9 @@ class Region_map(object):
                             working_img.shape[0])
 
         # boot strap up the heights
-        height_map, set_by, fails = cls._boot_strap(N, fringe_rings)
+        height_map, set_by, fails = _boot_strap(N, fringe_rings)
         return cls(fringe_rings, region_edges, working_img, height_map,
-                   thresh=thresh, size_cut=size_cut, structure=structure,
+                   thresh=thresh, size_cut=size_cut,
                    **kwargs)
 
     def __init__(self, fringe_rings, region_edges, working_img, height_map,
@@ -650,7 +653,7 @@ class Region_map(object):
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
-
+        ax.format_coord = self.format_factory(yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
     def display_all_regions(self, ax=None, cmap='jet',
@@ -680,6 +683,7 @@ class Region_map(object):
                   origin='bottom',
                   )
         im.set_clim([1, len(self.height_map)])
+        ax.format_coord = self.format_factory(yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
     def reconstruct_height_img(self):
@@ -1161,19 +1165,19 @@ class Region_map(object):
             row = int(y / yscale)
             if col >= 0 and col < numcols and row >= 0 and row < numrows:
                 r_start, r_labels, r_end = self.region_edges[col]
-                region_indx =  _bin_region(row, r_start, r_end)
-                print region_indx, len(r_labels)
+                region_indx = _bin_region(row, r_start, r_end)
                 if region_indx is not None:
-                    #region = r_labels[region_indx]
-                    region = 1
+                    region = r_labels[region_indx]
                 else:
                     region = 0
 
-                print region, len(self.height_map) #self.height_map[region],
-                return "x:{x}, y:{y}, r:{reg}, h:{h}".format(x=col * xscale,
+                return "x:{x}({col}), y:{y}({row}), r:{reg}, h:{h}, I:{I}".format(x=col * xscale,
                                                              y=row * yscale,
                                                              reg=region,
-                                                    h=0)
+                                                    h=self.height_map[region],
+                                                    I=self.working_img[row, col],
+                                                    row=row,
+                                                    col=col)
             else:
                 return 'x=%1.4f, y=%1.4f' % (x, y)
         return format_coord
@@ -1386,7 +1390,7 @@ def _boot_strap(N, FRs):
     return height_map, set_by, fails
 
 
-def _label_regions(mask, size_cut, structure):
+def _label_regions(mask, size_cut, mask_filter=None):
     '''
     Labels the regions
 
@@ -1397,13 +1401,7 @@ def _label_regions(mask, size_cut, structure):
 
     size_cut : int
         Maximum number of pixels to be in a
-
-    structure : None or ndarray
-        passed to `numpy.ndimage.binary_erosion`
     '''
-    if structure is not None:
-        mask = ndi.binary_erosion(mask, structure=structure, border_value=1)
-    #    mask = ndi.binary_propagation(mask)
 
     lab_regions, nb = ndi.label(mask)
     # loop to make periodic
