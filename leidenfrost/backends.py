@@ -197,7 +197,7 @@ class HdfBackend(object):
 
     def gen_back_img(self):
         if self.cine_fname is not None:
-            self.bck_img = infra.gen_bck_img(self.cine_fname)
+            self.bck_img = infra.gen_bck_img(self.cine_fname.format)
 
     def __iter__(self):
         self._iter_cur_item = -1
