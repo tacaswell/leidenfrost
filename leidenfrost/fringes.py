@@ -481,7 +481,7 @@ class Region_map(object):
 
     @classmethod
     def from_backend(cls, backend, mask_fun, n_frames=None, reclassify=False, thresh=0,
-                     size_cut=100, mask_filter=None, N=2**12, **kwargs):
+                     size_cut=100, N=2**12, **kwargs):
         '''
         Constructor style class method
 
@@ -507,7 +507,10 @@ class Region_map(object):
 
         mask_filter : None or function
             Used to filter the light/dark masks.  Must take one argument
-            of an `ndarray` and return an  `ndarray` of the same size
+            of an `ndarray` and return an  `ndarray` of the same size.
+
+            The function takes in the `working_img` and returns two masks
+            corresponding to the light and dark regions.
 
         N : int
             Number of sample to take around rim
@@ -544,17 +547,18 @@ class Region_map(object):
                                              -th_offset + np.linspace(0, 2 * np.pi, N)))
             img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
 
-        working_img = np.vstack(img_bck_grnd_slices).T
+        working_img = np.vstack(img_bck_grnd_slices, dtype=np.float16).T
 
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
         lab_bright_regions, nb_br = _label_regions(up_mask_dt,
-                                                        size_cut,
-                                                        mask_filter)
+                                                        size_cut)
         lab_dark_regions, nb_dr = _label_regions(down_mask_dt,
-                                                      size_cut,
-                                                      mask_filter)
-        lab_dark_regions[lab_dark_regions > 0] += nb_br
+                                                      size_cut)
+
+        #        lab_dark_regions[lab_dark_regions > 0] += nb_br
+        lab_dark_regions += nb_br         # shift labels
+        lab_dark_regions *= down_mask_dt  # mask the zeros back to zero
 
         label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
                                         dtype=np.uint32)
@@ -1390,14 +1394,15 @@ def _boot_strap(N, FRs):
     return height_map, set_by, fails
 
 
-def _label_regions(mask, size_cut, mask_filter=None):
+def _label_regions(mask, size_cut):
     '''
     Labels the regions
 
     Parameters
     ----------
     mask : binary ndarray
-        The array to identify regions in
+        The array to identify regions in.  Assumes that
+        the masks are pre-filtered
 
     size_cut : int
         Maximum number of pixels to be in a
