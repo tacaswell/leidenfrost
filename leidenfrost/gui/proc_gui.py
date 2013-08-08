@@ -335,7 +335,6 @@ class LFGui(QtGui.QMainWindow):
         self.proc_next_frame_acc.setEnabled(False)
         self.save_param_acc.setEnabled(False)
         self.iterate_button.setEnabled(False)
-        self.refresh_lines_flg = True
         self.fringe_grp_bx.setChecked(False)
 
     def set_spline_fitter(self, i):
@@ -355,10 +354,7 @@ class LFGui(QtGui.QMainWindow):
         self.redraw_sig.emit(False, False)
 
     def set_cur_frame(self, i):
-        old_frame = self.cur_frame
-        self.cur_frame = i
-        self.refresh_lines_flg = True
-        self.refresh_img = True
+        old_frame, self.cur_frame = self.cur_frame, i
         if old_frame == self.cur_frame - 1:
             self.cur_curve = self.next_curve
             if self.draw_fringes:
