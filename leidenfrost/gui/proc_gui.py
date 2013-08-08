@@ -101,6 +101,7 @@ class LFGui(QtGui.QMainWindow):
     open_file_sig = QtCore.Signal(backends.FilePath, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
+    draw_done_sig = QtCore.Signal()
     spinner_lst = [
         {'name': 's_width',
          'min': 0,
@@ -238,6 +239,8 @@ class LFGui(QtGui.QMainWindow):
 
         self.kill_thread.connect(self.thread.quit)
 
+        self.draw_done_sig.connect(self._play)
+
         self.show()
         self.thread.start()
         QtGui.qApp.exec_()
@@ -323,6 +326,7 @@ class LFGui(QtGui.QMainWindow):
         self.status_text.setNum(self.cur_frame)
         self.prog_bar.hide()
         self.diag.setEnabled(True)
+        self.draw_done_sig.emit()
 
     def clear_mbe(self):
         self.cur_curve = None
@@ -470,6 +474,14 @@ class LFGui(QtGui.QMainWindow):
         frame_selector_group.addLayout(fs_form)
         frame_selector_group.addWidget(fs_stepbox)
         diag_layout.addLayout(frame_selector_group)
+
+        # play button
+        play_button = QtGui.QPushButton('Play')
+        self.play_button = play_button
+        play_button.setCheckable(True)
+        play_button.setChecked(False)
+        self.play_button.pressed.connect(self.frame_spinner.stepUp)
+        diag_layout.addWidget(play_button)
 
         # tool box for all the controls
         diag_tool_box = QtGui.QToolBox()
@@ -799,3 +811,12 @@ class LFGui(QtGui.QMainWindow):
         procMenu = menubar.addMenu('&Process')
         procMenu.addAction(self.proc_this_frame_acc)
         procMenu.addAction(self.proc_next_frame_acc)
+
+    @QtCore.Slot()
+    def _play(self):
+        QtGui.qApp.processEvents()        # make sure all pending events are cleaned up
+                                          # if we don't do this, this
+                                          # gets hit before the button
+                                          # is marked as checked
+        if self.play_button.isChecked():
+            QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)
