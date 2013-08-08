@@ -664,10 +664,10 @@ class LFGui(QtGui.QMainWindow):
         # 5x4 inches, 100 dots-per-inch
         #
 
-        self.fig = Figure((24, 24))
+        self.fig = Figure((24, 24), tight_layout=True)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
-        self.axes = self.fig.add_subplot(111)
+        self.axes = self.fig.add_subplot(111, adjustable='datalim', aspect='equal')
         #      self.fig.tight_layout(.3, None, None, None)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
