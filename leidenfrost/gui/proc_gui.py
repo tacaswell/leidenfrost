@@ -449,10 +449,27 @@ class LFGui(QtGui.QMainWindow):
         self.frame_spinner = QtGui.QSpinBox()
         self.frame_spinner.setRange(0, len(self.worker) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
-        fs_form = QtGui.QFormLayout()
-        fs_form.addRow(QtGui.QLabel('frame #'), self.frame_spinner)
 
-        diag_layout.addLayout(fs_form)
+        frame_selector_group = QtGui.QVBoxLayout()
+        fs_form = QtGui.QHBoxLayout()
+        fs_form.addWidget(QtGui.QLabel('frame #'))
+        fs_form.addWidget(self.frame_spinner)
+        fs_form.addWidget(QtGui.QLabel(' of '))
+        self.max_cine_label = QtGui.QLabel(str(len(self.worker) - 1))
+        fs_form.addWidget(self.max_cine_label)
+        fs_stepbox = QtGui.QGroupBox("Frame step")
+        fs_sb_rb = QtGui.QHBoxLayout()
+        for j in [1, 10, 100, 1000, 10000]:
+            tmp_rdo = QtGui.QRadioButton(str(j))
+            tmp_rdo.toggled.connect(lambda x, j=j: self.frame_spinner.setSingleStep(j) if x else None)
+            fs_sb_rb.addWidget(tmp_rdo)
+            if j == 1:
+                tmp_rdo.toggle()
+            pass
+        fs_stepbox.setLayout(fs_sb_rb)
+        frame_selector_group.addLayout(fs_form)
+        frame_selector_group.addWidget(fs_stepbox)
+        diag_layout.addLayout(frame_selector_group)
 
         # tool box for all the controls
         diag_tool_box = QtGui.QToolBox()
@@ -716,6 +733,7 @@ class LFGui(QtGui.QMainWindow):
         #self.status_text.setText(label)
 
         self.frame_spinner.setRange(0, len(self.worker) - 1)
+        self.max_cine_label.setText(str(len(self.worker) - 1))
         self.frame_spinner.setValue(0)
 
         self.redraw_sig.emit(False, False)
