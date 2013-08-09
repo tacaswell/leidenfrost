@@ -1432,3 +1432,19 @@ def _label_regions(mask, size_cut):
     labels = np.unique(lab_regions)
     lab_regions = np.searchsorted(labels, lab_regions)
     return lab_regions, len(labels)
+
+
+def filter_fun(working_img, thresh, struct=None):
+
+    if struct is None:
+        #        struct = ndi.morphology.generate_binary_structure(2, 1)
+        struct = [[1, 1, 1]]
+        #    struct = np.ones((3, 3))
+
+    up_mask = ndi.binary_dilation(working_img > 1 + thresh, structure=struct, iterations=1)
+    down_mask = ndi.binary_dilation(working_img < 1 - thresh, structure=struct, iterations=1)
+
+    up_mask_dt = np.logical_and(up_mask, ~down_mask)
+    down_mask_dt = np.logical_and(down_mask, ~up_mask)
+
+    return up_mask_dt, down_mask_dt
