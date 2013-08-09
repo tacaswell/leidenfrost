@@ -545,9 +545,9 @@ class Region_map(object):
 
             XY = np.vstack(curve.q_phi_to_xy(0,
                                              -th_offset + np.linspace(0, 2 * np.pi, N)))
-            img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
+            img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2).astype(np.float16))
 
-        working_img = np.vstack(img_bck_grnd_slices, dtype=np.float16).T
+        working_img = np.vstack(img_bck_grnd_slices).T
 
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
@@ -965,9 +965,15 @@ class Region_map(object):
 
 
         '''
-        assert len(h5_backend) == self.resampled_height.shape[1]
+        assert len(h5_backend) >= self.resampled_height.shape[1]
         if f_slice is None:
             f_slice = slice(None)
+
+        if len(h5_backend) > self.resampled_height.shape[1]:
+            f_slice = slice(f_slice.start,
+                            min([_f for _f in [self.resampled_height.shape[1], f_slice.stop] if _f is not None]),
+                            f_slice.step)
+
         # make sure we don't load stuff we don't need
         h5_backend.prams = HdfBEPram(False, False)
         # get the cumulative lengths
@@ -981,7 +987,8 @@ class Region_map(object):
              (np.arange(*f_slice.indices(self.resampled_height.shape[1])).reshape(-1, 1) *
               (t_scale / h5_backend.cine.frame_rate))).T
         # create pcolormesh
-        ax.pcolormesh(X, Y, self.resampled_height[:, f_slice], **kwargs)
+        pm = ax.pcolormesh(X, Y, self.resampled_height[:, f_slice], **kwargs)
+        pm.set_clim([-np.nanmax(self.height_map), -np.nanmin(self.height_map)])
         # force re-draw
         ax.figure.canvas.draw()
 
