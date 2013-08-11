@@ -284,7 +284,7 @@ class LFReaderGui(QtGui.QMainWindow):
         tmp_dict = {'cine_cache_dir': self.paths_dict['cine cache path'],
                     'hdf_cache_dir': self.paths_dict['hdf cache path']}
 
-        self.fname_text.setText(fname_)
+        self.fname_text.setText('/'.join((path_, fname_)))
 
         self.open_file_sig.emit(new_hdf_fname, cine_bp, tmp_dict)
 
