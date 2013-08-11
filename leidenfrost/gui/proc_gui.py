@@ -101,6 +101,7 @@ class LFGui(QtGui.QMainWindow):
     open_file_sig = QtCore.Signal(backends.FilePath, dict)
     kill_thread = QtCore.Signal()
     redraw_sig = QtCore.Signal(bool, bool)
+    draw_done_sig = QtCore.Signal()
     spinner_lst = [
         {'name': 's_width',
          'min': 0,
@@ -238,6 +239,8 @@ class LFGui(QtGui.QMainWindow):
 
         self.kill_thread.connect(self.thread.quit)
 
+        self.draw_done_sig.connect(self._play)
+
         self.show()
         self.thread.start()
         QtGui.qApp.exec_()
@@ -323,6 +326,7 @@ class LFGui(QtGui.QMainWindow):
         self.status_text.setNum(self.cur_frame)
         self.prog_bar.hide()
         self.diag.setEnabled(True)
+        self.draw_done_sig.emit()
 
     def clear_mbe(self):
         self.cur_curve = None
@@ -331,7 +335,6 @@ class LFGui(QtGui.QMainWindow):
         self.proc_next_frame_acc.setEnabled(False)
         self.save_param_acc.setEnabled(False)
         self.iterate_button.setEnabled(False)
-        self.refresh_lines_flg = True
         self.fringe_grp_bx.setChecked(False)
 
     def set_spline_fitter(self, i):
@@ -351,10 +354,7 @@ class LFGui(QtGui.QMainWindow):
         self.redraw_sig.emit(False, False)
 
     def set_cur_frame(self, i):
-        old_frame = self.cur_frame
-        self.cur_frame = i
-        self.refresh_lines_flg = True
-        self.refresh_img = True
+        old_frame, self.cur_frame = self.cur_frame, i
         if old_frame == self.cur_frame - 1:
             self.cur_curve = self.next_curve
             if self.draw_fringes:
@@ -449,10 +449,35 @@ class LFGui(QtGui.QMainWindow):
         self.frame_spinner = QtGui.QSpinBox()
         self.frame_spinner.setRange(0, len(self.worker) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
-        fs_form = QtGui.QFormLayout()
-        fs_form.addRow(QtGui.QLabel('frame #'), self.frame_spinner)
 
-        diag_layout.addLayout(fs_form)
+        frame_selector_group = QtGui.QVBoxLayout()
+        fs_form = QtGui.QHBoxLayout()
+        fs_form.addWidget(QtGui.QLabel('frame #'))
+        fs_form.addWidget(self.frame_spinner)
+        fs_form.addWidget(QtGui.QLabel(' of '))
+        self.max_cine_label = QtGui.QLabel(str(len(self.worker) - 1))
+        fs_form.addWidget(self.max_cine_label)
+        fs_stepbox = QtGui.QGroupBox("Frame step")
+        fs_sb_rb = QtGui.QHBoxLayout()
+        for j in [1, 10, 100, 1000, 10000]:
+            tmp_rdo = QtGui.QRadioButton(str(j))
+            tmp_rdo.toggled.connect(lambda x, j=j: self.frame_spinner.setSingleStep(j) if x else None)
+            fs_sb_rb.addWidget(tmp_rdo)
+            if j == 1:
+                tmp_rdo.toggle()
+            pass
+        fs_stepbox.setLayout(fs_sb_rb)
+        frame_selector_group.addLayout(fs_form)
+        frame_selector_group.addWidget(fs_stepbox)
+        diag_layout.addLayout(frame_selector_group)
+
+        # play button
+        play_button = QtGui.QPushButton('Play')
+        self.play_button = play_button
+        play_button.setCheckable(True)
+        play_button.setChecked(False)
+        self.play_button.pressed.connect(self.frame_spinner.stepUp)
+        diag_layout.addWidget(play_button)
 
         # tool box for all the controls
         diag_tool_box = QtGui.QToolBox()
@@ -635,10 +660,10 @@ class LFGui(QtGui.QMainWindow):
         # 5x4 inches, 100 dots-per-inch
         #
 
-        self.fig = Figure((24, 24))
+        self.fig = Figure((24, 24), tight_layout=True)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
-        self.axes = self.fig.add_subplot(111)
+        self.axes = self.fig.add_subplot(111, adjustable='datalim', aspect='equal')
         #      self.fig.tight_layout(.3, None, None, None)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
@@ -716,6 +741,7 @@ class LFGui(QtGui.QMainWindow):
         #self.status_text.setText(label)
 
         self.frame_spinner.setRange(0, len(self.worker) - 1)
+        self.max_cine_label.setText(str(len(self.worker) - 1))
         self.frame_spinner.setValue(0)
 
         self.redraw_sig.emit(False, False)
@@ -781,3 +807,12 @@ class LFGui(QtGui.QMainWindow):
         procMenu = menubar.addMenu('&Process')
         procMenu.addAction(self.proc_this_frame_acc)
         procMenu.addAction(self.proc_next_frame_acc)
+
+    @QtCore.Slot()
+    def _play(self):
+        QtGui.qApp.processEvents()        # make sure all pending events are cleaned up
+                                          # if we don't do this, this
+                                          # gets hit before the button
+                                          # is marked as checked
+        if self.play_button.isChecked():
+            QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)

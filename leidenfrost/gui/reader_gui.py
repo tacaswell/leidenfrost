@@ -211,7 +211,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.axes = None
         self.fig.clf()
-        self.axes = self.fig.add_subplot(111)
+        self.axes = self.fig.add_subplot(111, adjustable='datalim', aspect='equal')
         #       self.fig.tight_layout(.3, None, None, None)
         # nuke all those objects
         self.fringe_lines = []
@@ -423,7 +423,7 @@ class LFReaderGui(QtGui.QMainWindow):
         # 5x4 inches, 100 dots-per-inch
         #
 
-        self.fig = Figure((24, 24))
+        self.fig = Figure((24, 24), tight_layout=True)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
 
