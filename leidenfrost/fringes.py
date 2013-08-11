@@ -545,9 +545,10 @@ class Region_map(object):
 
             XY = np.vstack(curve.q_phi_to_xy(0,
                                              -th_offset + np.linspace(0, 2 * np.pi, N)))
-            img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2))
+            img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2).astype(np.float16))
 
-        working_img = np.vstack(img_bck_grnd_slices, dtype=np.float16).T
+        working_img = np.vstack(img_bck_grnd_slices, dtype=img_bck_grnd_slices[0].dtype).T
+        del img_bck_grnd_slices
 
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
