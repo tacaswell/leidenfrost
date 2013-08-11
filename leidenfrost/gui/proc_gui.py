@@ -183,6 +183,17 @@ class LFGui(QtGui.QMainWindow):
          'togglable': True,
          'default_state': True,
          'tooltip': 'The maximum gap (in rad) before the alternate gap handling is used'},
+         {'name': 'max_circ_change',
+          'min': 0,
+          'max': 1,
+          'step': .0005,
+          'prec': 4,
+          'type': np.float,
+          'default': .002,
+          'togglable': True,
+          'default_state': True,
+          'tooltip': """The maximum fractional change in the circumference of successive rims.
+If exceeded, the previous seed-curve is re-used"""}
     ]
 
     toggle_lst = [
