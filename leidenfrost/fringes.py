@@ -1318,6 +1318,21 @@ def _connection_network(N, fringe_rings, dirc='f'):
     Sets up the network between the regions based on what fringes fall in
     them.
 
+    Parameters
+    ----------
+    N : int
+        number of regions
+
+    fringe_rings : list of FringRing objects
+        The data used to link the regions
+
+    Returns
+    -------
+    connections : list of dicts of dicts
+        The list is by starting region, the first level of dict is
+        keyed by the region the connection is _to_.   The inner
+        dict has keys {-1, 0, 1} and counts the number of times a
+        pair of fringes has that dh between the two regions.
 
     """
     inner_dict = lambda: dict({-1: 0, 1: 0, 0: 0})
