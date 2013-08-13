@@ -547,7 +547,7 @@ class Region_map(object):
                                              -th_offset + np.linspace(0, 2 * np.pi, N)))
             img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2).astype(np.float16))
 
-        working_img = np.vstack(img_bck_grnd_slices, dtype=img_bck_grnd_slices[0].dtype).T
+        working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
 
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
@@ -722,7 +722,7 @@ class Region_map(object):
         tmp : ndarray
             ndarray of the same shape
         '''
-        tmp = np.zeros(self.working_img.shape) * np.nan
+        tmp = np.zeros(self.working_img.shape)
         for j, edges in enumerate(self.region_edges):
             for (r_start, r_label, r_stop) in zip(*edges):
                 tmp[r_start:r_stop, j] = r_label
@@ -903,7 +903,7 @@ class Region_map(object):
         data = self.label_img
 
         norm_br = matplotlib.colors.Normalize(vmin=.5,
-                                              vmax=np.max(data), clip=False)
+                                              vmax=np.nanmax(data), clip=False)
         my_cmap = cm.get_cmap('jet')
         my_cmap.set_under(alpha=0)
 
