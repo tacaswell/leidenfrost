@@ -1277,14 +1277,14 @@ def _dict_to_dh(input_d, threshold=15):
 
     Parameters
     ----------
-    input_d: dict
+    input_d : dict
         `input_d` contains the keys [-1, 0, 1] with values that are counts
     threshold: int
         the minimum number of counts to be valid
 
     Returns
     -------
-    dh: int, (-1, 0, 1) or `None`
+    dh : int, (-1, 0, 1) or `None`
     """
     # check of there is more than one entry with non-zero counts
     if input_d[0] and input_d[-1] and input_d[1]:
