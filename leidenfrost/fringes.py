@@ -481,7 +481,7 @@ class Region_map(object):
 
     @classmethod
     def from_backend(cls, backend, mask_fun, n_frames=None, reclassify=False, thresh=0,
-                     size_cut=100, N=2**12, **kwargs):
+                     size_cut=100, N=2**12, link_threshold=5, **kwargs):
         '''
         Constructor style class method
 
@@ -515,6 +515,13 @@ class Region_map(object):
         N : int
             Number of sample to take around rim
 
+        link_threshold : int
+            How many valid fringes are needed between two regions to get
+            a dh between them
+
+        Reutrns
+
+        ret : Region_map
         '''
 
         if n_frames is None:
@@ -549,7 +556,12 @@ class Region_map(object):
 
         working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
+        return cls.from_working_img(working_img, fringe_rings, mask_fun, thresh, size_cut=size_cut, link_threshold=link_threshold,
+                                    **kwargs)
 
+    @classmethod
+    def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
+                     size_cut=100, N=2**12, link_threshold=5, **kwargs):
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
         lab_bright_regions, nb_br = _label_regions(up_mask_dt,
@@ -557,9 +569,10 @@ class Region_map(object):
         lab_dark_regions, nb_dr = _label_regions(down_mask_dt,
                                                       size_cut)
 
-        #        lab_dark_regions[lab_dark_regions > 0] += nb_br
-        lab_dark_regions += nb_br         # shift labels
-        lab_dark_regions *= down_mask_dt  # mask the zeros back to zero
+        lab_dark_regions[lab_dark_regions > 0] += nb_br
+
+
+        assert np.sum(lab_dark_regions * lab_bright_regions) == 0
 
         label_regions = np.asarray(lab_dark_regions + lab_bright_regions,
                                         dtype=np.uint32)
@@ -575,10 +588,14 @@ class Region_map(object):
                             working_img.shape[0])
 
         # boot strap up the heights
-        height_map, set_by, fails = _boot_strap(N, fringe_rings)
-        return cls(fringe_rings, region_edges, working_img, height_map,
+        height_map, set_by, fails = _boot_strap(N, fringe_rings, link_threshold)
+        RM = cls(fringe_rings, region_edges, working_img, height_map,
                    thresh=thresh, size_cut=size_cut,
                    **kwargs)
+        # stash diagnostics about boot strapping
+        RM._set_by = set_by
+        RM._fails = fails
+        return RM
 
     def __init__(self, fringe_rings, region_edges, working_img, height_map,
                  **kwargs):
@@ -1368,27 +1385,64 @@ def _connection_network(N, fringe_rings, dirc='f'):
     return connections
 
 
-def _boot_strap(N, FRs):
-    """An improved boot-strap operation
+def _boot_strap(N, FRs, connection_threshold, conflict_threshold=5):
     """
-    valid_connections = deque()
-    for dd in izip(_connection_network(N, FRs, 'f'),
-                   _connection_network(N, FRs, 'r')):
-        tmp_dict = {}
-        for _dd in dd:
-            for k, v in _dd.items():
-                dh = _dict_to_dh(v, threshold=5)
-                if dh is not None:
-                    if k in tmp_dict and tmp_dict[k] != dh:
-                        print 'conflict'
-                        # if we have inconsistent linking, throw
-                        # everything out
-                        del tmp_dict[k]
-                        continue
-                    tmp_dict[k] = dh
-        valid_connections.append(tmp_dict)
+    An improved boot-strap operation
 
-    valid_connections = list(valid_connections)
+    Parameters
+    ----------
+    N : int
+        The number of regions
+
+    FRs : list of FringeRings
+        The fringe data structurens
+
+    connection_threshold : int
+       The number of fringe connections between two regions to link them
+
+    conflict_threshold : int
+       The number of conflicts (number of times that looking forwards
+        and looking backwards between a pair of fringes is
+        inconstant) required to get a region blacklisted.
+    """
+    # pre-allocate the connection dicts
+    valid_connections = [{} for j in range(N)]
+    conflict_flags = np.zeros((N,), dtype=np.uint32)
+    # zip together the forward and backwards linking
+    for i, (forward_d, backward_d) in enumerate(izip(_connection_network(N, FRs, 'f'),
+                                                     _connection_network(N, FRs, 'r'))):
+
+        tmp_dict = valid_connections[i]
+
+        for dest_region, link_dict in forward_d.items():
+            dh = _dict_to_dh(link_dict, threshold=connection_threshold)
+            if dh is not None:
+                tmp_dict[dest_region] = dh
+        for dest_region, link_dict in backward_d.items():
+            dh = _dict_to_dh(link_dict, threshold=connection_threshold)
+            if dh is not None:
+                if dest_region in tmp_dict and tmp_dict[dest_region] != dh:
+                    print 'conflict {} {}'.format(i, dest_region)
+                    # if we have inconsistent linking (between forward and backwards), throw
+                    # everything out
+                    # this happens
+                    del tmp_dict[dest_region]
+                    conflict_flags[dest_region] += 1
+                    conflict_flags[i] += 1
+                    continue
+                tmp_dict[dest_region] = dh
+
+    black_list = np.flatnonzero(conflict_flags > conflict_threshold)
+    print len(black_list)
+    for bl in black_list:
+        # we don't want to try any connections with the black-listed regions
+        # nuke it's outward connections
+        valid_connections[bl] = {}
+        # nuke it as an inward connection
+        for d in valid_connections:
+            if bl in d:
+                del d[bl]
+
 
     # pick the one with the most forward connections
     start = np.argmax([len(r) for r in valid_connections])
