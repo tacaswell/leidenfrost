@@ -153,6 +153,16 @@ class HdfBackend(object):
         return self.num_frames
 
     @property
+    def calibration_value(self):
+        # TODO add check to h5 file first
+        return self.db.get_movie_md(self.cine.hash)['cal_val']
+
+    @property
+    def calibration_unit(self):
+        # TODO add check to h5 file first
+        return self.db.get_movie_md(self.cine.hash)['cal_unit']
+
+    @property
     def cine_len(self):
         return len(self.cine)
 
