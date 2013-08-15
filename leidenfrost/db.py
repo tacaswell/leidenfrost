@@ -165,6 +165,9 @@ class LFDbWrapper(object):
         :param path: the path of the file _relative to a base path_
         :param fname: file name of data
         '''
+        raise NotImplementedError('you must define this is a sub class')
+
+
 
 
 class LFmongodb(LFDbWrapper):
@@ -173,7 +176,6 @@ class LFmongodb(LFDbWrapper):
                'proc': 'proc_collection',  # collection for point to the results of processing a cine
                'config': 'config_collection',  # collection of configurations used for procs
                'comment': 'comment_collection',  # collection of comments on data and/or results
-               'fpath': 'filepath_collection',  # collection that maps cine_hash -> file path
                }
 
     def __init__(self, host='10.8.0.1', port=27017, *args, **kwargs):
@@ -181,14 +183,49 @@ class LFmongodb(LFDbWrapper):
         self.connection = MongoClient(host, port)
         self.db = self.connection.LF
         self.coll_dict = {}
-        self.coll_dict['bck_img'] = self.db[self.col_map['bck_img']]
-        self.coll_dict['bck_img'].ensure_index('cine', unique=True)
         for f in self.col_map:
-            if f is 'bck_img':
-                pass
             self.coll_dict[f] = self.db[self.col_map[f]]
-            self.coll_dict[f].ensure_index('cine')
+            if f in ['bck_img', 'movs']:
+                self.coll_dict[f].ensure_index('cine', unique=True)
+            else:
+                self.coll_dict[f].ensure_index('cine')
         pass
+
+    def store_movie_md(self, cine, cine_path, calibration_value, calibration_unit):
+        """
+        Stores a movie in the data base
+
+        Parameters
+        ----------
+        cine : `Cine` object
+            an open `Cine` object
+        cine_path : `FilePath`
+            Where the cine is
+
+        calibration_value : float
+            The length per pixel
+
+        calibration_unit : string
+        """
+        tmp_dict = {}
+        # save the hash
+        tmp_dict['cine'] = cine.hash
+        # save the calibration
+        tmp_dict['cal_val'] = calibration_value
+        tmp_dict['cal_unit'] = calibration_unit
+        # save the path information
+        f_dict = cine_path._asdict()
+        f_dict.pop('base_path', None)  # don't want to save the base_path part
+        tmp_dict['fpath']  = f_dict
+        # save the frame rate
+        tmp_dict['frame_rate'] = cine.frame_rate
+        # save the camera version
+        tmp_dict['camera'] = cine.camera_version
+        self.coll_dict['movs'].insert(tmp_dict)
+
+    def get_movie_md(self, cine_hash):
+        record = self.coll_dict['movs'].find_one({'cine': cine_hash})
+        return record
 
     def get_background_img(self, cine_hash):
         record = self.coll_dict['bck_img'].find_one({'cine': cine_hash})
