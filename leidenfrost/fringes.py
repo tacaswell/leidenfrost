@@ -480,12 +480,11 @@ class Region_map(object):
         return True
 
     @classmethod
-    def from_backend(cls, backend, mask_fun, n_frames=None, reclassify=False, thresh=0,
-                     size_cut=100, N=2**12, link_threshold=5, **kwargs):
+    def from_backend(cls, backend, mask_fun, n_frames=None, reclassify=False, N=2**12, **kwargs):
         '''
         Constructor style class method
 
-        extra kwrags are passed through to `__init__`.
+        extra kwrags are passed through to `__init__` and from_working_img
 
         Parameters
         ----------
@@ -499,13 +498,7 @@ class Region_map(object):
         reclassify : bool
             If the fringes should be reclassified
 
-        thresh : float
-            threshold for labeling dark/light regions.  1 \pm thresh
-
-        size_cut : int
-            The minimum size of a segmented region
-
-        mask_filter : None or function
+        mask_fun : function
             Used to filter the light/dark masks.  Must take one argument
             of an `ndarray` and return an  `ndarray` of the same size.
 
@@ -515,11 +508,8 @@ class Region_map(object):
         N : int
             Number of sample to take around rim
 
-        link_threshold : int
-            How many valid fringes are needed between two regions to get
-            a dh between them
-
-        Reutrns
+        Returns
+        -------
 
         ret : Region_map
         '''
@@ -556,12 +546,53 @@ class Region_map(object):
 
         working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
-        return cls.from_working_img(working_img, fringe_rings, mask_fun, thresh, size_cut=size_cut, link_threshold=link_threshold,
+        return cls.from_working_img(working_img, fringe_rings, mask_fun,
                                     **kwargs)
 
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
-                     size_cut=100, N=2**12, link_threshold=5, **kwargs):
+                     size_cut=100, link_threshold=5, conflict_threshold=2, **kwargs):
+        '''
+        Generates a Region_map object from a kymograph and a set of fringe rings
+
+        Parameters
+        ----------
+        working_img : ndarray
+            Kymograph
+
+        fringe_rings : list of FringeRing objects
+            Fringe data
+
+        mask_fun : function
+            Used to filter the light/dark masks.  Must take one argument
+            of an `ndarray` and return an  `ndarray` of the same size.
+
+            The function takes in the `working_img` and returns two masks
+            corresponding to the light and dark regions.
+
+        thresh : float
+            threshold for labeling dark/light regions.  1 \pm thresh
+
+        size_cut : int
+            The minimum size of a segmented region
+
+        link_threshold : int
+            How many valid fringes are needed between two regions to get
+            a dh between them
+
+        conflict_threshold : int
+            The number of conflicts (number of times that looking forwards
+            and looking backwards between a pair of fringes is
+            inconstant) required to get a region blacklisted.
+
+            Passed to _boot_strap
+
+
+        Returns
+        -------
+        ret : Region_map
+
+        '''
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
         lab_bright_regions, nb_br = _label_regions(up_mask_dt,
@@ -570,7 +601,6 @@ class Region_map(object):
                                                       size_cut)
 
         lab_dark_regions[lab_dark_regions > 0] += nb_br
-
 
         assert np.sum(lab_dark_regions * lab_bright_regions) == 0
 
@@ -588,7 +618,8 @@ class Region_map(object):
                             working_img.shape[0])
 
         # boot strap up the heights
-        height_map, set_by, fails = _boot_strap(N, fringe_rings, link_threshold)
+        height_map, set_by, fails = _boot_strap(N, fringe_rings, link_threshold,
+                                                conflict_threshold=conflict_threshold)
         RM = cls(fringe_rings, region_edges, working_img, height_map,
                    thresh=thresh, size_cut=size_cut,
                    **kwargs)
@@ -1385,7 +1416,7 @@ def _connection_network(N, fringe_rings, dirc='f'):
     return connections
 
 
-def _boot_strap(N, FRs, connection_threshold, conflict_threshold=5):
+def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
     """
     An improved boot-strap operation
 
