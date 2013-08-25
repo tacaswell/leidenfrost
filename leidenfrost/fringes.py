@@ -1536,7 +1536,7 @@ def _label_regions(mask, size_cut):
 
 
 def filter_fun(working_img, thresh, struct=None):
-
+    print 'threshold {}'.format(thresh)
     if struct is None:
         #        struct = ndi.morphology.generate_binary_structure(2, 1)
         struct = [[1, 1, 1]]
@@ -1549,3 +1549,16 @@ def filter_fun(working_img, thresh, struct=None):
     down_mask_dt = np.logical_and(down_mask, ~up_mask)
 
     return up_mask_dt, down_mask_dt
+
+
+def filter_fun_orig(working_img, thresh, struct=None):
+    print 'threshold {}'.format(thresh)
+    if struct is None:
+        #        struct = ndi.morphology.generate_binary_structure(2, 1)
+        struct = [[1, 1, 1]]
+        #    struct = np.ones((3, 3))
+
+    up_mask = ndi.binary_erosion(working_img > 1 + thresh, structure=struct, iterations=1, border_value=1)
+    down_mask = ndi.binary_erosion(working_img < 1 - thresh, structure=struct, iterations=1, border_value=1)
+
+    return up_mask, down_mask
