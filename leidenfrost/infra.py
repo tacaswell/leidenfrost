@@ -316,7 +316,7 @@ class spline_fitter(object):
         self.canvas = ax.get_figure().canvas
         self.cid = None
         self.pt_lst = []
-        self.pt_plot = ax.plot([], [], marker='x', linestyle='-')[0]
+        self.pt_plot = ax.plot([], [], marker='o', linestyle='none', zorder=5)[0]
         self.sp_plot = ax.plot([], [], lw=3, color='r')[0]
         self.pix_err = pix_err
         self.connect_sf()
