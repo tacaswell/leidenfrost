@@ -11,3 +11,5 @@
    leidenfrost.infra
    leidenfrost.gui
    leidenfrost.db
+   leidenfrost.fringes
+   leidenfrost.backends
