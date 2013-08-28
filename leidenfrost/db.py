@@ -168,8 +168,6 @@ class LFDbWrapper(object):
         raise NotImplementedError('you must define this is a sub class')
 
 
-
-
 class LFmongodb(LFDbWrapper):
     col_map = {'bck_img': 'backimg_collection',  # collection for the background images
                'movs': 'movie_collection',  # collection for pointing to movies
@@ -216,7 +214,7 @@ class LFmongodb(LFDbWrapper):
         # save the path information
         f_dict = cine_path._asdict()
         f_dict.pop('base_path', None)  # don't want to save the base_path part
-        tmp_dict['fpath']  = f_dict
+        tmp_dict['fpath'] = f_dict
         # save the frame rate
         tmp_dict['frame_rate'] = cine.frame_rate
         # save the camera version
