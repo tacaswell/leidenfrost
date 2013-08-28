@@ -209,7 +209,9 @@ class RProfile(object):
         new_curve = infra.SplineCurve.from_pts(np.vstack(mbe.curve.q_phi_to_xy(q,
                                                                                phi)),
                                                **mbe.params)
-        new_curve.fft_filter(mbe.params['fft_filter'])
+        if 'fft_filter' in mbe.params:
+            new_curve.fft_filter(mbe.params['fft_filter'])
+
         XY = np.vstack(new_curve.q_phi_to_xy(0, self.th))
 
         center = np.mean(XY, 1).reshape(2, 1)
@@ -250,7 +252,7 @@ class MarkedupImage(object):
         # # set up for the image + fringe lines
         self.img = self.ax.imshow(np.zeros((limits[3] - limits[2],
                                            limits[1] - limits[0])),
-                                  extent=limits, cmap='gray_r',
+                                  extent=limits, cmap='gray',
                                   origin='lower',
                                   interpolation='nearest')
         self.img.set_clim(clims)
@@ -283,14 +285,14 @@ class MarkedupImage(object):
 
         # deal with fringes
 
-        for l in self.fringe_lines:
-            l.remove()
-        self.fringe_lines = []
-        if self.draw_finges:
-            self.fringe_lines.extend(
-                mbe.ax_plot_tracks(self.ax,
-                                   min_len=0,
-                                   all_tracks=False))
+        # for l in self.fringe_lines:
+        #     l.remove()
+        # self.fringe_lines = []
+        # if self.draw_finges:
+        #     self.fringe_lines.extend(
+        #         mbe.ax_plot_tracks(self.ax,
+        #                            min_len=0,
+        #                            all_tracks=False))
 
         center_line_lst = []
 
@@ -299,7 +301,8 @@ class MarkedupImage(object):
         q, phi = mbe.res[0][2], mbe.res[0][1]
         new_curve = infra.SplineCurve.from_pts(np.vstack(mbe.curve.q_phi_to_xy(q, phi)),
                                                **mbe.params)
-        new_curve.fft_filter(mbe.params['fft_filter'])
+        if 'fft_filter' in mbe.params:
+            new_curve.fft_filter(mbe.params['fft_filter'])
 
         if self.draw_curve:
             x, y = new_curve.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, 1000))
