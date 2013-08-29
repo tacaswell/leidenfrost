@@ -44,12 +44,19 @@ import leidenfrost.db as ldb
 
 
 class hash_line_angular(object):
-    '''1D hash table with linked ends for doing the ridge linking
-    around a rim'''
     def __init__(self, dims, bin_width):
         '''
-        :param dims: the maximum value of the parameritazation parameter
-        :param bin_width: the width of each bin in units of `dims`
+        1D hash table with linked ends for doing the ridge linking
+        around a rim
+
+
+        Parameters
+        ----------
+        dims : float
+            the maximum value of the parameritazation parameter
+        bin_width : float
+            the width of each bin in units of `dims`
+
         '''
         full_width = dims
         self.boxes = [[] for j

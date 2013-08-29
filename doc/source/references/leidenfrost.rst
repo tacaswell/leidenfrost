@@ -1,10 +1,6 @@
-========================
+===========================
  :mod:`leidenfrost` Package
-========================
-
-.. automodule:: leidenfrost.__init__
-    :members:
-    :undoc-members:
+===========================
 
 .. toctree::
 
@@ -13,3 +9,10 @@
    leidenfrost.db
    leidenfrost.fringes
    leidenfrost.backends
+   leidenfrost.proc
+
+
+
+.. automodule:: leidenfrost.__init__
+    :members:
+    :undoc-members:
