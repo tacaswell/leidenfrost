@@ -1348,6 +1348,35 @@ def _dict_to_dh(input_d, threshold=15):
     return None
 
 
+def _dict_to_dh_Nstep(input_d, threshold=15):
+    """Converts a (-1, 0, 1) dict -> a single dh.  Returns `None` if
+    the conversion is ambiguous.  The conversion in ambiguous if a)
+    more than one bin has counts b) the number of counts is less than
+    `threshold`.
+
+
+    Parameters
+    ----------
+    input_d : dict
+        `input_d` contains the keys [-1, 0, 1] with values that are counts
+    threshold: int
+        the minimum number of counts to be valid
+
+    Returns
+    -------
+    dh : int, (-1, 0, 1) or `None`
+    """
+    # check of there is more than one entry with non-zero counts
+    if len(input_d) > 1 or len(input_d) == 0:
+        return None
+
+    ((k, v), ) = input_d.items()
+    if v > threshold:
+        return k
+
+    return None
+
+
 def _height_interpolate(phi, h, steps, min_range, max_range, intep_func):
     # make periodic
     phi = np.hstack((phi[-1] - max_range, phi, phi[0] + max_range))
@@ -1415,6 +1444,93 @@ def _connection_network(N, fringe_rings, dirc='f'):
             if not np.isnan(dh):
                 dh = int(dh)
                 connections[fr.region][ln_region][dh] += 1
+
+    return connections
+
+
+def _connection_network_Nstep(N, fringe_rings, dirc='f'):
+    """
+    Sets up the network between the regions based on what fringes fall in
+    them.
+
+    Parameters
+    ----------
+    N : int
+        number of regions
+
+    fringe_rings : list of FringRing objects
+        The data used to link the regions
+
+    Returns
+    -------
+    connections : list of dicts of dicts
+        The list is by starting region, the first level of dict is
+        keyed by the region the connection is _to_.   The inner
+        dict has keys {-1, 0, 1} and counts the number of times a
+        pair of fringes has that dh between the two regions.
+
+    """
+    inner_dict = lambda: defaultdict(int)
+
+    link_dict = {'f': 'next_P', 'r': 'prev_P'}
+    dh_dict = {'f': 'forward_dh', 'r': 'reverse_dh'}
+
+    dh_str = dh_dict[dirc]
+    ln_str = link_dict[dirc]
+
+    # main data structure
+    connections = [defaultdict(inner_dict)
+                for j in range(N)]
+    for FR in fringe_rings:
+        for fr in FR:
+            if fr is None:
+                print 'WTF mate'
+                continue
+            if fr.region == 0:
+                continue
+            ln_fr = getattr(fr, ln_str)
+            if ln_fr is None:
+                continue
+            # get the region of the linked to fringe
+            ln_region = ln_fr.region
+            # if it is zero, walk until we find a non-zero region or
+            # run out of connectivity
+            if ln_region == 0:
+                print 'zero'
+                # start at zero
+                accum_dh = 0
+                while ln_region == 0:
+                    print accum_dh,
+                    # get the next dh
+                    dh = getattr(fr, dh_str)
+                    if np.isnan(dh):
+                        print dh
+                        break
+                    # add to the accumulated dh
+                    accum_dh += dh
+                    # asign the current link fringe to fr
+                    fr = ln_fr
+                    # get the next link fringe
+                    ln_fr = getattr(fr, ln_str)
+                    # get the region of the link fringe
+                    ln_region = ln_fr.region
+                # only do this if the while condition becomes false
+                else:
+                    # get the last step
+                    dh = getattr(fr, dh_str)
+                    # if it isn't nan
+                    if ~np.isnan(dh):
+                        accum_dh += dh
+                        print accum_dh
+                        connections[fr.region][ln_region][int(accum_dh)] += 1
+                    else:
+                        print dh
+            # else, we have a one step connection, just assign it
+            else:
+                dh = getattr(fr, dh_str)
+                if not np.isnan(dh):
+                    dh = int(dh)
+                    connections[fr.region][ln_region][dh] += 1
 
     return connections
 
