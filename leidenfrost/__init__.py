@@ -25,3 +25,8 @@ class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname']
     @property
     def format(self):
         return os.path.join(*self)
+
+    @classmethod
+    def from_db_dict(cls, in_dict, disk_dict):
+        base_path = disk_dict[in_dict.pop('disk')]
+        return cls(base_path, **in_dict)
