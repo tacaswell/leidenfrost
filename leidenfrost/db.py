@@ -268,7 +268,7 @@ class LFmongodb(LFDbWrapper):
 
     def store_proc(self, cine_hash, config_key, file_out, **kwargs):
         record = {'cine': cine_hash}
-        record['conig_key'] = config_key
+        record['config_key'] = config_key
         f_dict = file_out._asdict()
         f_dict.pop('base_path', None)  # don't want to save the base_path part
         record['out_file'] = f_dict
@@ -279,6 +279,20 @@ class LFmongodb(LFDbWrapper):
         config_record['proc_keys'].append(p_id)
         config_record['proced'] = True
         self.coll_dict['config'].save(config_record)
+
+    def remove_proc(self, proc_key):
+        # get the process record
+        proc_record = self.coll_dict['proc'].find_one({'_id': proc_key})
+        if proc_record is None:
+            # no record, nothing to do
+            return
+        config_record = self.coll_dict['config'].find_one({'_id': proc_record['config_key']})
+        if config_record is not None:
+            # make sure that the config record really exists
+            config_record['proc_keys'].remove(proc_key)
+            self.coll_dict['config'].save(config_record)
+        self.coll_dict['proc'].remove({'_id': proc_key})
+        pass
 
     def set_config_unproced(self, config_key):
         config_record = self.coll_dict['config'].find_one({'_id': config_key})
