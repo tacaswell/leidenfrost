@@ -37,7 +37,8 @@ def _timeout_handler(signum, frame):
     raise TimeoutException()
 
 
-def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve, _id=None):
+def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
+    db = ldb.LFmongodb()
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
 
@@ -50,27 +51,22 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve, _id=
     lh.setFormatter(formatter)
     logger.addHandler(lh)
 
-    start_frame = params.pop('start_frame', 0)
+    _id, h5_fname = db.start_proc(ch, params, seed_curve.to_dict(), h5_fname)
 
+    start_frame = params.pop('start_frame', 0)
     max_circ_change_frac = params.pop('max_circ_change_frac', None)
 
     if not os.path.isfile(h5_fname.format):
-        stack = lb.ProcessBackend.from_args(cine_fname, **params)
-        stack.gen_stub_h5(h5_fname.format, seed_curve)
-        hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
-        file_out = hfb.file
-        logger.info('created file')
-    else:
-        hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
-        logger.info('opened file')
-        file_out = hfb.file
-        # make sure that we continue with the same parameters
-        params = dict((k, hfb.proc_prams[k]) for k in params)
-        stack = lb.ProcessBackend.from_args(cine_fname, ver=hfb.ver, **params)
+        print ('panic')
+        logger.error("file already exists")
+        db.remove_proc(_id)
+        return
 
-    if _id is not None:
-        db = ldb.LFmongodb()
-        db.store_proc(ch, _id, h5_fname)
+    stack = lb.ProcessBackend.from_args(cine_fname, **params)
+    stack.gen_stub_h5(h5_fname.format, seed_curve)
+    hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
+    file_out = hfb.file
+    logger.info('created file')
 
     old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
 
@@ -105,12 +101,18 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve, _id=
             file_out.flush()
             gc.collect()
     except TimeoutException:
+        # handle the time out error
         logger.warn('timed out')
+        db.timeout_proc(_id)
     except Exception as e:
+        # handle all exceptions we should get
         logger.warn(str(e))
     except:
+        # handle everything else
         logger.warn('raised exception not derived from Exception')
-
+    else:
+        # if we ran through the full movie, mark it done (yay)
+        db.finish_proc(_id)
     finally:
         # make sure that no matter what the output file gets cleaned up
         file_out.close()
