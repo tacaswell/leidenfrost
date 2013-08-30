@@ -78,7 +78,7 @@ class HdfBackend(object):
             self.writeable = False
 
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
-        self.prams = HdfBEPram(True, True)
+        self._prams = HdfBEPram(True, True)
         self.proc_prams = dict(self.file.attrs)
 
         if cine_base_path is not None:
@@ -101,7 +101,7 @@ class HdfBackend(object):
             self.db = None
 
         self.bck_img = None
-        if self.db is not None:
+        if self.db is not None and self.cine is not None:
             self.bck_img = self.db.get_background_img(self.cine.hash)
         # if that fails too, run it
         if self.bck_img is None and self.cine is not None:
@@ -110,7 +110,7 @@ class HdfBackend(object):
             if self.db is not None and self.bck_img is not None:
                 self.db.store_background_img(self.cine.hash, self.bck_img)
 
-        if self.file.attrs['ver'] < '0.1.5':
+        if 'ver' not in self.file.attrs or self.file.attrs['ver'] < '0.1.5':
             self._frame_str = 'frame_{:05}'
         else:
             self._frame_str = 'frame_{:07}'
@@ -120,6 +120,14 @@ class HdfBackend(object):
     @property
     def ver(self):
         return self.file.attrs['ver']
+
+    def _set_bep(self, arg):
+        self._prams = HdfBEPram(*arg)
+
+    def _get_bep(self):
+        return self._prams
+
+    prams = property(_get_bep, _set_bep)
 
     def _del_frame(self, j):
         """Deletes frame j.
