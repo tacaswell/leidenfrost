@@ -547,6 +547,22 @@ class SplineCurve(object):
             self._cntr = np.mean(new_pts, 1)
         return self._cntr
 
+    @property
+    def tck0(self):
+        return self.tck[0]
+
+    @property
+    def tck1(self):
+        return self.tck[1]
+
+    @property
+    def tck2(self):
+        return self.tck[2]
+
+    @property
+    def to_pickle_dict(self):
+        return dict((lab, cPickle.dumps(getattr(self, lab))) for lab in ['tck0', 'tck1', 'tck2'])
+
     def q_phi_to_xy(self, q, phi, cross=None):
         '''Converts q, phi pairs -> x, y pairs.  All other code that
         does this should move to using this so that there is minimal
