@@ -20,7 +20,9 @@ import time
 import gc
 
 import leidenfrost.db as ldb
-import leidenfrost.backends as lfbe
+import leidenfrost.fringes as lf
+import leidenfrost.backends as lb
+
 import logging
 
 import os
@@ -53,18 +55,18 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve, _id=
     max_circ_change_frac = params.pop('max_circ_change_frac', None)
 
     if not os.path.isfile(h5_fname.format):
-        stack = lfbe.ProcessBackend.from_args(cine_fname, **params)
+        stack = lb.ProcessBackend.from_args(cine_fname, **params)
         stack.gen_stub_h5(h5_fname.format, seed_curve)
-        hfb = lfbe.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
+        hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
         file_out = hfb.file
         logger.info('created file')
     else:
-        hfb = lfbe.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
+        hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
         logger.info('opened file')
         file_out = hfb.file
         # make sure that we continue with the same parameters
         params = dict((k, hfb.proc_prams[k]) for k in params)
-        stack = lfbe.ProcessBackend.from_args(cine_fname, ver=hfb.ver, **params)
+        stack = lb.ProcessBackend.from_args(cine_fname, ver=hfb.ver, **params)
 
     if _id is not None:
         db = ldb.LFmongodb()
@@ -119,3 +121,43 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve, _id=
         logger.removeHandler(lh)
 
     return None
+
+
+def proc_h5_to_RM(h5_fname, output_file_template, RM_params, fname_mutator=None, cine_base_path=None):
+    """
+    Runs the RM code on an h5 file and writes the result to disk.
+
+    Parameters
+    ----------
+    h5_fname : FilePath
+        the h5_file to load
+
+    output_file_template : FilePath
+        Template for the output file, fname will be replaced
+
+    RM_params : dict
+        the parameters to be passed to Region_map.from_backend
+
+    frame_mutator : function or None
+        function that takes one string as it's argument and returns a fname
+        for the RM output based on it.  If None, then '.RM' is appended.
+
+    cine_base_path : str or None
+        Base path for the cine file.  If None, assumed to be the base_path in
+        h5_fname
+
+
+    """
+    if fname_mutator is None:
+        fname_mutator = lambda x: x + '.RM'
+
+    if cine_base_path is None:
+        cine_base_path = h5_fname.base_path
+
+    out_fname = output_file_template._replace(fname=fname_mutator(h5_fname.fname))
+
+    h5_backend = lb.HdfBackend(h5_fname, cine_base_path=cine_base_path)
+
+    RM = lf.Region_map.from_backend(h5_backend, **RM_params)
+
+    RM.write_to_hdf(out_fname, md_dict=RM_params)
