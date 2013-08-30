@@ -19,7 +19,7 @@ from __future__ import division, print_function
 
 from datetime import datetime
 import cPickle
-
+import os.path
 import pymongo
 from pymongo import MongoClient
 import bson
@@ -197,27 +197,41 @@ class LFmongodb(LFDbWrapper):
     def get_procs(self, cine_hash):
         return self.coll_dict['proc'].find_one({'cine': cine_hash})
 
-    def start_proc(self, cine_hash, parameter_dict, curve_dict, file_out, **kwargs):
+    def start_proc(self, cine_hash, parameter_dict, curve, file_out, **kwargs):
         # start with the cine hash
         record = {'cine': cine_hash}
-        # convert the FilePath -> dict for storage
-        f_dict = file_out._asdict()
-        # map the local base_path to disk number
-        f_dict['disk'] = self.disk_dict.get(f_dict.pop('base_path', None), '')
-        record['out_file'] = f_dict
         # time stamp
         record['start_time_stamp'] = datetime.now()
         # store parameters
         record['parameters'] = parameter_dict
         # store the seed curve
-        record['curve'] = curve_dict
+        record['curve'] = curve.to_pickle_dict
         # insert and return _id
-        return self.coll_dict['proc'].insert(record)
+        _id = self.coll_dict['proc'].insert(record)
+        # convert the FilePath -> dict for storage
+        fname, ext = os.path.splitext(file_out.fname)
+        file_out = file_out._replace(fname="{}_{}{}".format(fname, _id, ext))
+        f_dict = file_out._asdict()
+        # map the local base_path to disk number
+        f_dict['disk'] = self.disk_dict.get(f_dict.pop('base_path', None), '')
+        record['out_file'] = f_dict
+        self.coll_dict['proc'].save(record)
+        return file_out, _id
 
     def finish_proc(self, id):
         record = self.coll_dict['proc'].find_one({'_id': id})
         record['done_time_stamp'] = datetime.now()
         record['finished'] = True
+        self.coll_dict['proc'].save(record)
+
+    def timeout_proc(self, id):
+        record = self.coll_dict['proc'].find_one({'_id': id})
+        record['timeout'] = True
+        self.coll_dict['proc'].save(record)
+
+    def flag_proc_useful(self, id):
+        record = self.coll_dict['proc'].find_one({'_id': id})
+        record['useful'] = True
         self.coll_dict['proc'].save(record)
 
     def remove_proc(self, proc_key):
