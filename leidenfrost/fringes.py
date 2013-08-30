@@ -1467,7 +1467,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
                 tmp_dict[dest_region] = dh
 
     black_list = np.flatnonzero(conflict_flags > conflict_threshold)
-    print len(black_list)
+    print "black list length: {}".format(len(black_list))
     for bl in black_list:
         # we don't want to try any connections with the black-listed regions
         # nuke it's outward connections
