@@ -75,52 +75,13 @@ class LFDbWrapper(object):
         '''
         raise NotImplementedError('you must define this is a sub class')
 
-    def get_all_configs(self, cine_hash):
-        '''
-        Returns all configurations associated with the data file of interest.
-
-        :param cine_hash: A unique identifier for the data set of interest.
-        :rtype: a list of dictionaries, one per configuration, empty if none
-        '''
-        raise NotImplementedError('you must define this is a sub class')
-
-    def get_proced_configs(self, cine_hash):
-        '''
-        Returns all configurations associated with the data file of interest
-        that have been processed at least once
-
-        :param cine_hash: A unique identifier for the data set of interest.
-        :rtype: a list of dictionaries, one per configuration, empty if none
-        '''
-        raise NotImplementedError('you must define this is a sub class')
-
-    def get_unproced_configs(self, cine_hash):
-        '''
-        Returns all configurations associated with the data file of interest
-        that have not been processed at least once
-
-        :param cine_hash: A unique identifier for the data set of interest.
-        :rtype: a list of dictionaries, one per configuration, empty if none
-        '''
-        raise NotImplementedError('you must define this is a sub class')
-
-    def get_config_by_key(self, key):
-        '''
-        Returns all configurations associated with the data file of interest
-        that have not been processed at least once
-
-        :param key: A unique identifier for configuration of interest
-        :rtype: a `dict`, `None` if key is invalid
-        '''
-        raise NotImplementedError('you must define this is a sub class')
-
     def get_procs(self, cine_hash):
         '''
         Return data on all the time the data set of interest has been processed
         '''
         raise NotImplementedError('you must define this is a sub class')
 
-    def store_proc(self, cine_hash, config_key, file_out, **kwargs):
+    def store_proc(self, cine_hash, parameters, file_out, **kwargs):
         '''
         Adds information about processing a data set to the data base
 
@@ -134,27 +95,6 @@ class LFDbWrapper(object):
 
     def remove_proc(self, proc_key):
         '''Removes a proc record from the db '''
-        raise NotImplementedError('you must define this is a sub class')
-
-    def remove_config(self, c_id):
-        '''Removes a configuration from the data base
-
-        Parameters
-        ----------
-        c_id : id type
-             The id of the configuration to remove
-        '''
-        raise NotImplementedError('you must define this is a sub class')
-
-    def store_config(self, cine_hash, data, **kwargs):
-        '''
-        Adds a configuration to the store
-
-        :param cine_hash: A unique identifier for the data set of interest.
-        :param data: a dictionary with the configuration meta-data in it
-
-        `**kwargs` can be used to pass implementation specific arguements
-        '''
         raise NotImplementedError('you must define this is a sub class')
 
     def add_hash_lookup(self, cine_hash, path, fname):
@@ -171,12 +111,12 @@ class LFDbWrapper(object):
 class LFmongodb(LFDbWrapper):
     col_map = {'bck_img': 'backimg_collection',  # collection for the background images
                'movs': 'movie_collection',  # collection for pointing to movies
-               'proc': 'proc_collection',  # collection for point to the results of processing a cine
-               'config': 'config_collection',  # collection of configurations used for procs
+               'proc': 'fringe_proc_collection',  # collection for point to the results of processing a cine
+               'RM': 'RM_proc_collection',  # collection for point to the results of processing a cine
                'comment': 'comment_collection',  # collection of comments on data and/or results
                }
 
-    def __init__(self, host='10.8.0.1', port=27017, *args, **kwargs):
+    def __init__(self, host='10.8.0.1', port=27017, disk_dict=None, *args, **kwargs):
         LFDbWrapper.__init__(self, *args, **kwargs)
         self.connection = MongoClient(host, port)
         self.db = self.connection.LF
@@ -187,6 +127,12 @@ class LFmongodb(LFDbWrapper):
                 self.coll_dict[f].ensure_index('cine', unique=True)
             else:
                 self.coll_dict[f].ensure_index('cine')
+
+        if disk_dict is None:
+            disk_dict = {}
+        self.disk_dict = disk_dict
+        self.i_disk_dict = {(v, k) for k, v in disk_dict.items()}
+
         pass
 
     def store_movie_md(self, cine, cine_path, calibration_value, calibration_unit):
@@ -248,71 +194,34 @@ class LFmongodb(LFDbWrapper):
     def rm_background_img(self, cine_hash):
         self.coll_dict['bck_img'].remove({'cine': cine_hash})
 
-    def get_all_configs(self, cine_hash):
-        return [_ for _ in self.coll_dict['config'].find({'cine': cine_hash})]
-
-    def get_proced_configs(self, cine_hash):
-        return [_ for _ in self.coll_dict['config'].find({'$and': [{'cine': cine_hash}, {"proced": True}]})]
-
-    def get_unproced_configs(self, cine_hash):
-        return [_ for _ in self.coll_dict['config'].find({'$and': [{'cine': cine_hash}, {"proced": False}]})]
-
-    def get_config_by_key(self, config_key):
-        if isinstance(config_key, str):
-            config_key = bson.objectid.ObjectId(config_key)
-        return self.coll_dict['config'].find_one({'_id': config_key})
-
     def get_procs(self, cine_hash):
+        return self.coll_dict['proc'].find_one({'cine': cine_hash})
 
-        raise NotImplementedError('you must define this is a sub class')
-
-    def store_proc(self, cine_hash, config_key, file_out, **kwargs):
+    def start_proc(self, cine_hash, parameter_dict, curve_dict, file_out, **kwargs):
+        # start with the cine hash
         record = {'cine': cine_hash}
-        record['config_key'] = config_key
+        # convert the FilePath -> dict for storage
         f_dict = file_out._asdict()
-        f_dict.pop('base_path', None)  # don't want to save the base_path part
+        # map the local base_path to disk number
+        f_dict['disk'] = self.disk_dict.get(f_dict.pop('base_path', None), '')
         record['out_file'] = f_dict
-        record['time_stamp'] = datetime.now()
-        p_id = self.coll_dict['proc'].insert(record)
-        # code goes here to update the config entries
-        config_record = self.coll_dict['config'].find_one({'_id': config_key})
-        config_record['proc_keys'].append(p_id)
-        config_record['proced'] = True
-        self.coll_dict['config'].save(config_record)
+        # time stamp
+        record['start_time_stamp'] = datetime.now()
+        # store parameters
+        record['parameters'] = parameter_dict
+        # store the seed curve
+        record['curve'] = curve_dict
+        # insert and return _id
+        return self.coll_dict['proc'].insert(record)
+
+    def finish_proc(self, id):
+        record = self.coll_dict['proc'].find_one({'_id': id})
+        record['done_time_stamp'] = datetime.now()
+        record['finished'] = True
+        self.coll_dict['proc'].save(record)
 
     def remove_proc(self, proc_key):
-        # get the process record
-        proc_record = self.coll_dict['proc'].find_one({'_id': proc_key})
-        if proc_record is None:
-            # no record, nothing to do
-            return
-        config_record = self.coll_dict['config'].find_one({'_id': proc_record['config_key']})
-        if config_record is not None:
-            # make sure that the config record really exists
-            config_record['proc_keys'].remove(proc_key)
-            self.coll_dict['config'].save(config_record)
         self.coll_dict['proc'].remove({'_id': proc_key})
-        pass
-
-    def set_config_unproced(self, config_key):
-        config_record = self.coll_dict['config'].find_one({'_id': config_key})
-        config_record['proced'] = False
-        self.coll_dict['config'].save(config_record)
-
-    def set_config_proced(self, config_key):
-        config_record = self.coll_dict['config'].find_one({'_id': config_key})
-        config_record['proced'] = True
-        self.coll_dict['config'].save(config_record)
-
-    def store_config(self, cine_hash, config_dict, curves_dict, **kwargs):
-        record = {'cine': cine_hash}
-        record['config'] = config_dict
-        record['curves'] = curves_dict
-        record['time_stamp'] = datetime.now()
-        record['proced'] = False
-        record['proc_keys'] = []
-        _id = self.coll_dict['config'].insert(record)
-        return _id
 
     def remove_config(self, c_id):
         self.coll_dict['config'].remove({'_id': c_id})
