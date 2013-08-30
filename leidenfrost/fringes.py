@@ -30,6 +30,7 @@ import numpy as np
 import h5py
 from bisect import bisect
 import scipy
+import types
 
 from leidenfrost.backends import HdfBEPram
 
@@ -1053,6 +1054,8 @@ class Region_map(object):
                 for key, val in md_dict.iteritems():
                     if val is None:
                         continue
+                    if isinstance(val, types.FunctionType):
+                        val = '.'.join((val.__module__, val.__name__))
                     try:
                         h5file.attrs[key] = val
                     except TypeError:
@@ -1473,7 +1476,6 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
         for d in valid_connections:
             if bl in d:
                 del d[bl]
-
 
     # pick the one with the most forward connections
     start = np.argmax([len(r) for r in valid_connections])
