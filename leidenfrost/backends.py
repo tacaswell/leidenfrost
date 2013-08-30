@@ -63,9 +63,6 @@ class HdfBackend(object):
         cine_buffer_base_path: str or `None`
             If not `None`, base path for buffering the cine file
         """
-
-        print fname
-
         self.fname = fname
         self._iter_cur_item = -1
         self.buffers = []
