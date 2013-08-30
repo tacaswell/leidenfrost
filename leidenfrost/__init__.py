@@ -17,7 +17,7 @@
 
 import collections
 import os.path
-
+import copy
 
 class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])):
     __slots__ = ()
@@ -28,5 +28,6 @@ class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname']
 
     @classmethod
     def from_db_dict(cls, in_dict, disk_dict):
+        in_dict = copy.copy(in_dict)
         base_path = disk_dict[in_dict.pop('disk')]
         return cls(base_path, **in_dict)
