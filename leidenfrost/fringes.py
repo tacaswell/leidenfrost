@@ -355,6 +355,7 @@ class FringeRing(object):
         self.fringes.sort(key=lambda x: x.phi)
 
     def link_fringes(self, region_starts, region_labels, region_ends,
+                    fringe_starts, fringe_labels, fringe_ends,
                     N_samples, length=2*np.pi):
         '''
         Given the region edges, properly link the fringes which are adjacent.
@@ -378,28 +379,37 @@ class FringeRing(object):
 
         '''
         # figure out which bin each fringe goes into just once
-        bins = [_bin_region(int((np.mod(_fr.phi, length)/(length)) * N_samples),
-                                    region_starts,
-                                    region_ends) for _fr in self.fringes]
+        scaled_fringe_loc = [int((np.mod(_fr.phi, length)/(length)) * N_samples)
+                             for _fr in self.fringes]
+        bins = [_bin_region(_n, region_starts, region_ends) for
+                _n in scaled_fringe_loc]
 
-        for (fr_b, b_b), (fr_f, b_f) in pairwise_periodic(izip(self.fringes, bins)):
+        f_bins = [_bin_region(_n, fringe_starts, fringe_ends) for
+                  _n in scaled_fringe_loc]
 
-            fr_b.abs_height = np.nan
+        for ((fringe_back, bin_back, fbin_back),
+             (fringe_front, bin_front, fbin_front)) in\
+                pairwise_periodic(izip(self.fringes, bins, f_bins)):
+
+            fringe_back.abs_height = np.nan
 
             # handle the other mapping
-            if b_b is None:
+            if bin_back is None:
                 label = 0
             else:
-                label = region_labels[b_b]
-            fr_b.region = label
-            fr_b.abs_height = np.nan
+                label = region_labels[bin_back]
+            fringe_back.region = label
+            fringe_back.abs_height = np.nan
 
             # handle the linking
-            if b_b is None or b_f is None:
+            if fbin_back is None or fbin_front is None:
                 continue
-            if (b_b + 1 == b_f) or (b_f == 0 and
-                                    b_b == len(region_labels) - 1):
-                fr_b.insert_ahead(fr_f)
+            # make sure we are in adjacent fringes
+            if (fbin_back + 1 == fbin_front) or (fbin_front == 0 and
+                                    fbin_back == len(fringe_labels) - 1):
+                # make sure they have alternate signs
+                if fringe_labels[fbin_front] == -fringe_labels[fbin_back]:
+                    fringe_back.insert_ahead(fringe_front)
 
     def __iter__(self):
         return self.fringes.__iter__()
@@ -612,10 +622,17 @@ class Region_map(object):
         region_edges = [_segment_labels(region_list)
                              for region_list in label_regions.T]
 
-        for FR, (region_starts,
+        fringe_edges = [_segment_fringes(fringe_slice)
+                             for fringe_slice in working_img.T]
+
+        for (FR, (region_starts,
                  region_labels,
-                 region_ends) in izip(fringe_rings, region_edges):
+                 region_ends),
+                (fringe_starts,
+                 fringe_labels,
+                 fringe_ends)) in izip(fringe_rings, region_edges, fringe_edges):
             FR.link_fringes(region_starts, region_labels, region_ends,
+                            fringe_starts, fringe_labels, fringe_ends,
                             working_img.shape[0])
 
         # boot strap up the heights
@@ -1150,7 +1167,7 @@ class Region_map(object):
         # link the fringes.  This is simpler than storing the linking information
         for FR, (region_starts,
                  region_labels,
-                 region_ends) in izip(fringe_rings, region_edges):
+                 region_ends) in izip(fringe_rings, region_edges, ):
             FR.link_fringes(region_starts, region_labels, region_ends,
                             working_img.shape[0])
 
@@ -1293,6 +1310,52 @@ def _segment_labels(region_list, zero_thresh=2):
         region_ends.append(len(region_list))
 
     return Region_Edges(region_starts, region_labels, region_ends)
+
+
+def _segment_fringes(image_slice, thresh=.1, filter_width=3):
+    """
+    segments a single column into light/dark fringes
+
+    Parameters
+    ----------
+    image_slice : ndarray
+        The slice to work on
+
+    thresh : float
+        defaults to .1, the difference from 1 to be 'light' or 'dark'
+
+    filter_width : int
+        width of maximum filter applied to thresholded lines
+    """
+
+    dark = scipy.ndimage.filters.maximum_filter1d(image_slice < 1 - thresh, filter_width)
+    light = scipy.ndimage.filters.maximum_filter1d(image_slice > 1 + thresh, filter_width)
+
+    tmp_xor = np.logical_xor(dark, light)
+
+    dark_dt = np.logical_and(dark, tmp_xor)
+    light_dt = np.logical_and(light, tmp_xor)
+
+    # f_segs = np.zeros(image_slice.shape, dtype=np.int16)
+
+    # r_indx = 0
+    # flag = 0
+    # for j, (_l, _d) in enumerate(izip(light_dt, dark_dt)):
+    #     if _l:
+    #         assert ~_d, 'should never both be true'
+    #         if flag != 1:
+    #             r_indx += 1
+    #             flag = 1
+    #     elif _d:
+    #         assert ~_l, 'should never both be true'
+    #         if flag != -1:
+    #             r_indx += 1
+    #             flag = -1
+    #     else:
+    #         flag = 0
+    #     f_segs[j] = r_indx * flag * flag
+    # return _segment_labels(f_segs)
+    return _segment_labels(-1 * dark_dt + light_dt)
 
 
 def _bin_region(N, region_starts, region_ends):
@@ -1483,10 +1546,11 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                 for j in range(N)]
     for FR in fringe_rings:
         for fr in FR:
+            fr_region = fr.region
             if fr is None:
                 print 'WTF mate'
                 continue
-            if fr.region == 0:
+            if fr_region == 0:
                 continue
             ln_fr = getattr(fr, ln_str)
             if ln_fr is None:
@@ -1496,7 +1560,6 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
             # if it is zero, walk until we find a non-zero region or
             # run out of connectivity
             if ln_region == 0:
-                print 'zero'
                 # start at zero
                 accum_dh = 0
                 while ln_region == 0:
@@ -1504,7 +1567,6 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                     # get the next dh
                     dh = getattr(fr, dh_str)
                     if np.isnan(dh):
-                        print dh
                         break
                     # add to the accumulated dh
                     accum_dh += dh
@@ -1512,6 +1574,9 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                     fr = ln_fr
                     # get the next link fringe
                     ln_fr = getattr(fr, ln_str)
+                    # check if next fringe is none
+                    if ln_fr is None:
+                        break
                     # get the region of the link fringe
                     ln_region = ln_fr.region
                 # only do this if the while condition becomes false
@@ -1521,10 +1586,7 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                     # if it isn't nan
                     if ~np.isnan(dh):
                         accum_dh += dh
-                        print accum_dh
-                        connections[fr.region][ln_region][int(accum_dh)] += 1
-                    else:
-                        print dh
+                        connections[fr_region][ln_region][int(accum_dh)] += 1
             # else, we have a one step connection, just assign it
             else:
                 dh = getattr(fr, dh_str)
@@ -1559,20 +1621,20 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
     valid_connections = [{} for j in range(N)]
     conflict_flags = np.zeros((N,), dtype=np.uint32)
     # zip together the forward and backwards linking
-    for i, (forward_d, backward_d) in enumerate(izip(_connection_network(N, FRs, 'f'),
-                                                     _connection_network(N, FRs, 'r'))):
+    for i, (forward_d, backward_d) in enumerate(izip(_connection_network_Nstep(N, FRs, 'f'),
+                                                     _connection_network_Nstep(N, FRs, 'r'))):
 
         tmp_dict = valid_connections[i]
 
         for dest_region, link_dict in forward_d.items():
-            dh = _dict_to_dh(link_dict, threshold=connection_threshold)
+            dh = _dict_to_dh_Nstep(link_dict, threshold=connection_threshold)
             if dh is not None:
                 tmp_dict[dest_region] = dh
         for dest_region, link_dict in backward_d.items():
-            dh = _dict_to_dh(link_dict, threshold=connection_threshold)
+            dh = _dict_to_dh_Nstep(link_dict, threshold=connection_threshold)
             if dh is not None:
                 if dest_region in tmp_dict and tmp_dict[dest_region] != dh:
-                    print 'conflict {} {}'.format(i, dest_region)
+                    print 'conflict from:{} to:{} old_dh:{} new_dh:{}'.format(i, dest_region, tmp_dict[dest_region], dh)
                     # if we have inconsistent linking (between forward and backwards), throw
                     # everything out
                     # this happens
@@ -1613,8 +1675,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
             set_by[b] = a
         else:
             if height_map[b] != prop_height:
-                print a, b, prop_height, \
-                      height_map[b], valid_connections[a][b]
+                print "from {}({}) to {}({}) proposed delta: {}".format(a, height_map[a], b, height_map[b], valid_connections[a][b])
                 fails.append((a, b))
 
     return height_map, set_by, fails
