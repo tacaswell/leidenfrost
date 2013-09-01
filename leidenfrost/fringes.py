@@ -31,6 +31,7 @@ import h5py
 from bisect import bisect
 import scipy
 import types
+import heapq
 
 from leidenfrost.backends import HdfBEPram
 
@@ -407,9 +408,7 @@ class FringeRing(object):
             # make sure we are in adjacent fringes
             if (fbin_back + 1 == fbin_front) or (fbin_front == 0 and
                                     fbin_back == len(fringe_labels) - 1):
-                # make sure they have alternate signs
-                if fringe_labels[fbin_front] == -fringe_labels[fbin_back]:
-                    fringe_back.insert_ahead(fringe_front)
+                fringe_back.insert_ahead(fringe_front)
 
     def __iter__(self):
         return self.fringes.__iter__()
@@ -1563,7 +1562,6 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                 # start at zero
                 accum_dh = 0
                 while ln_region == 0:
-                    print accum_dh,
                     # get the next dh
                     dh = getattr(fr, dh_str)
                     if np.isnan(dh):
@@ -1581,6 +1579,9 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                     ln_region = ln_fr.region
                 # only do this if the while condition becomes false
                 else:
+                    # if we have walked back to our self, no connection
+                    if ln_region == fr_region:
+                        break
                     # get the last step
                     dh = getattr(fr, dh_str)
                     # if it isn't nan
@@ -1589,6 +1590,8 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
                         connections[fr_region][ln_region][int(accum_dh)] += 1
             # else, we have a one step connection, just assign it
             else:
+                if ln_region == fr_region:
+                    break
                 dh = getattr(fr, dh_str)
                 if not np.isnan(dh):
                     dh = int(dh)
@@ -1664,18 +1667,23 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
 
     set_by = dict()
     fails = deque()
-    work_list = deque()
-    work_list.extend([(start, k) for k in valid_connections[start].keys()])
+    work_list = []
+    for e in ((abs(v), start, k) for k, v in valid_connections[start].items()):
+        heapq.heappush(work_list, e)
     while len(work_list) > 0:
-        a, b = work_list.pop()
+        _, a, b = heapq.heappop(work_list)
+        assert a != b, "should never link a region to it's self"
         prop_height = height_map[a] + valid_connections[a][b]
         if np.isnan(height_map[b]):
             height_map[b] = prop_height
-            work_list.extend([(b, k) for k in valid_connections[b].keys()])
+            for e in ((abs(v), b, k) for k, v in valid_connections[b].items()):
+                heapq.heappush(work_list, e)
+
             set_by[b] = a
         else:
             if height_map[b] != prop_height:
-                print "from {}({}) to {}({}) proposed delta: {}".format(a, height_map[a], b, height_map[b], valid_connections[a][b])
+                print "from {}({}) to {}({}) proposed delta: {} current delta: {}".format(
+                    a, height_map[a], b, height_map[b], valid_connections[a][b], height_map[b] - height_map[a])
                 fails.append((a, b))
 
     return height_map, set_by, fails
