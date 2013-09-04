@@ -219,7 +219,7 @@ class Fringe(object):
         self._fdh = None
         self._rdh = None
 
-        self.region = np.nan     #: region of the khymograph
+        self.region = 0     #: region of the khymograph
         self.abs_height = None   #: the height of this fringe as given by tracking in time
 
     def __eq__(self, other):
