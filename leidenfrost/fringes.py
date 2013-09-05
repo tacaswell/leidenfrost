@@ -33,6 +33,8 @@ import scipy
 import types
 import heapq
 
+import networkx
+
 from leidenfrost.backends import HdfBEPram
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
@@ -1658,8 +1660,21 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
             if bl in d:
                 del d[bl]
 
-    # pick the one with the most forward connections
-    start = np.argmax([len(r) for r in valid_connections])
+    # network computation interlude
+    G = networkx.Graph()
+    for n in xrange(N):
+        G.add_node(n)
+
+    for n, g in enumerate(valid_connections):
+        for k, v in g.items():
+            G.add_edge(n, k)
+
+    G.remove_nodes_from(networkx.isolates(G))
+    res = networkx.connected_component_subgraphs(G)
+
+    # pick a node in the largest connected component
+    start = res[0].node.keys()[0]
+
     # clear height map
     height_map = np.ones(N, dtype=np.float32) * np.nan
     #set first height
