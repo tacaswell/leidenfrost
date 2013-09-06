@@ -125,7 +125,7 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     return None
 
 
-def proc_h5_to_RM(h5_fname, output_file_template, RM_params, fname_mutator=None, cine_base_path=None):
+def proc_h5_to_RM_tofile(h5_fname, output_file_template, RM_params, fname_mutator=None, cine_base_path=None):
     """
     Runs the RM code on an h5 file and writes the result to disk.
 
@@ -158,8 +158,17 @@ def proc_h5_to_RM(h5_fname, output_file_template, RM_params, fname_mutator=None,
 
     out_fname = output_file_template._replace(fname=fname_mutator(h5_fname.fname))
 
-    h5_backend = lb.HdfBackend(h5_fname, cine_base_path=cine_base_path)
+    RM, h5_backend = proc_h5_to_RM(h5_fname, RM_params, cine_base_path)
+
+    RM.write_to_hdf(out_fname, md_dict=RM_params)
+
+
+def proc_h5_to_RM(h5_name, RM_params, cine_base_path=None):
+    if cine_base_path is None:
+        cine_base_path = h5_name.base_path
+
+    h5_backend = lb.HdfBackend(h5_name, cine_base_path=cine_base_path)
 
     RM = lf.Region_map.from_backend(h5_backend, **RM_params)
 
-    RM.write_to_hdf(out_fname, md_dict=RM_params)
+    return RM, h5_backend
