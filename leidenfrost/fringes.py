@@ -15,6 +15,7 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
+import __builtin__
 from itertools import tee, izip, cycle
 from collections import namedtuple, defaultdict, deque
 
@@ -798,6 +799,171 @@ class Region_map(object):
         tmp[-1, :] = tmp[-2, :]
         return tmp
 
+    def _frame_fringe_positions(self,
+                           frame_num,
+                            length=2*np.pi):
+        local_tuple = namedtuple('local_tuple', ['regions', 'fringes'])
+        # get fringe ring
+        FR = self.fringe_rings[frame_num]
+        # re-set fringes
+        for _fr in FR:
+            _fr.abs_height = np.nan
+        # get the region edges
+        region_edges = self.region_edges[frame_num]
+        # get image edges
+        image_edges = _segment_fringes(self.working_img[:, frame_num])
+
+        # set up working data
+        work_data = [local_tuple([], []) for k in xrange(len(image_edges.labels))]
+        work_height_map = np.ones(len(image_edges.labels), dtype=np.float) * np.nan
+        fail_flags = np.zeros(len(image_edges.labels), dtype=np.bool)
+
+        N_samples = self.working_img.shape[0]
+        for _fr in FR:
+            # figure out which image region the fringe falls into
+            _bin = _bin_region(int((np.mod(_fr.phi, length)/(length)) * N_samples),
+                               image_edges.starts,
+                               image_edges.ends)
+            # if it falls in a bin, add it to the working list
+            if _bin is not None:
+                work_data[_bin].fringes.append(_fr)
+
+        for rs, rl, re in zip(*region_edges):
+            # get the image region that the region start is in
+            _bin_start = _bin_region(rs,
+                                     image_edges.starts,
+                                     image_edges.ends)
+            # get the image region that the region start is in
+            _bin_end = _bin_region(rs,
+                                   image_edges.starts,
+                                   image_edges.ends)
+            # if they are in the same bin yay !
+            if _bin_start == _bin_end:
+                # if both are None, continue
+                if _bin_start is None:
+                    continue
+                # else, add to work list
+                work_data[_bin_end].regions.append(rl)
+            # if just the end is out side of a region
+            elif _bin_end is None:
+                # use the start
+                work_data[_bin_start].regions.append(rl)
+            # if just the start is outside of a region
+            elif _bin_start is None:
+                # use the end
+                work_data[_bin_end].regions.append(rl)
+            else:
+                # this means that the region spans two image regions, don't like this
+                # mark both image regions as bad
+                fail_flags[_bin_end] = True
+                fail_flags[_bin_start] = True
+
+        for j, wd in enumerate(work_data):
+            # skip regions we didn't like above
+            if fail_flags[j]:
+                continue
+            trial_height = np.nan
+            heights = []
+            # if we have more than 0 region in this image region
+            if len(wd.regions) > 0:
+                # get the non-nan height
+                heights = [self.height_map[r] for r in wd.regions if ~np.isnan(self.height_map[r])]
+                if len(heights) > 0:
+                    trial_height = heights[0]
+                    if not __builtin__.all(trial_height == h for h in heights[1:]):
+                        # not all the same
+                        trial_height = np.nan
+
+            # if the trial height is not nan
+            if not np.isnan(trial_height):
+                # set the fringes height
+                for _fr in wd.fringes:
+                    _fr.abs_height = trial_height
+
+            work_height_map[j] = trial_height
+
+        # walk the fringes
+        work_list = deque()
+        # find fringes with labeled heights and with neightbors
+        for _f in FR:
+            # if the region has a height, and the fringe has unlabeled neighbors
+            if ~np.isnan(_f.abs_height) and ((_f.next_P is not None and np.isnan(_f.next_P.abs_height)) or
+                    (_f.prev_P is not None and np.isnan(_f.prev_P.abs_height))):
+                work_list.append(_f)
+
+        while len(work_list) > 0:
+            # grab a fringe to work on
+            cur = work_list.pop()
+            assert ~np.isnan(cur.abs_height), (cur.abs_height, cur.forward_dh, cur.reverse_dh)
+            # has foward link, the forward fringe is un-heighted and the forward step is valid
+            if cur.next_P is not None and np.isnan(cur.next_P.abs_height) and ~np.isnan(cur.forward_dh):
+                cur.next_P.abs_height = cur.abs_height + cur.forward_dh
+                work_list.append(cur.next_P)
+            # same for reverse
+            if cur.prev_P is not None and np.isnan(cur.prev_P.abs_height) and ~np.isnan(cur.reverse_dh):
+                cur.prev_P.abs_height = cur.abs_height + cur.reverse_dh
+                work_list.append(cur.prev_P)
+
+        for j, wd in enumerate(work_data):
+            # skip regions we didn't like above
+            if fail_flags[j]:
+                continue
+            # if this image region already has a height don't tempt fate
+            if ~np.isnan(work_height_map[j]):
+                continue
+            # did any of the fringes picked up a height
+            heights = [_fr.abs_height for _fr in wd.fringes if ~np.isnan(_fr.abs_height)]
+            if len(heights) > 0:
+                trial_height = heights[0]
+                if __builtin__.all((trial_height == h for h in heights[1:])):
+                    work_height_map[j] = trial_height
+
+        phi, h = [], []
+        #deal with wrap-around
+        ir_s_f, ir_l_f, ir_e_f = [p[0] for p in image_edges]
+        ir_s_L, ir_l_L, ir_e_L = [p[-1] for p in image_edges]
+
+        post_list = None
+        # over lapping regions
+        if ir_s_f == 0 and ir_e_L == N_samples and ir_l_f == ir_l_L:
+            if ~np.isnan(work_height_map[0]) or ~np.isnan(work_height_map[-1]):
+                if np.isnan(work_height_map[0]):
+                    work_height_map[0] = work_height_map[-1]
+
+                elif np.isnan(work_height_map[-1]):
+                    work_height_map[-1] = work_height_map[0]
+
+                cent = ir_s_L + ((N_samples - ir_s_L) + ir_e_f)/2
+                if cent < N_samples:
+                    post_list = [[2 * np.pi * cent / N_samples], [work_height_map[0]]]
+                else:
+                    cent = cent - N_samples
+                    phi.append(2*np.pi * cent / N_samples)
+                    h.append(work_height_map[0])
+        # non-wrapped around region
+        else:
+            if not np.isnan(work_height_map[-1]):
+                post_list = [[np.pi * (ir_s_L + ir_e_L) / N_samples], [work_height_map[-1]]]
+            if not np.isnan(work_height_map[0]):
+                phi.append(np.pi * (ir_s_f + ir_e_f) / N_samples)
+                h.append(work_height_map[0])
+        # deal with middle region
+        # note, 2s cancel
+        _phi, _h = zip(*[(np.pi * (ir_s + ir_e) / (N_samples), _h)
+                       for (ir_s, ir_l, ir_e), _h in zip(izip(*image_edges), work_height_map)[1:-1]
+                        if ~np.isnan(_h)])
+        phi.extend(_phi)
+        h.extend(_h)
+        if post_list is not None:
+            phi.extend(post_list[0])
+            h.extend(post_list[1])
+
+        ## phi, h = zip(*[(np.pi * (ir_s + ir_e) /( N_samples), _h)
+        ##                 for (ir_s, ir_l, ir_e), _h in izip(izip(*image_edges), work_height_map)
+        ##                  if ~np.isnan(_h)])
+
+        return phi, h
+
     def resample_height(self,
                         N=1024,
                         intep_func=scipy.interpolate.InterpolatedUnivariateSpline,
@@ -827,98 +993,13 @@ class Region_map(object):
         '''
         tmp = []
         for j in xrange(len(self)):
-            regions = self.get_region_centers(j)
-            if len(regions) > 3:
-                frame_numer, phi, h = zip(*[(a, b, c) for (a, b), c in regions])
-
-                phi_new, h_new = _height_interpolate(phi, h, N, min_range, max_range, intep_func=intep_func)
-
-                tmp.append(-h_new)
-            else:
-                tmp.append(np.nan * np.ones(N))
+            phi, h = self._frame_fringe_positions(j)
+            phi_new, h_new = _height_interpolate(phi, h, N, min_range, max_range, intep_func=intep_func)
+            tmp.append(-h_new)
 
         self._resampled_height = np.vstack(tmp).T
 
         return self._resampled_height
-
-    def get_region_centers(self, f_slice=None, scale=2*np.pi):
-        '''
-        Turns the region edges -> points for their centers
-
-        Parameters
-        ----------
-        f_slice : slice or int or None
-            The frames to get the centers for
-
-        scale : float
-            How to scale the bin numbers -> real units.  Will return
-            fringe position in range [0, scale]
-
-        Returns
-        -------
-        Rte : list
-            list of [((frame_number, phi), h), ... ]
-
-        '''
-        if f_slice is None:
-            f_slice = slice(None)
-
-        if type(f_slice) is int:
-            f_slice = slice(f_slice, f_slice + 1)
-
-        scale = scale / self.working_img.shape[0]
-
-        tmp_pts = []
-        last_pt = None
-        for j, (region_starts,
-                region_labels,
-                region_ends) in izip(xrange(*f_slice.indices(len(self.region_edges))), self.region_edges[f_slice]):
-            if len(region_starts) < 3:
-                continue
-            if (region_starts[0] == 0 and
-                  region_ends[-1] == self.working_img.shape[0] and
-                  region_labels[0] == region_labels[-1] and
-                  not np.isnan(self.height_map[region_labels[0]])):
-                # if the first region starts at zero and the last region ends on the last bin
-                # then this is the same region
-                rs = region_starts[-1] - self.working_img.shape[0]
-                re = region_ends[0]
-                rl = region_labels[0]
-                r_center = (re + rs) / 2
-                # if the center is positive, it is the first fringe
-                if r_center >= 0:
-                    tmp_pts.append(((j, scale * r_center),
-                                    self.height_map[rl]))
-                    # no last fringe
-                    last_pt = None
-                # if it is negative it will be the last fringe
-                else:
-
-                    last_pt = ((j, scale * (r_center + self.working_img.shape[0])),
-                               self.height_map[rl])
-            # or it's not one fringe
-            else:
-                # first fringe
-                if not np.isnan(self.height_map[region_labels[0]]):
-                    tmp_pts.append(((j,
-                                    scale * (region_starts[0] + region_ends[0])/2),
-                                    self.height_map[region_labels[0]]))
-                # last fringe
-                if not np.isnan(self.height_map[region_labels[-1]]):
-                    last_pt = ((j,
-                               scale * (region_starts[-1] + region_ends[-1])/2),
-                               self.height_map[region_labels[-1]])
-
-            # deal with all the fringes in the middle
-            tmp_pts.extend(((j, scale * (re + rs) / 2), self.height_map[rl])
-                           for rs, re, rl in izip(region_starts[1:-1],
-                                                  region_ends[1:-1],
-                                                  region_labels[1:-1])
-                           if not np.isnan(self.height_map[rl]))
-            # if there is a last fringe, tack it on the end
-            if last_pt is not None:
-                tmp_pts.append(last_pt)
-        return tmp_pts
 
     def display_height_resampled(self, ax=None, cmap='jet',
                                  bckgnd=True, alpha=.65,
