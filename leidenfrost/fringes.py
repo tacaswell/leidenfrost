@@ -1328,14 +1328,16 @@ def _segment_fringes(image_slice, thresh=.1, filter_width=3):
     filter_width : int
         width of maximum filter applied to thresholded lines
     """
+    dark = scipy.ndimage.filters.maximum_filter1d(image_slice < 1 - thresh, filter_width, mode='wrap')
+    light = scipy.ndimage.filters.maximum_filter1d(image_slice > 1 + thresh, filter_width, mode='wrap')
+    # this implements the xor logic, if both are true -> sums to 0, if neither are true stays 0,
+    # if only dark is true -> -1, if only light is true -> 1
+    return _segment_labels(-1 * dark + light)
+    ## tmp_xor = np.logical_xor(dark, light)
 
-    dark = scipy.ndimage.filters.maximum_filter1d(image_slice < 1 - thresh, filter_width)
-    light = scipy.ndimage.filters.maximum_filter1d(image_slice > 1 + thresh, filter_width)
-
-    tmp_xor = np.logical_xor(dark, light)
-
-    dark_dt = np.logical_and(dark, tmp_xor)
-    light_dt = np.logical_and(light, tmp_xor)
+    ## dark_dt = np.logical_and(dark, tmp_xor)
+    ## light_dt = np.logical_and(light, tmp_xor)
+    ## return _segment_labels(-1 * dark_dt + light_dt)
 
     # f_segs = np.zeros(image_slice.shape, dtype=np.int16)
 
@@ -1356,7 +1358,6 @@ def _segment_fringes(image_slice, thresh=.1, filter_width=3):
     #         flag = 0
     #     f_segs[j] = r_indx * flag * flag
     # return _segment_labels(f_segs)
-    return _segment_labels(-1 * dark_dt + light_dt)
 
 
 def _bin_region(N, region_starts, region_ends):
