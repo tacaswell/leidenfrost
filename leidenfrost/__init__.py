@@ -19,6 +19,7 @@ import collections
 import os.path
 import copy
 
+
 class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])):
     __slots__ = ()
 
