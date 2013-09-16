@@ -38,32 +38,52 @@ def _timeout_handler(signum, frame):
 
 
 def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
+    """
+    Processes a cine path -> h5
+
+    Parameters
+    ----------
+    cine_fname : FilePath
+        The cine file of interest
+    ch : str
+        Hash of the cine_fname
+    hdf_fname_template: FilePath
+        Template for where to put the output file + log files
+
+    params : dict
+        Parameters to use to process the cine file
+
+    seed_curve : int
+        The first frame to process
+
+    """
+    # make data base communication object
     db = ldb.LFmongodb()
+    # set up logging stuff
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
-
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
+    # sort out output files names
     h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
-
-    lh = logging.FileHandler(hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'log')).format)
+    # get _id from DB
+    _id, h5_fname = db.start_proc(ch, params, seed_curve.to_dict(), h5_fname)
+    lh = logging.FileHandler(hdf_fname_template._replace(fname=h5_fname.fname.replace('h5', 'log')).format)
 
     lh.setFormatter(formatter)
     logger.addHandler(lh)
-
-    _id, h5_fname = db.start_proc(ch, params, seed_curve.to_dict(), h5_fname)
 
     start_frame = params.pop('start_frame', 0)
     max_circ_change_frac = params.pop('max_circ_change_frac', None)
 
     if not os.path.isfile(h5_fname.format):
-        print ('panic')
+        print ('panic!')
         logger.error("file already exists")
         db.remove_proc(_id)
         return
 
     stack = lb.ProcessBackend.from_args(cine_fname, **params)
-    stack.gen_stub_h5(h5_fname.format, seed_curve)
+    stack.gen_stub_h5(h5_fname.format, seed_curve, start_frame)
     hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
     file_out = hfb.file
     logger.info('created file')
@@ -103,6 +123,7 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     except TimeoutException:
         # handle the time out error
         logger.warn('timed out')
+        # tell the DB we timed out
         db.timeout_proc(_id)
     except Exception as e:
         # handle all exceptions we should get
