@@ -68,3 +68,29 @@ class directory_selector(QtGui.QWidget):
             path = None
         self.path = path
         return path
+
+    @property
+    def path(self):
+        return self.label.text()
+
+
+class numbered_paths(QtGui.QWidget):
+    def __init__(self, N, parent=None):
+        """
+        Parameters
+        ----------
+        N : int
+           Initial number of path to keep track of
+        """
+        QtGui.QWidget.__init__(self, parent)
+        self.path_widgets = []
+        layout = QtGui.QVBoxLayout()
+        self.setLayout(layout)
+        for j in xrange(N):
+            tmp = directory_selector('Disk {}'.format(j))
+            self.path_widgets.append(tmp)
+            layout.addWidget(tmp)
+
+    @property
+    def path_dict(self):
+        return {j: path for j, path in enumerate(fs.path for fs in self.path_widgets)}
