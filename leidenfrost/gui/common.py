@@ -60,7 +60,6 @@ class directory_selector(QtGui.QWidget):
                                                       dir=None)
 
         if len(path) > 0:
-            self.selected.emit(path)
             self.label.setText(path)
             self.selected.emit(path)
             return path
