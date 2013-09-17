@@ -19,6 +19,9 @@
 # switch to PyQt later
 import PySide.QtCore as QtCore
 import PySide.QtGui as QtGui
+import os.path
+
+from leidenfrost import FilePath
 
 
 class directory_selector(QtGui.QWidget):
@@ -51,26 +54,35 @@ class directory_selector(QtGui.QWidget):
 
     @QtCore.Slot(str)
     def set_path(self, path):
-        pass
+        if os.path.isdir(path):
+            self.label.setText(path)
+            self.selected.emit(path)
+        else:
+            raise Exception("path does not exst")
 
     @QtCore.Slot()
     def select_path(self):
+        cur_path = self.path
+        if len(cur_path) == 0:
+            cur_path = None
         path = QtGui.QFileDialog.getExistingDirectory(self,
                                                       caption=self.cap,
-                                                      dir=None)
+                                                      dir=cur_path)
 
         if len(path) > 0:
-            self.label.setText(path)
-            self.selected.emit(path)
+            self.path = path
             return path
         else:
             path = None
-        self.path = path
         return path
 
     @property
     def path(self):
         return self.label.text()
+
+    @path.setter
+    def path(self, in_path):
+        self.set_path(in_path)
 
 
 class numbered_paths(QtGui.QWidget):
@@ -93,3 +105,41 @@ class numbered_paths(QtGui.QWidget):
     @property
     def path_dict(self):
         return {j: path for j, path in enumerate(fs.path for fs in self.path_widgets)}
+
+
+class base_path_path_selector(QtGui.QWidget):
+    def __init__(self, caption, parent=None):
+        """
+        Parameters
+        ----------
+        N : int
+           Initial number of path to keep track of
+        """
+        QtGui.QWidget.__init__(self, parent)
+        self.base_widget = directory_selector('{} base path'.format(caption))
+        self.path_widget = directory_selector('{} path'.format(caption))
+        self.path_widget.selected.connect(self.validate_path)
+
+        layout = QtGui.QVBoxLayout()
+        self.setLayout(layout)
+        layout.addWidget(self.base_widget)
+        layout.addWidget(self.path_widget)
+
+    @property
+    def base_path(self):
+        return self.base_widget.path
+
+    @property
+    def path(self):
+        return self.path_widget.path
+
+    @property
+    def path_template(self):
+        bp = self.base_path
+        return FilePath(bp, self.path[len(bp)+1:], '')
+
+    @QtCore.Slot()
+    def validate_path(self, in_path):
+        bp = self.base_path
+        if in_path[:len(bp)] != bp:
+            self.path_widget.path = bp
