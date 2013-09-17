@@ -118,7 +118,8 @@ class HdfBackend(object):
         else:
             self._frame_str = 'frame_{:07}'
 
-        pass
+        self._cal_val = None
+        self._cal_val_unit = None
 
     @property
     def ver(self):
@@ -162,13 +163,17 @@ class HdfBackend(object):
 
     @property
     def calibration_value(self):
-        # TODO add check to h5 file first
-        return self.db.get_movie_md(self.cine.hash)['cal_val']
+        if self._cal_val is None:
+            # TODO add check to h5 file first
+            self._cal_val = self.db.get_movie_md(self.cine.hash)['cal_val']
+        return self._cal_val
 
     @property
     def calibration_unit(self):
-        # TODO add check to h5 file first
-        return self.db.get_movie_md(self.cine.hash)['cal_unit']
+        if self._cal_val_unit is None:
+            self._cal_val_unit = self.db.get_movie_md(self.cine.hash)['cal_unit']
+            # TODO add check to h5 file first
+        return self._cal_val_unit
 
     @property
     def cine_len(self):
