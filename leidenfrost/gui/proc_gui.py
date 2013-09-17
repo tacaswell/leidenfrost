@@ -18,6 +18,7 @@
 from __future__ import division
 
 import os
+import copy
 
 # do this to make me learn where stuff is and to make it easy to
 # switch to PyQt later
@@ -35,8 +36,12 @@ from collections import defaultdict
 
 import numpy as np
 
+import leidenfrost
 import leidenfrost.infra as infra
+import leidenfrost.proc as proc
 import leidenfrost.backends as backends
+
+from IPython.parallel import Client
 
 
 class LFWorker(QtCore.QObject):
@@ -94,6 +99,19 @@ class LFWorker(QtCore.QObject):
                                                                  bck_img=None,
                                                                  **params)
         self.file_loaded.emit(True, True)
+
+    def start_comp(self, seed_curve, name_template, cur_frame, disk_dict):
+        # make the connection to the ether
+        lb_view = Client(profile='vpn').load_balanced_view()
+        # grab a copy of the paramters
+        proc_prams = copy.copy(self.process_backend.params)
+        # put in the start_frame
+        if cur_frame is not None:
+            proc_prams['start_frame'] = cur_frame
+        name_template = leidenfrost.convert_base_path(name_template, disk_dict)
+        # push to ether and hope!
+        lb_view.apply_async(proc.proc_cine_to_h5, self.cine_fname, self.cine.ch,
+                            name_template, proc_prams, seed_curve)
 
 
 class LFGui(QtGui.QMainWindow):
@@ -389,7 +407,7 @@ If exceeded, the previous seed-curve is re-used"""}
         self.diag.show()
 
     def start_comp(self):
-        self.worker.process_backend.start_comp(self.cur_curve, self.cur_frame)
+        self.worker.start_comp(self.cur_curve, self.cur_frame)
 
     def open_file(self):
 
