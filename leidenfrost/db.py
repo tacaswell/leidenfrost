@@ -131,7 +131,7 @@ class LFmongodb(LFDbWrapper):
         if disk_dict is None:
             disk_dict = {}
         self.disk_dict = disk_dict
-        self.i_disk_dict = {(v, k) for k, v in disk_dict.items()}
+        self.i_disk_dict = {v: k for k, v in disk_dict.items()}
 
         pass
 

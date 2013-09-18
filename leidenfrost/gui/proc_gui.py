@@ -18,6 +18,7 @@
 from __future__ import division
 
 import os
+import copy
 
 # do this to make me learn where stuff is and to make it easy to
 # switch to PyQt later
@@ -35,8 +36,12 @@ from collections import defaultdict
 
 import numpy as np
 
+import leidenfrost
 import leidenfrost.infra as infra
+import leidenfrost.proc as proc
 import leidenfrost.backends as backends
+
+from IPython.parallel import Client
 
 
 class LFWorker(QtCore.QObject):
@@ -94,6 +99,19 @@ class LFWorker(QtCore.QObject):
                                                                  bck_img=None,
                                                                  **params)
         self.file_loaded.emit(True, True)
+
+    def start_comp(self, seed_curve, name_template, cur_frame, disk_dict):
+        # make the connection to the ether
+        lb_view = Client(profile='vpn').load_balanced_view()
+        # grab a copy of the paramters
+        proc_prams = copy.copy(self.process_backend.params)
+        # put in the start_frame
+        if cur_frame is not None:
+            proc_prams['start_frame'] = cur_frame
+        name_template = leidenfrost.convert_base_path(name_template, disk_dict)
+        # push to ether and hope!
+        lb_view.apply_async(proc.proc_cine_to_h5, self.cine_fname, self.cine.ch,
+                            name_template, proc_prams, seed_curve)
 
 
 class LFGui(QtGui.QMainWindow):
@@ -261,7 +279,7 @@ If exceeded, the previous seed-curve is re-used"""}
             self.cur_curve = self.sf.return_SplineCurve()
             if self.cur_curve is not None:
                 self.proc_this_frame_acc.setEnabled(True)
-                self.save_param_acc.setEnabled(True)
+                self.start_comp_acc.setEnabled(True)
             else:
                 print 'no spline!?'
         except:
@@ -344,7 +362,7 @@ If exceeded, the previous seed-curve is re-used"""}
         self.next_curve = None
         self.proc_this_frame_acc.setEnabled(False)
         self.proc_next_frame_acc.setEnabled(False)
-        self.save_param_acc.setEnabled(False)
+        self.start_comp_acc.setEnabled(False)
         self.iterate_button.setEnabled(False)
         self.fringe_grp_bx.setChecked(False)
 
@@ -388,8 +406,8 @@ If exceeded, the previous seed-curve is re-used"""}
     def show_cntrls(self):
         self.diag.show()
 
-    def save_config(self):
-        self.worker.process_backend.write_config(self.cur_curve, self.cur_frame)
+    def start_comp(self):
+        self.worker.start_comp(self.cur_curve, self.cur_frame)
 
     def open_file(self):
 
@@ -620,14 +638,14 @@ If exceeded, the previous seed-curve is re-used"""}
         fc_vboxes.addWidget(iterate_button)
         self.iterate_button = iterate_button
 
-        save_param_bttn = QtGui.QPushButton('Save Configuration')
-        save_param_bttn.clicked.connect(self.save_param_acc.trigger)
+        start_comp_bttn = QtGui.QPushButton('Start Computation')
+        start_comp_bttn.clicked.connect(self.start_comp_acc.trigger)
 
-        save_param_bttn.setEnabled(self.save_param_acc.isEnabled())
-        self.save_param_acc.changed.connect(
-            lambda: save_param_bttn.setEnabled(self.save_param_acc.isEnabled()))
+        start_comp_bttn.setEnabled(self.start_comp_acc.isEnabled())
+        self.start_comp_acc.changed.connect(
+            lambda: start_comp_bttn.setEnabled(self.start_comp_acc.isEnabled()))
 
-        fc_vboxes.addWidget(save_param_bttn)
+        fc_vboxes.addWidget(start_comp_bttn)
         fc_vboxes.addStretch()
 
         # section for making spline fitting panel
@@ -780,9 +798,9 @@ If exceeded, the previous seed-curve is re-used"""}
         self.show_cntrl_acc = QtGui.QAction(u'show controls', self)
         self.show_cntrl_acc.triggered.connect(self.show_cntrls)
 
-        self.save_param_acc = QtGui.QAction(u'Save Parameters', self)
-        self.save_param_acc.setEnabled(False)
-        self.save_param_acc.triggered.connect(self.save_config)
+        self.start_comp_acc = QtGui.QAction(u'Save Parameters', self)
+        self.start_comp_acc.setEnabled(False)
+        self.start_comp_acc.triggered.connect(self.start_comp)
 
         self.open_file_acc = QtGui.QAction(u'Open &File', self)
         self.open_file_acc.triggered.connect(self.open_file)
@@ -808,7 +826,7 @@ If exceeded, the previous seed-curve is re-used"""}
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
         fileMenu.addAction(self.show_cntrl_acc)
-        fileMenu.addAction(self.save_param_acc)
+        fileMenu.addAction(self.start_comp_acc)
 
         fileMenu.addAction(self.open_file_acc)
         pathMenu = menubar.addMenu('&Path')

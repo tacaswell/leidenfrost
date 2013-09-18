@@ -27,15 +27,18 @@ import matplotlib.pyplot as plt
 import h5py
 import cine
 
-
 import copy
 
 import shutil
 import collections
 
+
 import leidenfrost.db as db
 import leidenfrost.infra as infra
 import leidenfrost.ellipse as ellipse
+import leidenfrost.proc as proc
+from IPython.parallel import Client
+
 from leidenfrost import FilePath
 
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
@@ -115,7 +118,8 @@ class HdfBackend(object):
         else:
             self._frame_str = 'frame_{:07}'
 
-        pass
+        self._cal_val = None
+        self._cal_val_unit = None
 
     @property
     def ver(self):
@@ -159,13 +163,17 @@ class HdfBackend(object):
 
     @property
     def calibration_value(self):
-        # TODO add check to h5 file first
-        return self.db.get_movie_md(self.cine.hash)['cal_val']
+        if self._cal_val is None:
+            # TODO add check to h5 file first
+            self._cal_val = self.db.get_movie_md(self.cine.hash)['cal_val']
+        return self._cal_val
 
     @property
     def calibration_unit(self):
-        # TODO add check to h5 file first
-        return self.db.get_movie_md(self.cine.hash)['cal_unit']
+        if self._cal_val_unit is None:
+            self._cal_val_unit = self.db.get_movie_md(self.cine.hash)['cal_unit']
+            # TODO add check to h5 file first
+        return self._cal_val_unit
 
     @property
     def cine_len(self):
@@ -425,13 +433,24 @@ class ProcessBackend(object):
                                        {str(0): tmpcurve_dict})
         return conf_id
 
-    def gen_stub_h5(self, h5_fname, seed_curve):
+    def start_comp(self, seed_curve, name_template, cur_frame):
+        # make
+        lb_view = Client(profile='vpn').load_balanced_view()
+        proc_prams = copy.copy(self.params)
+        if cur_frame is not None:
+            proc_prams['start_frame'] = cur_frame
+
+        # push to either and hope!
+        lb_view.apply_async(proc.proc_cine_to_h5, self.cine_fname, self.cine.ch,
+                            name_template, proc_prams, seed_curve)
+
+    def gen_stub_h5(self, h5_fname, seed_curve, start_frame=0):
         '''Generates a h5 file that can be read back in for later
         processing.  This assumes that the location of the h5 file is
         valid'''
 
         file_out = h5py.File(h5_fname, 'w-')   # open file
-        file_out.attrs['ver'] = '0.1.5'       # set meta-data
+        file_out.attrs['ver'] = '0.1.6'       # set meta-data
         for key, val in self.params.items():
             try:
                 file_out.attrs[key] = val
@@ -440,6 +459,9 @@ class ProcessBackend(object):
                 print ' an hdf object, please reconsider your life choices'
             except Exception as e:
                 print "FAILURE WITH HDF: " + e.__str__()
+
+        # make sure there is a start frame
+        file_out.attrs['start_frame'] = start_frame
 
         file_out.attrs['cine_path'] = str(self.cine_fname.path)
         file_out.attrs['cine_fname'] = str(self.cine_fname.fname)
@@ -667,7 +689,8 @@ class MemBackendFrame(object):
 
     def write_to_hdf(self, parent_group):
         #        print 'frame_%05d' % self.frame_number
-
+        # update the last frame number
+        parent_group.attrs['last_frame'] = self.frame_number
         group = parent_group.create_group(self._frame_str.format(self.frame_number))
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
