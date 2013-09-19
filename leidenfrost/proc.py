@@ -18,16 +18,16 @@ from __future__ import division, print_function
 import signal
 import time
 import gc
+import copy
+import logging
+import os
+
+import numpy as np
 
 import leidenfrost
 import leidenfrost.db as ldb
 import leidenfrost.fringes as lf
 import leidenfrost.backends as lb
-
-import logging
-
-import os
-import numpy as np
 
 
 class TimeoutException(Exception):
@@ -65,6 +65,8 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    # make a copy so we don't export side effects
+    params = copy.copy(params)
 
     # convert disk
     disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
