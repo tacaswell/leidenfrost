@@ -36,8 +36,6 @@ import collections
 import leidenfrost.db as db
 import leidenfrost.infra as infra
 import leidenfrost.ellipse as ellipse
-import leidenfrost.proc as proc
-from IPython.parallel import Client
 
 from leidenfrost import FilePath
 
@@ -432,17 +430,6 @@ class ProcessBackend(object):
         conf_id = self.db.store_config(self.cine_.hash, tmp_params,
                                        {str(0): tmpcurve_dict})
         return conf_id
-
-    def start_comp(self, seed_curve, name_template, cur_frame):
-        # make
-        lb_view = Client(profile='vpn').load_balanced_view()
-        proc_prams = copy.copy(self.params)
-        if cur_frame is not None:
-            proc_prams['start_frame'] = cur_frame
-
-        # push to either and hope!
-        lb_view.apply_async(proc.proc_cine_to_h5, self.cine_fname, self.cine.ch,
-                            name_template, proc_prams, seed_curve)
 
     def gen_stub_h5(self, h5_fname, seed_curve, start_frame=0):
         '''Generates a h5 file that can be read back in for later
