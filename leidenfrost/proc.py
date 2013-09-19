@@ -83,7 +83,7 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     start_frame = params.pop('start_frame', 0)
     max_circ_change_frac = params.pop('max_circ_change', None)
 
-    if not os.path.isfile(h5_fname.format):
+    if os.path.isfile(h5_fname.format):
         print ('panic!')
         logger.error("file already exists")
         db.remove_proc(_id)
