@@ -66,4 +66,4 @@ def convert_base_path(in_file_path, disk_dict):
     disk_dict : dict
         Dict that maps old value of base_path -> new values of base_path
     '''
-    return in_file_path._replace(base_path=disk_dict.get(in_file_path.base_path, None), fname='')
+    return in_file_path._replace(base_path=disk_dict.get(in_file_path.base_path, None))
