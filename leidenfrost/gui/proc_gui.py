@@ -30,7 +30,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 
-from common import directory_selector
+from common import directory_selector, numbered_paths, base_path_path_selector
 
 from collections import defaultdict
 
@@ -680,6 +680,12 @@ If exceeded, the previous seed-curve is re-used"""}
             self.directory_actions[c].triggered.connect(ds.select_path)
             ds.selected.connect(lambda x, c=c: self.paths_dict.__setitem__(c, x))
 
+        self.disk_widget = numbered_paths(2, self)
+        paths_layout.addWidget(self.disk_widget)
+
+        self.output_template = base_path_path_selector('output template')
+        paths_layout.addWidget(self.output_template)
+
         paths_layout.addStretch()
         diag_tool_box.addItem(path_w, "Paths")
 
@@ -845,3 +851,11 @@ If exceeded, the previous seed-curve is re-used"""}
                                           # is marked as checked
         if self.play_button.isChecked():
             QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)
+
+    @property
+    def disk_dict(self):
+        return self.disk_widget.path_dict
+
+    @property
+    def i_disk_dict(self):
+        return {v:k for k,v in self.disk_widget.path_dict.items()}
