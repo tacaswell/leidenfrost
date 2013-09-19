@@ -19,6 +19,7 @@ import signal
 import time
 import gc
 
+import leidenfrost
 import leidenfrost.db as ldb
 import leidenfrost.fringes as lf
 import leidenfrost.backends as lb
@@ -47,6 +48,7 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
         The cine file of interest
     ch : str
         Hash of the cine_fname
+
     hdf_fname_template: FilePath
         Template for where to put the output file + log files
 
@@ -64,10 +66,13 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
+    # convert disk
+    disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
+    hdf_fname_template = leidenfrost.convert_base_path(hdf_fname_template, disk_dict)
     # sort out output files names
     h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
     # get _id from DB
-    _id, h5_fname = db.start_proc(ch, params, seed_curve.to_dict(), h5_fname)
+    _id, h5_fname = db.start_proc(ch, params, seed_curve, h5_fname)
     lh = logging.FileHandler(hdf_fname_template._replace(fname=h5_fname.fname.replace('h5', 'log')).format)
 
     lh.setFormatter(formatter)
