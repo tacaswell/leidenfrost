@@ -77,9 +77,6 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     _id, h5_fname = db.start_proc(ch, params, seed_curve, h5_fname)
     lh = logging.FileHandler(hdf_fname_template._replace(fname=h5_fname.fname.replace('h5', 'log')).format)
 
-    lh.setFormatter(formatter)
-    logger.addHandler(lh)
-
     start_frame = params.pop('start_frame', 0)
     max_circ_change_frac = params.pop('max_circ_change', None)
 
@@ -98,6 +95,9 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
 
     try:
+        lh.setFormatter(formatter)
+        logger.addHandler(lh)
+
         for j in xrange(start_frame, len(stack)):
             # set a 30s window, if the frame does not finish on 30s, kill it
             if hfb.contains_frame(j):
