@@ -38,7 +38,7 @@ import numpy as np
 
 import leidenfrost
 import leidenfrost.infra as infra
-import leidenfrost.proc as proc
+import leidenfrost.proc
 import leidenfrost.backends as backends
 
 from IPython.parallel import Client
@@ -110,7 +110,7 @@ class LFWorker(QtCore.QObject):
             proc_prams['start_frame'] = cur_frame
         name_template = leidenfrost.convert_base_path(name_template, disk_dict)
         # push to ether and hope!
-        lb_view.apply_async(proc.proc_cine_to_h5, self.cine_fname, self.cine.ch,
+        lb_view.apply_async(leidenfrost.proc.proc_cine_to_h5, self.process_backend.cine_fname, self.process_backend.cine_.hash,
                             name_template, proc_prams, seed_curve)
 
 
@@ -407,7 +407,7 @@ If exceeded, the previous seed-curve is re-used"""}
         self.diag.show()
 
     def start_comp(self):
-        self.worker.start_comp(self.cur_curve, self.cur_frame)
+        self.worker.start_comp(self.cur_curve, self.output_template.path_template, self.cur_frame, self.i_disk_dict)
 
     def open_file(self):
 
