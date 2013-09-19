@@ -858,4 +858,4 @@ If exceeded, the previous seed-curve is re-used"""}
 
     @property
     def i_disk_dict(self):
-        return {v:k for k,v in self.disk_widget.path_dict.items()}
+        return {v: k for k, v in self.disk_widget.path_dict.items()}
