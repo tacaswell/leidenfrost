@@ -216,7 +216,7 @@ class LFmongodb(LFDbWrapper):
         f_dict['disk'] = self.disk_dict.get(f_dict.pop('base_path', None), '')
         record['out_file'] = f_dict
         self.coll_dict['proc'].save(record)
-        return file_out, _id
+        return _id, file_out
 
     def finish_proc(self, id):
         record = self.coll_dict['proc'].find_one({'_id': id})
