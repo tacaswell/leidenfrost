@@ -18,15 +18,16 @@ from __future__ import division, print_function
 import signal
 import time
 import gc
+import copy
+import logging
+import os
 
+import numpy as np
+
+import leidenfrost
 import leidenfrost.db as ldb
 import leidenfrost.fringes as lf
 import leidenfrost.backends as lb
-
-import logging
-
-import os
-import numpy as np
 
 
 class TimeoutException(Exception):
@@ -47,6 +48,7 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
         The cine file of interest
     ch : str
         Hash of the cine_fname
+
     hdf_fname_template: FilePath
         Template for where to put the output file + log files
 
@@ -63,20 +65,22 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    # make a copy so we don't export side effects
+    params = copy.copy(params)
 
+    # convert disk
+    disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
+    hdf_fname_template = leidenfrost.convert_base_path(hdf_fname_template, disk_dict)
     # sort out output files names
     h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
     # get _id from DB
-    _id, h5_fname = db.start_proc(ch, params, seed_curve.to_dict(), h5_fname)
+    _id, h5_fname = db.start_proc(ch, params, seed_curve, h5_fname)
     lh = logging.FileHandler(hdf_fname_template._replace(fname=h5_fname.fname.replace('h5', 'log')).format)
 
-    lh.setFormatter(formatter)
-    logger.addHandler(lh)
-
     start_frame = params.pop('start_frame', 0)
-    max_circ_change_frac = params.pop('max_circ_change_frac', None)
+    max_circ_change_frac = params.pop('max_circ_change', None)
 
-    if not os.path.isfile(h5_fname.format):
+    if os.path.isfile(h5_fname.format):
         print ('panic!')
         logger.error("file already exists")
         db.remove_proc(_id)
@@ -91,6 +95,9 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
 
     try:
+        lh.setFormatter(formatter)
+        logger.addHandler(lh)
+
         for j in xrange(start_frame, len(stack)):
             # set a 30s window, if the frame does not finish on 30s, kill it
             if hfb.contains_frame(j):

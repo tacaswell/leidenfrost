@@ -30,7 +30,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 
-from common import directory_selector
+from common import directory_selector, numbered_paths, base_path_path_selector
 
 from collections import defaultdict
 
@@ -38,7 +38,7 @@ import numpy as np
 
 import leidenfrost
 import leidenfrost.infra as infra
-import leidenfrost.proc as proc
+import leidenfrost.proc
 import leidenfrost.backends as backends
 
 from IPython.parallel import Client
@@ -110,7 +110,7 @@ class LFWorker(QtCore.QObject):
             proc_prams['start_frame'] = cur_frame
         name_template = leidenfrost.convert_base_path(name_template, disk_dict)
         # push to ether and hope!
-        lb_view.apply_async(proc.proc_cine_to_h5, self.cine_fname, self.cine.ch,
+        lb_view.apply_async(leidenfrost.proc.proc_cine_to_h5, self.process_backend.cine_fname, self.process_backend.cine_.hash,
                             name_template, proc_prams, seed_curve)
 
 
@@ -407,7 +407,7 @@ If exceeded, the previous seed-curve is re-used"""}
         self.diag.show()
 
     def start_comp(self):
-        self.worker.start_comp(self.cur_curve, self.cur_frame)
+        self.worker.start_comp(self.cur_curve, self.output_template.path_template, self.cur_frame, self.i_disk_dict)
 
     def open_file(self):
 
@@ -680,6 +680,12 @@ If exceeded, the previous seed-curve is re-used"""}
             self.directory_actions[c].triggered.connect(ds.select_path)
             ds.selected.connect(lambda x, c=c: self.paths_dict.__setitem__(c, x))
 
+        self.disk_widget = numbered_paths(2, self)
+        paths_layout.addWidget(self.disk_widget)
+
+        self.output_template = base_path_path_selector('output template')
+        paths_layout.addWidget(self.output_template)
+
         paths_layout.addStretch()
         diag_tool_box.addItem(path_w, "Paths")
 
@@ -845,3 +851,11 @@ If exceeded, the previous seed-curve is re-used"""}
                                           # is marked as checked
         if self.play_button.isChecked():
             QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)
+
+    @property
+    def disk_dict(self):
+        return self.disk_widget.path_dict
+
+    @property
+    def i_disk_dict(self):
+        return {v: k for k, v in self.disk_widget.path_dict.items()}
