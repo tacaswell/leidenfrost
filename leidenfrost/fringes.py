@@ -918,6 +918,9 @@ class Region_map(object):
                 if __builtin__.all((trial_height == h for h in heights[1:])):
                     work_height_map[j] = trial_height
 
+        if np.all(np.isnan(work_height_map)):
+            return [], []
+
         phi, h = [], []
         #deal with wrap-around
         ir_s_f, ir_l_f, ir_e_f = [p[0] for p in image_edges]
@@ -1524,11 +1527,16 @@ def _dict_to_dh_Nstep(input_d, threshold=15):
 
 
 def _height_interpolate(phi, h, steps, min_range, max_range, intep_func):
+    assert len(phi) == len(h), 'mismatched input'
+    # generate even sampling
+    new_phi = np.linspace(min_range, max_range, steps)
+
+    if len(phi) == 0:
+        return new_phi, np.nan * np.ones(new_phi.shape)
     # make periodic
     phi = np.hstack((phi[-1] - max_range, phi, phi[0] + max_range))
     h = np.hstack((h[-1], h, h[0]))
-    # generate even sampling
-    new_phi = np.linspace(min_range, max_range, steps)
+
     # set up interpolation
     try:
         f = intep_func(phi, h)
