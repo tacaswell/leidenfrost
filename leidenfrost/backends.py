@@ -193,7 +193,8 @@ class HdfBackend(object):
     @property
     def calibration_unit(self):
         if self._cal_val_unit is None:
-            self._cal_val_unit = self.db.get_movie_md(self.cine.hash)['cal_unit']
+            self._cal_val_unit = \
+              self.db.get_movie_md(self.cine.hash)['cal_unit']
             # TODO add check to h5 file first
         return self._cal_val_unit
 
@@ -245,12 +246,12 @@ class HdfBackend(object):
             self.bck_img = infra.gen_bck_img(self.cine_fname.format)
 
     def __iter__(self):
-        self._iter_cur_item = -1
+        self._iter_cur_item = self.first_frame - 1
         return self
 
     def next(self):
         self._iter_cur_item += 1
-        if self._iter_cur_item >= self.num_frames:
+        if self._iter_cur_item > self.last_frame:
             raise StopIteration
         else:
             return self.get_frame(self._iter_cur_item)
