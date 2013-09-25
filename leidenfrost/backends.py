@@ -31,7 +31,7 @@ import copy
 
 import shutil
 import collections
-
+import parse
 
 import leidenfrost.db as db
 import leidenfrost.infra as infra
@@ -112,16 +112,40 @@ class HdfBackend(object):
                 self.db.store_background_img(self.cine.hash, self.bck_img)
 
         if 'ver' not in self.file.attrs or self.file.attrs['ver'] < '0.1.5':
-            self._frame_str = 'frame_{:05}'
+            self._frame_str = 'frame_{:05d}'
         else:
-            self._frame_str = 'frame_{:07}'
+            self._frame_str = 'frame_{:07d}'
 
         self._cal_val = None
         self._cal_val_unit = None
+        self._first_frame = None
+        self._last_frame = None
 
     @property
     def ver(self):
         return self.file.attrs['ver']
+
+    @property
+    def first_frame(self):
+        if self._first_frame is None:
+            if 'frist_frame' in self.file.attrs:
+                self._first_frame = self.file.attrs['frist_frame']
+            else:
+                tmp = [k for k in self.file.keys() if 'frame' in k]
+                self._first_frame = parse.parse(self._frame_str,
+                                                tmp[0])[0]
+        return self._first_frame
+
+    @property
+    def last_frame(self):
+        if self._last_frame is None:
+            if 'frist_frame' in self.file.attrs:
+                self._last_frame = self.file.attrs['frist_frame']
+            else:
+                tmp = [k for k in self.file.keys() if 'frame' in k]
+                self._last_frame = parse.parse(self._frame_str,
+                                                tmp[-1])[0]
+        return self._last_frame
 
     def _set_bep(self, arg):
         self._prams = HdfBEPram(*arg)
@@ -241,7 +265,8 @@ class HdfBackend(object):
         else:
             return self.get_frame(key)
 
-    def circumference_vs_time_ax(self, ax, t_scale=1, t_offset=0, f_slice=None, **kwargs):
+    def circumference_vs_time_ax(self, ax, t_scale=1,
+                                 t_offset=0, f_slice=None, **kwargs):
         '''
         Plots the circumference vs time onto the given ax.
 
@@ -254,11 +279,13 @@ class HdfBackend(object):
         t_scale : float
             Scale factor to apply the frame number for plotting.
 
-            The displayed time will be :math:`(frame_number - t_offset) * t_scale`
+            The displayed time will be
+            :math:`(frame_number - t_offset) * t_scale`
         t_offset : int
             off set to apply to the frame number before scaling.
 
-            The displayed time will be :math:`(frame_number - t_offset) * t_scale`
+            The displayed time will be
+            :math:`(frame_number - t_offset) * t_scale`
 
         f_slice : `slice` or None
             which frames to plot
@@ -521,7 +548,8 @@ class MemBackendFrame(object):
                     .9 * np.min(y), 1.1 * np.max(y),
                     ]
 
-    def get_next_spline(self, mix_in_count=0, pix_err=0, max_gap=None, **kwargs):
+    def get_next_spline(self, mix_in_count=0,
+                        pix_err=0, max_gap=None, **kwargs):
         _params_cache = (mix_in_count, pix_err, max_gap)
         if _params_cache == self._params_cache and self.next_curve is not None:
             return self.next_curve
@@ -544,7 +572,9 @@ class MemBackendFrame(object):
                          t.q is not None
                          and t.phi is not None
                          and bool(t.charge)] +
-                         list(np.linspace(0, 2 * np.pi, mix_in_count, endpoint=False)))
+                         list(np.linspace(0, 2 * np.pi,
+                                          mix_in_count,
+                                          endpoint=False)))
 
         indx = t_phi.argsort()
         t_q = t_q[indx]
@@ -573,9 +603,11 @@ class MemBackendFrame(object):
                 elif gap >= len(t_phi) - N:
                     # deal with wrap-around
                     _x_l = x[gap-N:gap]
-                    _x_r = np.hstack((x[gap:], x[:(N - (len(t_phi) - gap)) + 1]))
+                    _x_r = np.hstack((x[gap:],
+                                      x[:(N - (len(t_phi) - gap)) + 1]))
                     _y_l = y[gap-N:gap]
-                    _y_r = np.hstack((y[gap:], y[:(N - (len(t_phi) - gap)) + 1]))
+                    _y_r = np.hstack((y[gap:],
+                                      y[:(N - (len(t_phi) - gap)) + 1]))
                 else:
                     _x_l = x[gap-N:gap]
                     _x_r = x[gap:gap+N+1]
@@ -584,7 +616,9 @@ class MemBackendFrame(object):
 
                 try:
                     filler_data.append((gap,
-                                        ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                                        ellipse.gap_filler((_x_l, _x_r),
+                                                           (_y_l, _y_r),
+                                                           R, cntr)))
                 except ellipse.EllipseException:  # as e:
                     #                    print e
                     pass
@@ -599,7 +633,9 @@ class MemBackendFrame(object):
 
                 try:
                     filler_data.append((gap,
-                                        ellipse.gap_filler((_x_l, _x_r), (_y_l, _y_r), R, cntr)))
+                                        ellipse.gap_filler((_x_l, _x_r),
+                                                           (_y_l, _y_r),
+                                                           R, cntr)))
                 except ellipse.EllipseException:  # as e:
                     #                    print e
                     pass
@@ -607,7 +643,8 @@ class MemBackendFrame(object):
             start_indx = 0
             accum_lst = []
             for gap, i_data in filler_data:
-                accum_lst.append(np.vstack((x[start_indx:gap], y[start_indx:gap])))
+                accum_lst.append(np.vstack((x[start_indx:gap],
+                                            y[start_indx:gap])))
                 accum_lst.append(i_data)
                 start_indx = gap
             accum_lst.append(np.vstack((x[start_indx:], y[start_indx:])))
@@ -678,7 +715,8 @@ class MemBackendFrame(object):
         #        print 'frame_%05d' % self.frame_number
         # update the last frame number
         parent_group.attrs['last_frame'] = self.frame_number
-        group = parent_group.create_group(self._frame_str.format(self.frame_number))
+        group = parent_group.create_group(
+            self._frame_str.format(self.frame_number))
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
                                     self.trk_lst[1],

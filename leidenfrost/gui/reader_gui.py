@@ -92,13 +92,25 @@ class LFReader(QtCore.QObject):
         self.backend = backends.HdfBackend(fname,
                                            cine_base_path=cbp,
                                            **kwargs)
-        self.mbe = self.backend.get_frame(0,
+        self.mbe = self.backend.get_frame(self.first_frame,
                                           raw=True,
                                           get_img=True)
         self.cur_frame = 0
 
         self.file_loaded.emit(True, True)
         self.file_params.emit(self.backend.proc_prams)
+
+    @property
+    def first_frame(self):
+        if self.backend is not None:
+            return self.backend.first_frame
+        return -1
+
+    @property
+    def last_frame(self):
+        if self.backend is not None:
+            return self.backend.last_frame
+        return -1
 
 
 class LFReaderGui(QtGui.QMainWindow):
@@ -211,7 +223,8 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.axes = None
         self.fig.clf()
-        self.axes = self.fig.add_subplot(111, adjustable='datalim', aspect='equal')
+        self.axes = self.fig.add_subplot(111, adjustable='datalim',
+                                         aspect='equal')
         #       self.fig.tight_layout(.3, None, None, None)
         # nuke all those objects
         self.fringe_lines = []
@@ -243,9 +256,10 @@ class LFReaderGui(QtGui.QMainWindow):
 
         #self.status_text.setText(label)
 
-        self.frame_spinner.setRange(0, len(self.reader) - 1)
-        self.frame_spinner.setValue(0)
-        self.max_frame_label.setText(str(len(self.reader) - 1))
+        self.frame_spinner.setRange(self.reader.first_frame,
+                                    self.reader.last_frame)
+        self.frame_spinner.setValue(self.reader.first_frame)
+        self.max_frame_label.setText(str(self.reader.last_frame))
         self.max_cine_label.setText(str(self.reader.cine_len() - 1))
         self.redraw_sig.emit(False, False)
 
@@ -337,7 +351,7 @@ class LFReaderGui(QtGui.QMainWindow):
         fs_form.addWidget(QtGui.QLabel('frame #'))
         fs_form.addWidget(self.frame_spinner)
         fs_form.addWidget(QtGui.QLabel(' of '))
-        self.max_frame_label = QtGui.QLabel(str(len(self.reader) - 1))
+        self.max_frame_label = QtGui.QLabel(str(self.reader.last_frame))
         fs_form.addWidget(self.max_frame_label)
         fs_form.addWidget(QtGui.QLabel(' cine '))
         self.max_cine_label = QtGui.QLabel(str(self.reader.cine_len() - 1))
@@ -346,7 +360,9 @@ class LFReaderGui(QtGui.QMainWindow):
         fs_sb_rb = QtGui.QHBoxLayout()
         for j in [1, 10, 100, 1000, 10000]:
             tmp_rdo = QtGui.QRadioButton(str(j))
-            tmp_rdo.toggled.connect(lambda x, j=j: self.frame_spinner.setSingleStep(j) if x else None)
+            tmp_rdo.toggled.connect(lambda x, j=j:
+                                    self.frame_spinner.setSingleStep(j)
+                                    if x else None)
             fs_sb_rb.addWidget(tmp_rdo)
             if j == 1:
                 tmp_rdo.toggle()
@@ -547,7 +563,8 @@ class LFReaderGui(QtGui.QMainWindow):
         graphMenu.addAction(self.show_track_graphs)
 
     def create_binary_search(self):
-        self.bin_search = BinaryFrameSearch(len(self.reader) - 1)
+        self.bin_search = BinaryFrameSearch(self.reader.last_frame,
+                                            self.reader.first_frame)
         self.bin_search.change_frame.connect(self.frame_spinner.setValue)
         self.bin_search.reset()
         self.bin_search.show()
