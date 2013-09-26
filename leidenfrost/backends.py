@@ -181,7 +181,7 @@ class HdfBackend(object):
         return self._frame_str.format(j) in self.file
 
     def __len__(self):
-        return self.num_frames
+        return self.last_frame - self.first_frame
 
     @property
     def calibration_value(self):
@@ -423,6 +423,7 @@ class ProcessBackend(object):
         if 'fft_filter' in self.params:
             next_curve = copy.copy(next_curve)  # to not screw up the original
             next_curve.fft_filter(self.params['fft_filter'])
+
         return mbe, next_curve
 
     def get_frame(self, ind, raw, img):
