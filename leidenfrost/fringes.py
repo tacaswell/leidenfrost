@@ -539,6 +539,8 @@ class Region_map(object):
             fringe_rings.append(FringeRing.from_mbe(mbe, reclassify=reclassify))
             if reclassify:
                 curve = mbe.get_next_spline()
+            if hasattr(mbe, 'next_curve') and mbe.next_curve is not None:
+                curve = mbe.next_curve
             else:
                 curve = mbe.curve
             img = mbe.img
