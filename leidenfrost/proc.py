@@ -70,12 +70,15 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
 
     # convert disk
     disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
-    hdf_fname_template = leidenfrost.convert_base_path(hdf_fname_template, disk_dict)
+    hdf_fname_template = leidenfrost.convert_base_path(hdf_fname_template,
+                                                       disk_dict)
     # sort out output files names
-    h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
+    h5_fname = hdf_fname_template._replace(
+        fname=cine_fname.fname.replace('cine', 'h5'))
     # get _id from DB
     _id, h5_fname = db.start_proc(ch, params, seed_curve, h5_fname)
-    lh = logging.FileHandler(hdf_fname_template._replace(fname=h5_fname.fname.replace('h5', 'log')).format)
+    lh = logging.FileHandler(hdf_fname_template._replace(
+        fname=h5_fname.fname.replace('h5', 'log')).format)
 
     start_frame = params.pop('start_frame', 0)
     max_circ_change_frac = params.pop('max_circ_change', None)
@@ -88,7 +91,9 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
 
     stack = lb.ProcessBackend.from_args(cine_fname, **params)
     stack.gen_stub_h5(h5_fname.format, seed_curve, start_frame)
-    hfb = lb.HdfBackend(h5_fname, cine_base_path=cine_fname.base_path, mode='rw')
+    hfb = lb.HdfBackend(h5_fname,
+                        cine_base_path=cine_fname.base_path,
+                        mode='rw')
     file_out = hfb.file
     logger.info('created file')
 
@@ -108,12 +113,14 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
             start = time.time()
             mbe, new_seed_curve = stack.process_frame(j, seed_curve)
             if max_circ_change_frac is not None:
-                # check if we are limiting how much the circumference can change
-                # between frames
+                # check if we are limiting how much the circumference
+                # can change between frames
                 old_circ = seed_curve.circ
                 new_circ = new_seed_curve.circ
-                # if it changes little enough, adopt the new seed curve
-                if np.abs(old_circ - new_circ) / old_circ < max_circ_change_frac:
+                # if it changes little enough, adopt the new seed
+                # curve
+                if (np.abs(old_circ - new_circ) / old_circ
+                    < max_circ_change_frac):
                     seed_curve = new_seed_curve
             else:
                 seed_curve = new_seed_curve
