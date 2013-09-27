@@ -17,6 +17,7 @@
 
 from __future__ import division
 import itertools
+from itertools import izip
 import cPickle
 import os
 
@@ -679,29 +680,38 @@ class MemBackendFrame(object):
         plt.draw()
         return ax
 
-    def ax_plot_tracks(self, ax, min_len=0, all_tracks=True):
-        color_cycle = ['r', 'b']
+    def ax_plot_tracks(self, ax, min_len=0, all_tracks=True,
+                       bright_dict=None, dark_dict=None):
+        _bright_dict = {'color': 'r', 'linestyle': '-'}
+        _dark_dict = {'color': 'b', 'linestyle': '-'}
+        if bright_dict is not None:
+            _bright_dict.update(bright_dict)
+        if dark_dict is not None:
+            _dark_dict.update(dark_dict)
+
         lines = []
-        for tk_l, c in zip(self.trk_lst, color_cycle):
+        for tk_l, kwargs in izip(self.trk_lst, (_dark_dict, _bright_dict)):
             lines.extend([t.plot_trk_img(self.curve,
-                                         ax,
-                                         color=c,
-                                         linestyle='-')
+                                         ax, **kwargs)
                           for t in tk_l
                           if len(t) > min_len and
                           (all_tracks or bool(t.charge))])
         return lines
 
-    def ax_draw_center_curves(self, ax, prev_c=True, next_c=True):
+    def ax_draw_center_curves(self, ax, prev_c=True, next_c=True, seed_dict=None, cur_dict=None):
+        _seed_dict = {'color': 'g', 'lw': 2, 'linestyle': '--'}
+        _cur_dict = {'color': 'm', 'lw': 1, 'linestyle': '--'}
+        if seed_dict is not None:
+            _seed_dict.update(seed_dict)
+        if cur_dict is not None:
+            _cur_dict.update(cur_dict)
         if prev_c:
-            lo = self.curve.draw_to_axes(ax, color='g',
-                                         lw=2, linestyle='--')
+            lo = self.curve.draw_to_axes(ax, **_seed_dict)
         else:
             lo = []
         if next_c:
             new_curve = self.get_next_spline(**self.params)
-            ln = new_curve.draw_to_axes(ax, color='m',
-                                        lw=1, linestyle='--')
+            ln = new_curve.draw_to_axes(ax, **_cur_dict)
         else:
             ln = []
 
