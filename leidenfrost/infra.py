@@ -552,6 +552,16 @@ class SplineCurve(object):
         return self._cntr
 
     @property
+    def th_offset(self):
+        """
+        The angle from the y-axis for (x, y) at `phi=0`
+        """
+        if self._th_offset is None:
+            x, y = self.q_phi_to_xy(0, 0) - self.cntr.reshape(2, 1)
+            self._th_offset = np.arctan2(y, x)
+        return self._th_offset
+
+    @property
     def tck0(self):
         return self.tck[0]
 
