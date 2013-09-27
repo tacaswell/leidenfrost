@@ -43,6 +43,10 @@ from . import FilePath
 import leidenfrost.db as ldb
 
 
+class TooFewPointsException(Exception):
+    pass
+
+
 class hash_line_angular(object):
     def __init__(self, dims, bin_width):
         '''
@@ -473,7 +477,7 @@ class SplineCurve(object):
             center /= len(pt_lst)
 
         if len(pt_lst) < 5:
-            raise Exception("not enough points")
+            raise TooFewPointsException("not enough points")
 
         if need_sort:
             # sort the list by angle around center
