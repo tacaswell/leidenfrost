@@ -240,7 +240,8 @@ class lf_Track(Track):
         Classification function which sorts out the charge of the track.
 
         '''
-        # this is here because if the length is too small, it will blow up the quad fit
+        # this is here because if the length is too small, it will
+        # blow up the quad fit
         if min_len < 5:
             min_len = 5
         phi, q = zip(*[(p.phi, p.q) for p in self.points])
@@ -327,7 +328,8 @@ class spline_fitter(object):
         self.canvas = ax.get_figure().canvas
         self.cid = None
         self.pt_lst = []
-        self.pt_plot = ax.plot([], [], marker='o', linestyle='none', zorder=5)[0]
+        self.pt_plot = ax.plot([], [], marker='o',
+                               linestyle='none', zorder=5)[0]
         self.sp_plot = ax.plot([], [], lw=3, color='r')[0]
         self.pix_err = pix_err
         self.connect_sf()
@@ -454,7 +456,8 @@ class SplineCurve(object):
         :type points: a 2xN ndarray or a list of len =2 tuples
 
         :param pix_err: the error is finding the spline in pixels
-        :param need_sort: if the points need to be sorted or should be processed as-is
+        :param need_sort: if the points need to be sorted
+            or should be processed as-is
 
         =====
         output
@@ -513,7 +516,8 @@ class SplineCurve(object):
 
     @classmethod
     def from_pickle_dict(cls, pickle_dict):
-        tck = [cPickle.loads(str(pickle_dict[_tk])) for _tk in ['tck0', 'tck1', 'tck2']]
+        tck = [cPickle.loads(str(pickle_dict[_tk]))
+               for _tk in ['tck0', 'tck1', 'tck2']]
         return cls(tck)
 
     def __init__(self, tck):
@@ -540,7 +544,8 @@ class SplineCurve(object):
         '''returns a rough estimate of the circumference'''
         if self._circ is None:
             new_pts = si.splev(np.linspace(0, 1, 1000), self.tck, ext=2)
-            self._circ = np.sum(np.sqrt(np.sum(np.diff(new_pts, axis=1) ** 2, axis=0)))
+            self._circ = np.sum(np.sqrt(np.sum(np.diff(new_pts, axis=1) ** 2,
+                                               axis=0)))
         return self._circ
 
     @property
@@ -575,7 +580,8 @@ class SplineCurve(object):
 
     @property
     def to_pickle_dict(self):
-        return dict((lab, cPickle.dumps(getattr(self, lab))) for lab in ['tck0', 'tck1', 'tck2'])
+        return dict((lab, cPickle.dumps(getattr(self, lab)))
+                    for lab in ['tck0', 'tck1', 'tck2'])
 
     def q_phi_to_xy(self, q, phi, cross=None):
         '''Converts q, phi pairs -> x, y pairs.  All other code that
@@ -600,7 +606,8 @@ class SplineCurve(object):
                 raise ValueError("q and phi must have same" +
                                  " dimensions to broadcast")
         if cross is None:
-            if ((phi_shape is not None) and (q_shape is not None) and (phi_shape == q_shape)):
+            if ((phi_shape is not None) and (q_shape is not None)
+                  and (phi_shape == q_shape)):
                 cross = False
             elif q_shape is None:
                 cross = False
@@ -650,7 +657,8 @@ class SplineCurve(object):
         self.tck = tck
 
     def draw_to_axes(self, ax, N=1024, **kwargs):
-        return ax.plot(*(self.q_phi_to_xy(0, np.linspace(0, 2 * np.pi, N)) + 0.5), **kwargs)
+        return ax.plot(*(self.q_phi_to_xy(0, np.linspace(0, 2*np.pi, N))+0.5),
+                       **kwargs)
 
     def curve_shape_fft(self, N=3):
         '''
@@ -667,16 +675,20 @@ class SplineCurve(object):
         Returns
         -------
         ret : list
-            [mode_param(n=n, x=abs_angle(x_amp, x_phase), y=abs_angle(y_amp, y_phase)), ...]
+            [mode_param(n=n, x=abs_angle(x_amp, x_phase),
+                        y=abs_angle(y_amp, y_phase)), ...]
         '''
         curve_data = self.q_phi_to_xy(1, np.linspace(0, 2*np.pi, 1000))
         curve_fft = [np.fft.fft(_d) / len(_d) for _d in curve_data]
-        return [self.mode_param(n, *[self.abs_angle(2 * np.abs(_cfft[n]), np.angle(_cfft[n]))
+        return [self.mode_param(n,
+                                *[self.abs_angle(2 * np.abs(_cfft[n]),
+                                                 np.angle(_cfft[n]))
                                for _cfft in curve_fft])
                 for n in range(1, N + 1)]
 
     def cum_length(self, N=1024):
-        '''Returns the cumulative length at N evenly sampled points in parameter space
+        '''Returns the cumulative length at N evenly
+        sampled points in parameter space
 
         Parameters
         ----------
@@ -686,9 +698,21 @@ class SplineCurve(object):
         Returns
         -------
         ret : ndarray
-            An ndarray of length N which is the cumulative distance around the rim
+            An ndarray of length N which is the cumulative distance
+            around the rim
         '''
-        return np.concatenate(([0], np.cumsum(np.sqrt(np.sum(np.diff(si.splev(np.linspace(0, 1, N), self.tck, ext=2), axis=1) ** 2, axis=0)))))
+        # turns out you _can_ write un-readable python
+        return np.concatenate(([0],
+                               np.cumsum(
+                                   np.sqrt(
+                                       np.sum(
+                                           np.diff(
+                                               si.splev(
+                                                   np.linspace(0, 1, N),
+                                                    self.tck,
+                                                    ext=2),
+                                                axis=1) ** 2,
+                                            axis=0)))))
 
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
@@ -917,7 +941,8 @@ def _fit_quad_to_peak(x, y):
 def update_average_cache(base_path):
     cine_fnames = []
     for dirpath, dirnames, fnames in os.walk(base_path + '/' + 'leidenfrost'):
-        cine_fnames.extend([FilePath(base_path, dirpath[len(base_path) + 1:], f) for f in fnames if 'cine' in f])
+        cine_fnames.extend([FilePath(base_path, dirpath[len(base_path)+1:], f)
+                            for f in fnames if 'cine' in f])
 
     db = ldb.LFmongodb()
 
