@@ -182,7 +182,7 @@ class HdfBackend(object):
         return self._frame_str.format(j) in self.file
 
     def __len__(self):
-        return self.last_frame - self.first_frame
+        return self.last_frame - self.first_frame + 1
 
     @property
     def calibration_value(self):
