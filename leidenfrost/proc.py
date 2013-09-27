@@ -131,9 +131,10 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
 
             mbe.write_to_hdf(file_out)
 
+            if j % 500 == 0:
+                file_out.flush()
             del mbe
-            file_out.flush()
-            gc.collect()
+            #gc.collect()
     except TimeoutException:
         # handle the time out error
         logger.warn('timed out')
