@@ -36,7 +36,6 @@ import parse
 
 import leidenfrost.db as db
 import leidenfrost.infra as infra
-import leidenfrost.ellipse as ellipse
 
 from leidenfrost import FilePath
 
@@ -555,8 +554,11 @@ class MemBackendFrame(object):
                     ]
 
     def get_next_spline(self, mix_in_count=0,
-                        pix_err=0, max_gap=None, **kwargs):
+                        pix_err=0, max_gap=None, fill_density=0.1,
+                        **kwargs):
+
         _params_cache = (mix_in_count, pix_err, max_gap)
+
         if _params_cache == self._params_cache and self.next_curve is not None:
             return self.next_curve
         else:
@@ -591,83 +593,51 @@ class MemBackendFrame(object):
         if max_gap is not None:
             # check for gaps
             t_phi_diff = np.diff(t_phi)
-            R = self.curve.circ / (np.pi*2)
-            cntr = self.curve.cntr
-            N = 12                             # how much buffer to take
 
             filler_data = []
             for gap in np.where(t_phi_diff > max_gap)[0]:
-                #        print 'MIND THE GAP', gap, len(t_phi)
-                gap += 1
-
-                if gap < N:
-                    # deal with wrap-around
-                    _x_l = np.hstack((x[len(t_phi) - (N - gap):], x[:gap]))
-                    _x_r = x[gap:gap+N+1]
-                    _y_l = np.hstack((y[len(t_phi) - (N - gap):], y[:gap]))
-                    _y_r = y[gap:gap+N+1]
-                elif gap >= len(t_phi) - N:
-                    # deal with wrap-around
-                    _x_l = x[gap-N:gap]
-                    _x_r = np.hstack((x[gap:],
-                                      x[:(N - (len(t_phi) - gap)) + 1]))
-                    _y_l = y[gap-N:gap]
-                    _y_r = np.hstack((y[gap:],
-                                      y[:(N - (len(t_phi) - gap)) + 1]))
-                else:
-                    _x_l = x[gap-N:gap]
-                    _x_r = x[gap:gap+N+1]
-                    _y_l = y[gap-N:gap]
-                    _y_r = y[gap:gap+N+1]
-
-                try:
-                    filler_data.append((gap,
-                                        ellipse.gap_filler((_x_l, _x_r),
-                                                           (_y_l, _y_r),
-                                                           R, cntr)))
-                except ellipse.EllipseException:  # as e:
-                    #                    print e
-                    pass
+                fill_angles = np.linspace(t_phi[gap],
+                                          t_phi[gap+1],
+                                          int(t_phi_diff[gap]/fill_density))
+                filler_data.append((gap,
+                                    self.curve.q_phi_to_xy(0,
+                                                           fill_angles[1:-1])))
 
             # deal with gap between last and first points
-            if np.mod(t_phi[0] - t_phi[-1], 2 * np.pi) > max_gap:
+            wrap_around_gap = t_phi[0] + 2 * np.pi - t_phi[-1]
+            if wrap_around_gap > max_gap:
                 gap = len(t_phi)
-                _x_l = x[-N:]
-                _x_r = x[:N+1]
-                _y_l = y[-N:]
-                _y_r = y[:N+1]
-
-                try:
-                    filler_data.append((gap,
-                                        ellipse.gap_filler((_x_l, _x_r),
-                                                           (_y_l, _y_r),
-                                                           R, cntr)))
-                except ellipse.EllipseException:  # as e:
-                    #                    print e
-                    pass
-
+                fill_angles = np.linspace(t_phi[-1],
+                                           t_phi[0] + 2*np.pi,
+                                           int(wrap_around_gap/fill_density))
+                filler_data.append((gap,
+                                    self.curve.q_phi_to_xy(0,
+                                                           fill_angles[1:-1])))
             start_indx = 0
             accum_lst = []
             for gap, i_data in filler_data:
-                accum_lst.append(np.vstack((x[start_indx:gap],
-                                            y[start_indx:gap])))
+                accum_lst.append(np.vstack((x[start_indx:gap+1],
+                                            y[start_indx:gap+1])))
                 accum_lst.append(i_data)
-                start_indx = gap
+                start_indx = gap+1
             accum_lst.append(np.vstack((x[start_indx:], y[start_indx:])))
 
             pts = np.hstack(accum_lst)
         else:
             # don't look for a gap
             pts = np.vstack((x, y))
-
         # generate the new curve
-        new_curve = infra.SplineCurve.from_pts(pts,
+        try:
+            new_curve = infra.SplineCurve.from_pts(pts,
                                                pix_err=pix_err,
                                                need_sort=False,
                                                **kwargs)
+        except infra.TooFewPointsException:
+            print 'should never hit this, not enough points to make new spline'
+            print '          reusing old one'
+            new_curve = self.curve
 
         self.next_curve = new_curve
-        self.mix_in_count = mix_in_count
 
         return new_curve
 
