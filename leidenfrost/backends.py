@@ -668,7 +668,9 @@ class MemBackendFrame(object):
                           (all_tracks or bool(t.charge))])
         return lines
 
-    def ax_draw_center_curves(self, ax, prev_c=True, next_c=True, seed_dict=None, cur_dict=None):
+    def ax_draw_center_curves(self, ax,
+                              prev_c=True, next_c=True,
+                              seed_dict=None, cur_dict=None):
         _seed_dict = {'color': 'g', 'lw': 2, 'linestyle': '--'}
         _cur_dict = {'color': 'm', 'lw': 1, 'linestyle': '--'}
         if seed_dict is not None:
