@@ -1099,9 +1099,12 @@ class Region_map(object):
         label = self.label_img[theta_indx, frame_num]
         return self.height_map[label]
 
-    def display_height_taper(self, h5_backend, ax, f_slice=None, t_scale=1, c_scale=1, **kwargs):
-        '''
-        Displays the height map with the vertical dimension as distance around the rim
+    def display_height_taper(self, h5_backend, ax,
+                             f_slice=None, t_scale=1, c_scale=1, **kwargs):
+        """
+
+        Displays the height map with the vertical
+        dimension as distance around the rim
         instead of angle.
 
         Extra kwargs are passed to `pcolormesh`
@@ -1118,27 +1121,31 @@ class Region_map(object):
            Scaling factor for distance
 
 
-        '''
+        """
         assert len(h5_backend) >= self.resampled_height.shape[1]
+        rs_h_shape = self.resampled_height.shape
         if f_slice is None:
             f_slice = slice(None)
 
-        if len(h5_backend) > self.resampled_height.shape[1]:
+        if len(h5_backend) > rs_h_shape[1]:
             f_slice = slice(f_slice.start,
-                            min([_f for _f in [self.resampled_height.shape[1], f_slice.stop] if _f is not None]),
+                            min([_f for _f in
+                                 [rs_h_shape[1], f_slice.stop]
+                                 if _f is not None]),
                             f_slice.step)
 
         # make sure we don't load stuff we don't need
         h5_backend.prams = HdfBEPram(False, False)
         # get the cumulative lengths
-        Y = np.vstack([mbe.curve.cum_length(self.resampled_height.shape[0]) for mbe in h5_backend[f_slice]]).T
+        Y = np.vstack([mbe.curve.cum_length(rs_h_shape[0])
+                       for mbe in h5_backend[f_slice]]).T
         # shift
         Y -= np.mean(Y, axis=0)
         # scale
         Y *= c_scale
         # generate X array via tricksy outer product
-        X = (np.ones((1, self.resampled_height.shape[0])) *
-             (np.arange(*f_slice.indices(self.resampled_height.shape[1])).reshape(-1, 1) *
+        X = (np.ones((1, rs_h_shape[0])) *
+             (np.arange(*f_slice.indices(rs_h_shape[1])).reshape(-1, 1) *
               (t_scale / h5_backend.cine.frame_rate))).T
         # create pcolormesh
         pm = ax.pcolormesh(X, Y, self.resampled_height[:, f_slice], **kwargs)
@@ -1147,7 +1154,7 @@ class Region_map(object):
         ax.figure.canvas.draw()
 
     def write_to_hdf(self, out_file, md_dict=None, mode='w-'):
-
+        fmt_str = "region_edges_{frn:07}"
         # this will blow up if the file exists
         with closing(h5py.File(out_file.format, mode)) as h5file:
 
@@ -1163,8 +1170,9 @@ class Region_map(object):
                     try:
                         h5file.attrs[key] = val
                     except TypeError:
-                        print 'key: ' + key + ' can not be gracefully shoved into'
-                        print ' an hdf object, please reconsider your life choices'
+                        print 'key: ' + key + ' can not be gracefully'
+                        print 'shoved into an hdf object, please reconsider'
+                        print ' your life choices'
 
             # save the parametrs
             param_grp = h5file.create_group('params')
@@ -1208,7 +1216,8 @@ class Region_map(object):
                                           t)
                     if v.shape[0] > 0:
                         fr_ds[:] = v
-                re_ds = re_grp.create_dataset("region_edges_{frn:07}".format(frn=frame_number),
+
+                re_ds = re_grp.create_dataset(fmt_str.format(frn=frame_number),
                                       re_data.shape,
                                       np.uint32)
                 re_ds[:] = re_data
@@ -1246,12 +1255,13 @@ class Region_map(object):
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
         fringe_rings = [FringeRing(int(_cn.split('_')[-1]),
-                                   [fringe_cls(*_c) for _c in fr_c_grp[_cn][:]],
-                                   [fringe_loc(*_l) for _l in fr_l_grp[_ln][:]])
-                                   for _cn, _ln in izip(fr_c_grp, fr_l_grp)
-                                   ]
+                                  [fringe_cls(*_c) for _c in fr_c_grp[_cn][:]],
+                                  [fringe_loc(*_l) for _l in fr_l_grp[_ln][:]])
+                                  for _cn, _ln in izip(fr_c_grp, fr_l_grp)
+                                  ]
         print 'starting linking'
-        # link the fringes.  This is simpler than storing the linking information
+        # link the fringes.
+        # This is simpler than storing the linking information
         for FR, (region_starts,
                  region_labels,
                  region_ends) in izip(fringe_rings, region_edges, ):
@@ -1260,7 +1270,8 @@ class Region_map(object):
 
         params = dict(h5file['params'].attrs)
 
-        return cls(fringe_rings, region_edges, working_img, height_map, **params)
+        return cls(fringe_rings, region_edges, working_img,
+                   height_map, **params)
 
     def get_frame_profile(self, j):
         '''
