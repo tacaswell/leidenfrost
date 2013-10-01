@@ -554,7 +554,7 @@ class MemBackendFrame(object):
                     ]
 
     def get_next_spline(self, mix_in_count=0,
-                        pix_err=0, max_gap=None, fill_density=0.1,
+                        pix_err=0, max_gap=None, fill_density=None,
                         **kwargs):
 
         _params_cache = (mix_in_count, pix_err, max_gap)
@@ -591,14 +591,17 @@ class MemBackendFrame(object):
         x, y = self.curve.q_phi_to_xy(t_q, t_phi, cross=False)
 
         if max_gap is not None:
+            if fill_density is None:
+                fill_density = 3 / max_gap
             # check for gaps
             t_phi_diff = np.diff(t_phi)
 
             filler_data = []
             for gap in np.where(t_phi_diff > max_gap)[0]:
+                n = np.max((3, int(t_phi_diff[gap] * fill_density)))
                 fill_angles = np.linspace(t_phi[gap],
                                           t_phi[gap+1],
-                                          int(t_phi_diff[gap]/fill_density))
+                                          n)
                 filler_data.append((gap,
                                     self.curve.q_phi_to_xy(0,
                                                            fill_angles[1:-1])))
@@ -607,9 +610,10 @@ class MemBackendFrame(object):
             wrap_around_gap = t_phi[0] + 2 * np.pi - t_phi[-1]
             if wrap_around_gap > max_gap:
                 gap = len(t_phi)
+                n = np.max((3, int(wrap_around_gap*fill_density)))
                 fill_angles = np.linspace(t_phi[-1],
                                            t_phi[0] + 2*np.pi,
-                                           int(wrap_around_gap/fill_density))
+                                           n)
                 filler_data.append((gap,
                                     self.curve.q_phi_to_xy(0,
                                                            fill_angles[1:-1])))
