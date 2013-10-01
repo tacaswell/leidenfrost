@@ -142,9 +142,9 @@ class HdfBackend(object):
             if 'frist_frame' in self.file.attrs:
                 self._last_frame = self.file.attrs['frist_frame']
             else:
-                tmp = [k for k in self.file.keys() if 'frame' in k]
-                self._last_frame = parse.parse(self._frame_str,
-                                                tmp[-1])[0]
+                tmp = [parse.parse(self._frame_str, k)[0]
+                       for k in self.file.keys() if 'frame' in k]
+                self._last_frame = max(tmp)
         return self._last_frame
 
     def _set_bep(self, arg):
@@ -264,7 +264,7 @@ class HdfBackend(object):
             if key.start is None or key.start < self.first_frame:
                 key = slice(self.first_frame, key.stop, key.step)
             return (self.get_frame(k)
-                    for k in xrange(*key.indices(self.last_frame)))
+                    for k in xrange(*key.indices(self.last_frame+1)))
 
         else:
             return self.get_frame(key)
