@@ -147,6 +147,10 @@ class HdfBackend(object):
                 self._last_frame = max(tmp)
         return self._last_frame
 
+    @property
+    def frame_rate(self):
+        return self.cine.frame_rate
+
     def _set_bep(self, arg):
         self._prams = HdfBEPram(*arg)
 
