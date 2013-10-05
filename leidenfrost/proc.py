@@ -208,6 +208,11 @@ def proc_h5_to_RM(h5_name, RM_params, cine_base_path=None):
 
     h5_backend = lb.HdfBackend(h5_name, cine_base_path=cine_base_path)
 
+    return _proc_h5_to_RM(h5_backend, RM_params)
+
+
+def _proc_h5_to_RM(h5_backend, RM_params, cine_base_path=None):
+
     RM = lf.Region_map.from_backend(h5_backend, **RM_params)
 
     return RM, h5_backend
