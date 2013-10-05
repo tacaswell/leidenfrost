@@ -109,14 +109,24 @@ class LFDbWrapper(object):
 
 
 class LFmongodb(LFDbWrapper):
-    col_map = {'bck_img': 'backimg_collection',  # collection for the background images
-               'movs': 'movie_collection',  # collection for pointing to movies
-               'proc': 'fringe_proc_collection',  # collection for point to the results of processing a cine
-               'RM': 'RM_proc_collection',  # collection for point to the results of processing a cine
-               'comment': 'comment_collection',  # collection of comments on data and/or results
+    col_map = {'bck_img': 'backimg_collection',  # collection for the
+                                                 #background images
+               'movs': 'movie_collection',  # collection for pointing
+                                            #to movies
+               'proc': 'fringe_proc_collection',  # collection for
+                                                  #point to the
+                                                  #results of
+                                                  #processing a cine
+               'RM': 'RM_proc_collection',  # collection for point to
+                                            #the results of processing
+                                            #a cine
+               'comment': 'comment_collection',  # collection of
+                                                 #comments on data
+                                                 #and/or results
                }
 
-    def __init__(self, host='10.8.0.1', port=27017, disk_dict=None, *args, **kwargs):
+    def __init__(self, host='10.8.0.1', port=27017, disk_dict=None,
+                 *args, **kwargs):
         LFDbWrapper.__init__(self, *args, **kwargs)
         self.connection = MongoClient(host, port)
         self.db = self.connection.LF
@@ -135,7 +145,8 @@ class LFmongodb(LFDbWrapper):
 
         pass
 
-    def store_movie_md(self, cine, cine_path, calibration_value, calibration_unit):
+    def store_movie_md(self, cine, cine_path,
+                       calibration_value, calibration_unit):
         """
         Stores a movie in the data base
 
