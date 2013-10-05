@@ -17,7 +17,7 @@
 from __future__ import division, print_function
 import signal
 import time
-import gc
+
 import copy
 import logging
 import os
@@ -161,7 +161,9 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     return None
 
 
-def proc_h5_to_RM_tofile(h5_fname, output_file_template, RM_params, fname_mutator=None, cine_base_path=None):
+def proc_h5_to_RM_tofile(h5_fname,
+                         output_file_template, RM_params,
+                         fname_mutator=None, cine_base_path=None):
     """
     Runs the RM code on an h5 file and writes the result to disk.
 
@@ -192,7 +194,8 @@ def proc_h5_to_RM_tofile(h5_fname, output_file_template, RM_params, fname_mutato
     if cine_base_path is None:
         cine_base_path = h5_fname.base_path
 
-    out_fname = output_file_template._replace(fname=fname_mutator(h5_fname.fname))
+    out_fname = output_file_template._replace(
+        fname=fname_mutator(h5_fname.fname))
 
     RM, h5_backend = proc_h5_to_RM(h5_fname, RM_params, cine_base_path)
 
