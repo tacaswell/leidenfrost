@@ -284,5 +284,3 @@ class LFmongodb(LFDbWrapper):
 
     def get_comment_by_cine_hash(self, cine_hash):
         return [_ for _ in self.coll_dict['config'].find({'cine': cine_hash})]
-
-    def add_good_
