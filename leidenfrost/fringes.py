@@ -1100,7 +1100,8 @@ class Region_map(object):
         return self.height_map[label]
 
     def display_height_taper(self, h5_backend, ax,
-                             f_slice=None, t_scale=1, c_scale=1, **kwargs):
+                             f_slice=None, t_scale=1, c_scale=1, h_scale=1,
+                             **kwargs):
         """
 
         Displays the height map with the vertical
@@ -1119,7 +1120,8 @@ class Region_map(object):
            Scaling factor for time
         c_scale : float
            Scaling factor for distance
-
+        h_scale : float
+           Scaling factor for vertical distance
 
         """
         assert len(h5_backend) >= self.resampled_height.shape[1]
@@ -1135,7 +1137,7 @@ class Region_map(object):
                             f_slice.step)
 
         # make sure we don't load stuff we don't need
-        h5_backend.prams = HdfBEPram(False, False)
+        h5_backend.prams = (False, False)
         # get the cumulative lengths
         Y = np.vstack([mbe.curve.cum_length(rs_h_shape[0])
                        for mbe in h5_backend[f_slice]]).T
@@ -1147,11 +1149,15 @@ class Region_map(object):
         X = (np.ones((1, rs_h_shape[0])) *
              (np.arange(*f_slice.indices(rs_h_shape[1])).reshape(-1, 1) *
               (t_scale / h5_backend.cine.frame_rate))).T
+        if 'rasterized' not in kwargs:
+            kwargs['rasterized'] = True
+
         # create pcolormesh
-        pm = ax.pcolormesh(X, Y, self.resampled_height[:, f_slice], **kwargs)
-        pm.set_clim([-np.nanmax(self.height_map), -np.nanmin(self.height_map)])
+        pm = ax.pcolormesh(X, Y, self.resampled_height[:, f_slice] * h_scale, **kwargs)
+        pm.set_clim(np.array([-np.nanmax(self.height_map), -np.nanmin(self.height_map)]) * h_scale)
         # force re-draw
         ax.figure.canvas.draw()
+        return pm
 
     def write_to_hdf(self, out_file, md_dict=None, mode='w-'):
         fmt_str = "region_edges_{frn:07}"

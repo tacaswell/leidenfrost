@@ -526,6 +526,7 @@ class SplineCurve(object):
         self.tck = tck
         self._cntr = None
         self._circ = None
+        self._th_offset = None
 
     def write_to_hdf(self, parent_group, name=None):
         '''

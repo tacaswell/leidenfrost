@@ -1,6 +1,6 @@
 #Copyright 2013 Thomas A Caswell
 #tcaswell@uchicago.edu
-#http://jfi.uchicago.edu/~tcaswell
+#http://JFK.uchicago.edu/~tcaswell
 #
 #This program is free software; you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -40,6 +40,108 @@ import leidenfrost.infra as infra
 from leidenfrost import FilePath
 
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
+
+
+class MultiHdfBackend(object):
+    """
+    A class to deal with hiding the fact that we have data spread across
+    multiple files
+    """
+
+    pass
+
+    def __init__(self, fname_list, cine_base_path):
+        """
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self._cinehash = None
+        self._h5_backends = []
+
+        for fn in fname_list:
+            tmp_be = HdfBackend(fn, cine_base_path)
+            if self._cinehash is None:
+                self._cinehash = tmp_be.cine.hash
+            elif tmp_be.cine.hash != self._cinehash:
+                print "This list is inconsistent dropping "
+                print fn.format
+            self._h5_backends.append(tmp_be)
+
+        # these are all really cine properties and all are from the same cine
+        # so we can just look at the first one.
+        self.frame_rate = self._h5_backends[0].frame_rate
+        self.calibration_value = self._h5_backends[0].calibration_value
+        self.calibration_unit = self._h5_backends[0].calibration_unit
+        self.cine_len = self._h5_backends[0].cine_len
+
+        # sort out first and last frame
+        first_frames = [hbe.first_frame for hbe in self._h5_backends]
+        last_frames = [hbe.last_frame for hbe in self._h5_backends]
+
+        tmp_flags = np.ones(self.cine_len, dtype='bool')
+        for _f, _l in izip(first_frames, last_frames):
+            tmp_flags[_f:_l] = True
+        runs = np.r_[0, np.nonzero(~tmp_flags)[0], len(tmp_flags)-1]
+        idx = np.argmax(np.diff(runs))
+        self.first_frame = runs[idx]
+        self.last_frame = runs[idx + 1]
+
+        self._first_frames = first_frames
+        self._last_frames = last_frames
+        pass
+
+    def __len__(self):
+        return self.last_frame - self.first_frame + 1
+
+    @property
+    def prams(self):
+        # should make this more clever
+        return self._h5_backends[0].prams
+
+    @prams.setter
+    def prams(self, prams):
+        for hbe in self._h5_backends:
+            hbe.prams = prams
+        pass
+
+    def __iter__(self):
+        self._iter_cur_item = self.first_frame - 1
+        return self
+
+    def next(self):
+        self._iter_cur_item += 1
+        if self._iter_cur_item > self.last_frame:
+            raise StopIteration
+        else:
+            return self.get_frame(self._iter_cur_item)
+        pass
+
+    def get_frame(self, j, *args, **kwargs):
+        if j < self.first_frame or j > self.last_frame:
+            raise ValueError("out of range")
+        for hbe, _f, _l in izip(self._h5_backends,
+                                self._first_frames,
+                                self._last_frames):
+            if j >= _f and j <= _l:
+                return hbe.get_frame(j, *args, **kwargs)
+        pass
+
+    def __getitem__(self, key):
+        if type(key) == slice:
+            # def tmp():
+            #     for k in xrange(*key.indices(self.num_frames)):
+            #         yield self.get_frame(k)
+            if key.start is None or key.start < self.first_frame:
+                key = slice(self.first_frame, key.stop, key.step)
+            return (self.get_frame(k)
+                    for k in xrange(*key.indices(self.last_frame+1)))
+
+        else:
+            return self.get_frame(key)
 
 
 class HdfBackend(object):

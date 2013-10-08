@@ -145,6 +145,13 @@ class LFmongodb(LFDbWrapper):
 
         pass
 
+    def set_disk_dict(self, disk_dict):
+        """
+        Sets the dictionaries used for translating disk number -> path
+
+
+        """
+
     def store_movie_md(self, cine, cine_path,
                        calibration_value, calibration_unit):
         """
@@ -277,3 +284,5 @@ class LFmongodb(LFDbWrapper):
 
     def get_comment_by_cine_hash(self, cine_hash):
         return [_ for _ in self.coll_dict['config'].find({'cine': cine_hash})]
+
+    def add_good_
