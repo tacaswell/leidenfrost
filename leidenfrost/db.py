@@ -252,6 +252,11 @@ class LFmongodb(LFDbWrapper):
         record['useful'] = True
         self.coll_dict['proc'].save(record)
 
+    def flag_proc_useless(self, id):
+        record = self.coll_dict['proc'].find_one({'_id': id})
+        record['useful'] = False
+        self.coll_dict['proc'].save(record)
+
     def remove_proc(self, proc_key):
         self.coll_dict['proc'].remove({'_id': proc_key})
 

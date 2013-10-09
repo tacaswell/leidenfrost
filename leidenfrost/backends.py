@@ -231,6 +231,14 @@ class HdfBackend(object):
         if self.db is not None and self._procid is not None:
             self.db.set_good_frame_range(self._procid, in_val, out_val)
 
+    def set_useful(self):
+        if self.db is not None and self._procid is not None:
+            self.db.flag_proc_useful(self._procid)
+
+    def set_useless(self):
+        if self.db is not None and self._procid is not None:
+            self.db.flag_proc_useless(self._procid)
+
     @property
     def ver(self):
         return self.file.attrs['ver']

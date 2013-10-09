@@ -88,6 +88,16 @@ class LFReader(QtCore.QObject):
         if self.backend is not None:
             self.backend.set_inout_range(in_val, out_val)
 
+    @QtCore.Slot()
+    def set_useful(self):
+        if self.backend is not None:
+            self.backend.set_useful()
+
+    @QtCore.Slot()
+    def set_useless(self):
+        if self.backend is not None:
+            self.backend.set_useless()
+
     @QtCore.Slot(backends.FilePath, str, dict)
     def set_fname(self, fname, cbp, kwargs):
         print 'entered set_fname'
@@ -433,6 +443,15 @@ class LFReaderGui(QtGui.QMainWindow):
             print "start: {} end: {}".format(x, y)
         in_out_select.frame_range.connect(tmp)
         in_out_select.frame_range.connect(self.reader.set_inout_range)
+
+        useful_button = QtGui.QPushButton('useful')
+        useful_button.clicked.connect(self.reader.set_useful)
+        useless_button = QtGui.QPushButton('useless')
+        useless_button.clicked.connect(self.reader.set_useless)
+        use_level = QtGui.QHBoxLayout()
+        use_level.addWidget(useful_button)
+        use_level.addWidget(useless_button)
+
         # add everything to the layout
         diag_layout.addLayout(frame_selector_group)
         diag_layout.addWidget(play_button)
@@ -440,6 +459,7 @@ class LFReaderGui(QtGui.QMainWindow):
         diag_layout.addWidget(path_box)
         diag_layout.addStretch()
         diag_layout.addWidget(in_out_select)
+        diag_layout.addLayout(use_level)
 
     @QtCore.Slot()
     def _play(self):
