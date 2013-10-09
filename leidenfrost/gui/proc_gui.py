@@ -110,7 +110,9 @@ class LFWorker(QtCore.QObject):
             proc_prams['start_frame'] = cur_frame
         name_template = leidenfrost.convert_base_path(name_template, disk_dict)
         # push to ether and hope!
-        lb_view.apply_async(leidenfrost.proc.proc_cine_to_h5, self.process_backend.cine_fname, self.process_backend.cine_.hash,
+        lb_view.apply_async(leidenfrost.proc.proc_cine_to_h5,
+                            self.process_backend.cine_fname,
+                            self.process_backend.cine_.hash,
                             name_template, proc_prams, seed_curve)
 
 
