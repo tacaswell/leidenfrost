@@ -37,7 +37,7 @@ import numpy as np
 import leidenfrost.infra as infra
 import leidenfrost.backends as backends
 
-from common import directory_selector
+from common import directory_selector, frame_range_selector
 
 
 class LFReader(QtCore.QObject):
@@ -82,6 +82,11 @@ class LFReader(QtCore.QObject):
             return self.backend.cine_len
         else:
             return 0
+
+    @QtCore.Slot(int, int)
+    def set_inout_range(self, in_val, out_val):
+        if self.backend is not None:
+            self.backend.set_inout_range(in_val, out_val)
 
     @QtCore.Slot(backends.FilePath, str, dict)
     def set_fname(self, fname, cbp, kwargs):
@@ -421,12 +426,20 @@ class LFReaderGui(QtGui.QMainWindow):
         self.graphs_window = GraphDialog((2, 1))
         self.show_track_graphs.toggled.connect(self.graphs_window.setVisible)
 
+        in_out_select = frame_range_selector(self.frame_spinner)
+
+        def tmp(x, y):
+            print x, y
+            print "start: {} end: {}".format(x, y)
+        in_out_select.frame_range.connect(tmp)
+        in_out_select.frame_range.connect(self.reader.set_inout_range)
         # add everything to the layout
         diag_layout.addLayout(frame_selector_group)
+        diag_layout.addWidget(play_button)
         diag_layout.addWidget(self.fringe_grp_bx)
         diag_layout.addWidget(path_box)
         diag_layout.addStretch()
-        diag_layout.addWidget(play_button)
+        diag_layout.addWidget(in_out_select)
 
     @QtCore.Slot()
     def _play(self):

@@ -20,6 +20,7 @@
 import PySide.QtCore as QtCore
 import PySide.QtGui as QtGui
 import os.path
+from itertools import izip
 
 from leidenfrost import FilePath
 
@@ -143,3 +144,71 @@ class base_path_path_selector(QtGui.QWidget):
         bp = self.base_path
         if in_path[:len(bp)] != bp:
             self.path_widget.path = bp
+
+
+class frame_range_selector(QtGui.QWidget):
+    frame_range = QtCore.Signal(int, int)
+    updated = QtCore.Signal()
+
+    def __init__(self, spinner, parent=None):
+        QtGui.QWidget.__init__(self, parent)
+        self._spinner = spinner
+        self._start = 0
+        self._end = 1
+        # global layout
+        layout = QtGui.QVBoxLayout()
+        self.setLayout(layout)
+        # top layer of labels
+        top_layer = QtGui.QHBoxLayout()
+        self._end_lab = QtGui.QLabel('-')
+        self._start_lab = QtGui.QLabel('-')
+        top_layer.addWidget(self._start_lab)
+        top_layer.addWidget(self._end_lab)
+
+        # in/out buttons
+        mid_layer = QtGui.QHBoxLayout()
+
+        start_button = QtGui.QPushButton('in')
+        start_button.clicked.connect(self._set_start)
+        mid_layer.addWidget(start_button)
+
+        end_button = QtGui.QPushButton('out')
+        end_button.clicked.connect(self._set_end)
+        mid_layer.addWidget(end_button)
+
+        # submit button
+        submit = QtGui.QPushButton('submit')
+        submit.clicked.connect(
+            lambda: self.frame_range.emit(self._start, self._end))
+        layout.addLayout(top_layer)
+        layout.addLayout(mid_layer)
+        layout.addWidget(submit)
+        self.updated.connect(self._update)
+
+    def _set_end(self):
+        trial_val = self._spinner.value() + 1
+        if trial_val < self._start:
+            return
+        self._end = trial_val
+        self.updated.emit()
+
+    def _set_start(self):
+        trial_val = self._spinner.value()
+        if trial_val >= self._end:
+            return
+        self._start = trial_val
+        self.updated.emit()
+
+    @QtCore.Slot(int, int)
+    def set_limit(self, in_val, out_val):
+        self._start = in_val
+        self._end = out_val
+        self.updated.emit()
+
+    @QtCore.Slot()
+    def _update(self):
+        for val, lab in izip((self._start, self._end), (self._start_lab, self._end_lab)):
+            if val is None:
+                lab.setText('-')
+            else:
+                lab.setNum(val)

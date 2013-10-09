@@ -284,3 +284,40 @@ class LFmongodb(LFDbWrapper):
 
     def get_comment_by_cine_hash(self, cine_hash):
         return [_ for _ in self.coll_dict['config'].find({'cine': cine_hash})]
+
+    def set_good_frame_range(self, proc_id, start, end):
+        """
+        Sets the good frame range for this proc
+
+        Parameters
+        ----------
+        proc_id : _uid
+           The _uid of the process to attach the data to
+
+        start : int
+           The first good frame in this proc file
+
+        end : int
+           The first bad frame (or one past the end) in this file
+        """
+        record = self.coll_dict['proc'].find_one({'_id': proc_id})
+        record['in_frame'] = start
+        record['out_frame'] = end
+        self.coll_dict['proc'].save(record)
+
+    def get_proc_id(self, fname):
+        """
+        Given a FilePath and a cinehash, figure out the proc's id
+
+        Parameters
+        ----------
+        fname : FilePath
+            The path to the hdf5 file
+
+        Returns
+        -------
+        id : the _id of this proc in the database
+
+        """
+        return self.coll_dict['proc'].find_one({'out_file.fname': fname.fname,
+                                                'out_file.path': fname.path})['_id']

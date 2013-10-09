@@ -13,6 +13,7 @@ import leidenfrost.infra as li
 import leidenfrost.file_help as lffh
 import leidenfrost.db as ldb
 import leidenfrost.backends as lfbe
+import numpy as np
 import h5py
 
 
@@ -55,7 +56,7 @@ class worker(Process):
                 return
             try:
                 cine_fname, cine_hash, hdf_fname_template = work_arg
-                proc_cine_fname(cine_fname, cine_hash, hdf_fname_template)
+                proc_cine_fname(cine_fname, cine_hash, hdf_fname_template, max_circ_change_frac=.002)
             except Exception as E:
                 # we want to catch _EVERYTHING_ so errors don't blow
                 # up the other computations with it
@@ -100,14 +101,15 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template, max_circ_change_frac=Non
             logger.info('opened file')
             file_out = hfb.file
             # make sure that we continue with the same parameters
-            params = dict((k, hfb.proc_prams[k]) for k in params)
-            stack = lfbe.ProcessBackend.from_args(cine_fname, **params)
+            # params = dict((k, hfb.proc_prams[k]) for k in params)
+            # need to find a better way to record this
+            stack = lfbe.ProcessBackend.from_args(cine_fname, ver=hfb.ver, **params)
 
         db.store_proc(ch, config_dict['_id'], h5_fname)
         old_handler = signal.signal(signal.SIGALRM, timeout_handler)
 
         # move the logging to the top
-        ver = ver=hfb.ver
+
         try:
             for j in xrange(start_frame, len(stack)):
                 # set a 30s window, if the frame does not finish on 30s, kill it
@@ -118,14 +120,18 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template, max_circ_change_frac=Non
                 signal.alarm(45)
                 start = time.time()
                 mbe, new_seed_curve = stack.process_frame(j, seed_curve)
+
                 if max_circ_change_frac is not None:
                     # check if we are limiting how much the circumference can change
                     # between frames
                     old_circ = seed_curve.circ
-                    new_circ = new_seed_curve
+                    new_circ = new_seed_curve.circ
+                    logger.info('curve circ diff: {}'.format(np.abs(old_circ - new_circ) / old_circ))
                     # if it changes little enough, adopt the new seed curve
                     if np.abs(old_circ - new_circ) / old_circ < max_circ_change_frac:
                         seed_curve = new_seed_curve
+                    else:
+                        logger.warn('reusing seedcurve')
                     # if we get here that means we are re-using the
                     # curve from n-m for frame n.  We are hitting this
                     # because the run is already going off the rails.  Hopefully we

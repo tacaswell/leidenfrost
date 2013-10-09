@@ -203,6 +203,10 @@ class HdfBackend(object):
             # this eats _ALL_ exceptions
             self.db = None
 
+        self._procid = None
+        if self.db is not None:
+            self._procid = self.db.get_proc_id(fname)
+
         self.bck_img = None
         if self.db is not None and self.cine is not None:
             self.bck_img = self.db.get_background_img(self.cine.hash)
@@ -222,6 +226,10 @@ class HdfBackend(object):
         self._cal_val_unit = None
         self._first_frame = None
         self._last_frame = None
+
+    def set_inout_range(self, in_val, out_val):
+        if self.db is not None and self._procid is not None:
+            self.db.set_good_frame_range(self._procid, in_val, out_val)
 
     @property
     def ver(self):
