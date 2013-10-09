@@ -325,4 +325,20 @@ class LFmongodb(LFDbWrapper):
 
         """
         return self.coll_dict['proc'].find_one({'out_file.fname': fname.fname,
-                                                'out_file.path': fname.path})['_id']
+                                                'out_file.path': fname.path}
+                                                )['_id']
+
+    def get_proc_entry(self, proc_id):
+        """
+        Given a proc_id return the full dictionary of information stored
+
+        Parameters
+        ----------
+        proc_id : ObjectID or equivalent
+            The proc to pull data for
+
+        Returns
+        -------
+        dict : the full set of meta-data for the proc
+        """
+        return self.coll_dict['proc'].find_one({'_id': proc_id})

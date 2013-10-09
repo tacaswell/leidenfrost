@@ -239,6 +239,10 @@ class HdfBackend(object):
         if self.db is not None and self._procid is not None:
             self.db.flag_proc_useless(self._procid)
 
+    def get_md(self):
+        if self.db is not None and self._procid is not None:
+            return self.db.get_proc_entry(self._procid)
+
     @property
     def ver(self):
         return self.file.attrs['ver']
@@ -390,6 +394,7 @@ class HdfBackend(object):
 
         else:
             return self.get_frame(key)
+
 
 class ProcessBackend(object):
     req_args_lst = ['search_range', 's_width', 's_num', 'pix_err']

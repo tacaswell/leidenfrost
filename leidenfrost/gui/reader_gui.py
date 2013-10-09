@@ -37,13 +37,14 @@ import numpy as np
 import leidenfrost.infra as infra
 import leidenfrost.backends as backends
 
-from common import directory_selector, frame_range_selector
+from common import directory_selector, frame_range_selector, md_state
 
 
 class LFReader(QtCore.QObject):
     frame_loaded = QtCore.Signal(bool, bool)
     file_loaded = QtCore.Signal(bool, bool)
     file_params = QtCore.Signal(dict)
+    md_updated = QtCore.Signal(dict)
 
     def __init__(self, parent=None):
         QtCore.QObject.__init__(self, parent)
@@ -87,16 +88,19 @@ class LFReader(QtCore.QObject):
     def set_inout_range(self, in_val, out_val):
         if self.backend is not None:
             self.backend.set_inout_range(in_val, out_val)
+        self.md_updated.emit(self.backend.get_md())
 
     @QtCore.Slot()
     def set_useful(self):
         if self.backend is not None:
             self.backend.set_useful()
+        self.md_updated.emit(self.backend.get_md())
 
     @QtCore.Slot()
     def set_useless(self):
         if self.backend is not None:
             self.backend.set_useless()
+        self.md_updated.emit(self.backend.get_md())
 
     @QtCore.Slot(backends.FilePath, str, dict)
     def set_fname(self, fname, cbp, kwargs):
@@ -114,6 +118,7 @@ class LFReader(QtCore.QObject):
 
         self.file_loaded.emit(True, True)
         self.file_params.emit(self.backend.proc_prams)
+        self.md_updated.emit(self.backend.get_md())
 
     @property
     def first_frame(self):
@@ -452,6 +457,9 @@ class LFReaderGui(QtGui.QMainWindow):
         use_level.addWidget(useful_button)
         use_level.addWidget(useless_button)
 
+        md_state_disp = md_state()
+        self.reader.md_updated.connect(md_state_disp.update_data)
+
         # add everything to the layout
         diag_layout.addLayout(frame_selector_group)
         diag_layout.addWidget(play_button)
@@ -460,6 +468,7 @@ class LFReaderGui(QtGui.QMainWindow):
         diag_layout.addStretch()
         diag_layout.addWidget(in_out_select)
         diag_layout.addLayout(use_level)
+        diag_layout.addWidget(md_state_disp)
 
     @QtCore.Slot()
     def _play(self):

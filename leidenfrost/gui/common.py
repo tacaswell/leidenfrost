@@ -207,8 +207,50 @@ class frame_range_selector(QtGui.QWidget):
 
     @QtCore.Slot()
     def _update(self):
-        for val, lab in izip((self._start, self._end), (self._start_lab, self._end_lab)):
+        for val, lab in izip((self._start, self._end),
+                             (self._start_lab, self._end_lab)):
             if val is None:
                 lab.setText('-')
             else:
                 lab.setNum(val)
+
+
+class md_state(QtGui.QWidget):
+    """
+    a class for displaying meta-data, eats dicts returned by the db
+    """
+    def __init__(self, parent=None):
+        QtGui.QWidget.__init__(self, parent)
+
+        top_row = QtGui.QHBoxLayout()
+        top_row.addWidget(QtGui.QLabel("in: "))
+        self._in_label = QtGui.QLabel('-')
+        top_row.addWidget(self._in_label)
+        top_row.addStretch()
+        self._out_label = QtGui.QLabel('-')
+        top_row.addWidget(self._out_label)
+
+        bottom_row = QtGui.QHBoxLayout()
+        bottom_row.addWidget(QtGui.QLabel("useful: "))
+        self._useful_lab = QtGui.QLabel('-')
+        bottom_row.addWidget(self._useful_lab)
+
+        # top level layout
+        layout = QtGui.QVBoxLayout()
+        self.setLayout(layout)
+        layout.addLayout(top_row)
+        layout.addLayout(bottom_row)
+
+    @QtCore.Slot(dict)
+    def update_data(self, md_dict):
+        in_val = md_dict.get('in_frame', None)
+        out_val = md_dict.get('out_frame', None)
+        use_val = md_dict.get('useful', None)
+
+        for v, lab in izip((in_val, out_val, use_val),
+                           (self._in_label, self._out_label,
+                            self._useful_lab)):
+            if v is None:
+                lab.setText('-')
+            else:
+                lab.setText(str(v))
