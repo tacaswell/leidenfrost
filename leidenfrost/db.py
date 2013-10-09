@@ -139,7 +139,16 @@ class LFmongodb(LFDbWrapper):
                 self.coll_dict[f].ensure_index('cine')
 
         if disk_dict is None:
-            disk_dict = {}
+            # hard code in my disks
+            disk_dict = {'/media/leidenfrost_a': 0,
+                         '/media/tcaswell/leidenfrost_a': 0,
+                         '/media/tcaswell/leidenfrost_b': 0,
+                         '/media/leidenfrost_b': 0,
+                         '/media/leidenfrost_c': 1,
+                         '/media/tcaswell/leidenfrost_c': 1,
+                         '/media/tcaswell/leidenfrost_d': 1,
+                         '/media/leidenfrost_d': 1,
+                         }
         self.disk_dict = disk_dict
         self.i_disk_dict = {v: k for k, v in disk_dict.items()}
 
@@ -148,7 +157,6 @@ class LFmongodb(LFDbWrapper):
     def set_disk_dict(self, disk_dict):
         """
         Sets the dictionaries used for translating disk number -> path
-
 
         """
 
