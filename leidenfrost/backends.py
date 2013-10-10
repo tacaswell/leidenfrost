@@ -790,7 +790,7 @@ class MemBackendFrame(object):
             return c_img
         return None
 
-    def write_to_hdf(self, parent_group):
+    def write_to_hdf(self, parent_group, md_args=None):
         #        print 'frame_%05d' % self.frame_number
         # update the last frame number
         parent_group.attrs['last_frame'] = self.frame_number
@@ -799,7 +799,9 @@ class MemBackendFrame(object):
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
                                     self.trk_lst[1],
-                                    self.curve)
+                                    self.curve,
+                                    next_curve=self.next_curve,
+                                    md_args=md_args)
         del group
 
     def get_profile(self):
