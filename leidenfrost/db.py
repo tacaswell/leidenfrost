@@ -332,8 +332,8 @@ class LFmongodb(LFDbWrapper):
         id : the _id of this proc in the database
 
         """
-        return self.coll_dict['proc'].find_one({'out_file.fname': fname.fname,
-                                                'out_file.path': fname.path}
+        return self.coll_dict['proc'].find_one({'out_file.fname': fname.fname.strip('/'),
+                                                'out_file.path': fname.path.strip('/')}
                                                 )['_id']
 
     def get_proc_entry(self, proc_id):
