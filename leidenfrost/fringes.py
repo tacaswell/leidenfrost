@@ -1265,14 +1265,23 @@ class Region_map(object):
                                   [fringe_loc(*_l) for _l in fr_l_grp[_ln][:]])
                                   for _cn, _ln in izip(fr_c_grp, fr_l_grp)
                                   ]
+
+        fringe_edges = [_segment_fringes(fringe_slice)
+                             for fringe_slice in working_img.T]
+
         print 'starting linking'
         # link the fringes.
         # This is simpler than storing the linking information
-        for FR, (region_starts,
+        for (FR, (region_starts,
                  region_labels,
-                 region_ends) in izip(fringe_rings, region_edges, ):
+                 region_ends),
+                (fringe_starts,
+                 fringe_labels,
+                 fringe_ends)) in izip(fringe_rings, region_edges, fringe_edges):
             FR.link_fringes(region_starts, region_labels, region_ends,
+                            fringe_starts, fringe_labels, fringe_ends,
                             working_img.shape[0])
+
 
         params = dict(h5file['params'].attrs)
 
