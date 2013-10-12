@@ -691,7 +691,8 @@ class MemBackendFrame(object):
                 n = np.max((3, int(t_phi_diff[gap] * fill_density)))
                 fill_angles = np.linspace(t_phi[gap],
                                           t_phi[gap+1],
-                                          n)
+                                          n,
+                                          endpoint=True)
                 filler_data.append((gap,
                                     self.curve.q_phi_to_xy(0,
                                                            fill_angles[1:-1])))
@@ -703,17 +704,21 @@ class MemBackendFrame(object):
                 n = np.max((3, int(wrap_around_gap*fill_density)))
                 fill_angles = np.linspace(t_phi[-1],
                                            t_phi[0] + 2*np.pi,
-                                           n)
+                                           n,
+                                            endpoint=True)
                 filler_data.append((gap,
                                     self.curve.q_phi_to_xy(0,
                                                            fill_angles[1:-1])))
             start_indx = 0
             accum_lst = []
-            for gap, i_data in filler_data:
-                accum_lst.append(np.vstack((x[start_indx:gap+1],
-                                            y[start_indx:gap+1])))
+            for gap_index, i_data in filler_data:
+                # get the data _upto_ the gap
+                accum_lst.append(np.vstack((x[start_indx:gap_index+1],
+                                            y[start_indx:gap_index+1])))
+                # shove in the patch up data
                 accum_lst.append(i_data)
-                start_indx = gap+1
+                # set the next starting point
+                start_indx = gap_index+1
             accum_lst.append(np.vstack((x[start_indx:], y[start_indx:])))
 
             pts = np.hstack(accum_lst)
@@ -792,7 +797,7 @@ class MemBackendFrame(object):
             return c_img
         return None
 
-    def write_to_hdf(self, parent_group):
+    def write_to_hdf(self, parent_group, md_args=None):
         #        print 'frame_%05d' % self.frame_number
         # update the last frame number
         parent_group.attrs['last_frame'] = self.frame_number
@@ -801,7 +806,9 @@ class MemBackendFrame(object):
         _write_frame_tracks_to_file(group,
                                     self.trk_lst[0],
                                     self.trk_lst[1],
-                                    self.curve)
+                                    self.curve,
+                                    next_curve=self.next_curve,
+                                    md_args=md_args)
         del group
 
     def get_profile(self):
