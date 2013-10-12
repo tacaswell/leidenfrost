@@ -95,3 +95,12 @@ def circumference_vs_time_ax(self, ax, t_scale=1, c_scale=1,
     self.prams = old_params
 
     return ax.plot(t, c, **kwargs)
+
+def taper(RM, h5_backend, ax, f_slice=None, **kwargs):
+    """
+    Plots the tapered height map for the range specified
+
+    Parameters
+    ----------
+    RM : RegionMap
+    """
