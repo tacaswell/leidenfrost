@@ -60,9 +60,13 @@ class LFWorker(QtCore.QObject):
     def proc_frame(self, ind, curve):
 
         if self.process_backend is not None:
-            self.mbe, self.next_curve = self.process_backend.process_frame(ind,
-                                                                           curve)
-            self.frame_proced.emit(True, True)
+            try:
+                self.mbe, self.next_curve = self.process_backend.process_frame(
+                    ind, curve)
+                self.frame_proced.emit(True, True)
+            except Exception as e:
+                print e
+                print 'something is borked'
 
     def get_mbe(self):
         return self.mbe
@@ -223,6 +227,14 @@ If exceeded, the previous seed-curve is re-used"""}
 
     cap_lst = ['cine base path']
 
+    @QtCore.Slot()
+    def unlock_gui(self):
+        """
+        Forcable un-locks the gui
+        """
+        self.prog_bar.hide()
+        self.diag.setEnabled(True)
+
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
@@ -271,6 +283,7 @@ If exceeded, the previous seed-curve is re-used"""}
         self.kill_thread.connect(self.thread.quit)
 
         self.draw_done_sig.connect(self._play)
+        self.draw_done_sig.connect(self.unlock_gui)
 
         self.show()
         self.thread.start()
@@ -355,8 +368,6 @@ If exceeded, the previous seed-curve is re-used"""}
 
         self.canvas.draw()
         self.status_text.setNum(self.cur_frame)
-        self.prog_bar.hide()
-        self.diag.setEnabled(True)
         self.draw_done_sig.emit()
 
     def clear_mbe(self):
