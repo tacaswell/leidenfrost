@@ -20,12 +20,13 @@ import os.path
 import copy
 
 
-class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname'])):
+class FilePath(collections.namedtuple('FilePath',
+                                      ['base_path', 'path', 'fname'])):
     '''
     Class for carrying around path information in what seemed like a
-    convenient way when I wrote this.  The segmentation of the path into two parts
-    is to make dealing with data on multiple external hard drives easier.  The idea
-    is basically the same as chroot.
+    convenient way when I wrote this.  The segmentation of the path into
+    two parts is to make dealing with data on multiple external hard
+    drives easier.  The idea is basically the same as chroot.
     '''
     __slots__ = ()
 
@@ -39,7 +40,8 @@ class FilePath(collections.namedtuple('FilePath', ['base_path', 'path', 'fname']
     @classmethod
     def from_db_dict(cls, in_dict, disk_dict):
         """
-        Construct a FilePath object from a dict, converting the base_path with disk_dict
+        Construct a FilePath object from a dict, converting the base_path with
+        disk_dict
 
         Parameters
         ----------
@@ -66,4 +68,5 @@ def convert_base_path(in_file_path, disk_dict):
     disk_dict : dict
         Dict that maps old value of base_path -> new values of base_path
     '''
-    return in_file_path._replace(base_path=disk_dict.get(in_file_path.base_path, None))
+    return in_file_path._replace(
+        base_path=disk_dict.get(in_file_path.base_path, None))
