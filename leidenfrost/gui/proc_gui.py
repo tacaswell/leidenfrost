@@ -206,7 +206,8 @@ class LFGui(QtGui.QMainWindow):
          'prec': 3,
          'togglable': True,
          'default_state': True,
-         'tooltip': 'The maximum gap (in rad) before the alternate gap handling is used'},
+         'tooltip': 'The maximum gap (in rad) before the' +
+                      ' alternate gap handling is used'},
          {'name': 'max_circ_change',
           'min': 0,
           'max': 1,
@@ -216,14 +217,15 @@ class LFGui(QtGui.QMainWindow):
           'default': .002,
           'togglable': True,
           'default_state': True,
-          'tooltip': """The maximum fractional change in the circumference of successive rims.
-If exceeded, the previous seed-curve is re-used"""}
+          'tooltip': """The maximum fractional change in the circumference of
+successive rims.  If exceeded, the previous seed-curve is re-used"""}
     ]
 
     toggle_lst = [
         {'name': 'straddle',
          'default': True,
-         'tooltip': 'If checked, then tracks must cross the seed line to be valid'}]
+         'tooltip': 'If checked, then tracks must cross' +
+                     ' the seed line to be valid'}]
 
     cap_lst = ['cine base path']
 
@@ -246,7 +248,8 @@ If exceeded, the previous seed-curve is re-used"""}
         self.draw_fringes = False
 
         default_params = dict((d['name'], d['default']) for
-                              d in self.spinner_lst if 'default_state' not in d or d['default_state'])
+                              d in self.spinner_lst
+                              if 'default_state' not in d or d['default_state'])
         for tog in self.toggle_lst:
             default_params[tog['name']] = tog['default']
 
@@ -420,14 +423,16 @@ If exceeded, the previous seed-curve is re-used"""}
         self.diag.show()
 
     def start_comp(self):
-        self.worker.start_comp(self.cur_curve, self.output_template.path_template, self.cur_frame, self.i_disk_dict)
+        self.worker.start_comp(self.cur_curve,
+                               self.output_template.path_template,
+                               self.cur_frame, self.i_disk_dict)
 
     def open_file(self):
 
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,
-                                                     caption='Select cine',
-                                                     dir=self.paths_dict['cine base path'],
-                                                     filter="cine (*.cine)")
+                    caption='Select cine',
+                    dir=self.paths_dict['cine base path'],
+                    filter="cine (*.cine)")
         if len(fname) == 0:
             return
 
@@ -443,8 +448,12 @@ If exceeded, the previous seed-curve is re-used"""}
         tmp_params = self._get_cur_parametrs()
         self.diag.setEnabled(False)
 
-        path_, fname_ = os.path.split(fname[(len(self.paths_dict['cine base path']) + 1):])
-        new_cine_fname = backends.FilePath(self.paths_dict['cine base path'], path_, fname_)
+        path_, fname_ = os.path.split(
+            fname[(len(self.paths_dict['cine base path']) + 1):])
+
+        new_cine_fname = backends.FilePath(
+            self.paths_dict['cine base path'], path_, fname_)
+
         self.fname_text.setText('/'.join(new_cine_fname[1:]))
         self.clear_mbe()
         # reset spinners to default values
@@ -503,7 +512,9 @@ If exceeded, the previous seed-curve is re-used"""}
         fs_sb_rb = QtGui.QHBoxLayout()
         for j in [1, 10, 100, 1000, 10000]:
             tmp_rdo = QtGui.QRadioButton(str(j))
-            tmp_rdo.toggled.connect(lambda x, j=j: self.frame_spinner.setSingleStep(j) if x else None)
+            tmp_rdo.toggled.connect(lambda x, j=j:
+                                    self.frame_spinner.setSingleStep(j)
+                                    if x else None)
             fs_sb_rb.addWidget(tmp_rdo)
             if j == 1:
                 tmp_rdo.toggle()
@@ -608,7 +619,8 @@ If exceeded, the previous seed-curve is re-used"""}
         ptf_button.clicked.connect(self.proc_this_frame_acc.trigger)
         ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled())
         self.proc_this_frame_acc.changed.connect(
-            lambda: ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled()))
+            lambda: ptf_button.setEnabled(
+                self.proc_this_frame_acc.isEnabled()))
 
         fc_vboxes.addWidget(ptf_button)
 
@@ -617,7 +629,8 @@ If exceeded, the previous seed-curve is re-used"""}
         pnf_button.clicked.connect(self.proc_next_frame_acc.trigger)
         pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled())
         self.proc_next_frame_acc.changed.connect(
-            lambda: pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled()))
+            lambda: pnf_button.setEnabled(
+                self.proc_next_frame_acc.isEnabled()))
 
         fc_vboxes.addWidget(pnf_button)
 
@@ -656,7 +669,8 @@ If exceeded, the previous seed-curve is re-used"""}
 
         start_comp_bttn.setEnabled(self.start_comp_acc.isEnabled())
         self.start_comp_acc.changed.connect(
-            lambda: start_comp_bttn.setEnabled(self.start_comp_acc.isEnabled()))
+            lambda: start_comp_bttn.setEnabled(
+                self.start_comp_acc.isEnabled()))
 
         fc_vboxes.addWidget(start_comp_bttn)
         fc_vboxes.addStretch()
@@ -691,7 +705,8 @@ If exceeded, the previous seed-curve is re-used"""}
             ds = directory_selector(caption=c)
             paths_layout.addWidget(ds)
             self.directory_actions[c].triggered.connect(ds.select_path)
-            ds.selected.connect(lambda x, c=c: self.paths_dict.__setitem__(c, x))
+            ds.selected.connect(lambda x, c=c:
+                                self.paths_dict.__setitem__(c, x))
 
         self.disk_widget = numbered_paths(2, self)
         paths_layout.addWidget(self.disk_widget)
@@ -711,7 +726,9 @@ If exceeded, the previous seed-curve is re-used"""}
         self.fig = Figure((24, 24), tight_layout=True)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
-        self.axes = self.fig.add_subplot(111, adjustable='datalim', aspect='equal')
+        self.axes = self.fig.add_subplot(111,
+                                         adjustable='datalim',
+                                         aspect='equal')
         #      self.fig.tight_layout(.3, None, None, None)
         # Since we have only one plot, we can use add_axes
         # instead of add_subplot, but then the subplot
@@ -722,7 +739,7 @@ If exceeded, the previous seed-curve is re-used"""}
 
         #        tmp = self.worker.get_frame(self.cur_frame)
 
-        #        self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
+        #self.im = self.axes.imshow(tmp, cmap='gray', interpolation='nearest')
         #        self.axes.set_aspect('equal')
         #        self.im.set_clim([.5, 1.5])
 
@@ -730,7 +747,8 @@ If exceeded, the previous seed-curve is re-used"""}
         self.sf.disconnect_sf()
 
         #        self.axes.set_xlim(left=0)
-        #        self.axes.set_ylim(top=0)         # this is because images are plotted upside down
+        #self.axes.set_ylim(top=0)
+        # this is because images are plotted upside down
         # Create the navigation toolbar, tied to the canvas
         #
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
@@ -798,7 +816,8 @@ If exceeded, the previous seed-curve is re-used"""}
         self.status_text = QtGui.QLabel(str(self.cur_frame))
 
         self.fname_text = QtGui.QLabel('')
-        self.fname_text.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.fname_text.setTextInteractionFlags(
+            QtCore.Qt.TextSelectableByMouse)
         self.statusBar().addWidget(self.status_text)
         self.prog_bar = QtGui.QProgressBar()
         self.prog_bar.setRange(0, 0)
@@ -858,10 +877,11 @@ If exceeded, the previous seed-curve is re-used"""}
 
     @QtCore.Slot()
     def _play(self):
-        QtGui.qApp.processEvents()        # make sure all pending events are cleaned up
-                                          # if we don't do this, this
-                                          # gets hit before the button
-                                          # is marked as checked
+        QtGui.qApp.processEvents()        # make sure all pending
+                                          # events are cleaned up if we
+                                          # don't do this, this gets
+                                          # hit before the button is
+                                          # marked as checked
         if self.play_button.isChecked():
             QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)
 
