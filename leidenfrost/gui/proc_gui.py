@@ -31,7 +31,7 @@ from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as Naviga
 from matplotlib.figure import Figure
 
 from common import directory_selector, numbered_paths, base_path_path_selector
-
+from common import dict_display
 from collections import defaultdict
 
 import numpy as np
@@ -40,6 +40,7 @@ import leidenfrost
 import leidenfrost.infra as infra
 import leidenfrost.proc
 import leidenfrost.backends as backends
+import leidenfrost.db as ldb
 
 from IPython.parallel import Client
 
@@ -47,6 +48,7 @@ from IPython.parallel import Client
 class LFWorker(QtCore.QObject):
     frame_proced = QtCore.Signal(bool, bool)
     file_loaded = QtCore.Signal(bool, bool)
+    md_loadad = QtCore.Signal(dict)
 
     def __init__(self, parent=None):
         QtCore.QObject.__init__(self, parent)
@@ -55,6 +57,13 @@ class LFWorker(QtCore.QObject):
 
         self.mbe = None
         self.next_curve = None
+
+        self.db = None
+        try:
+            self.db = ldb.LFmongodb()
+        except Exception as e:
+            print e
+            print 'no database for you!'
 
     @QtCore.Slot(int, infra.SplineCurve)
     def proc_frame(self, ind, curve):
@@ -67,6 +76,28 @@ class LFWorker(QtCore.QObject):
             except Exception as e:
                 print e
                 print 'something is borked'
+                self.frame_proced.emit(False, False)
+
+    @QtCore.Slot()
+    def set_useful(self):
+        if self.db is not None and self.process_backend is not None:
+            self.db.set_cine_useful(self.process_backend.cine_.hash, True)
+            self.md_loadad.emit(self.get_cine_md())
+
+    @QtCore.Slot()
+    def set_useless(self):
+        if self.db is not None and self.process_backend is not None:
+            self.db.set_cine_useful(self.process_backend.cine_.hash, False)
+            self.md_loadad.emit(self.get_cine_md())
+
+    def get_cine_md(self):
+        if self.db is not None and self.process_backend is not None:
+            print 'trying to grab md'
+            md_dict = self.db.get_movie_md(self.process_backend.cine_.hash)
+            print 'trying to grabed md'
+            return md_dict
+        print 'md not attempted to grab from DB'
+        return {}
 
     def get_mbe(self):
         return self.mbe
@@ -103,6 +134,7 @@ class LFWorker(QtCore.QObject):
                                                                  bck_img=None,
                                                                  **params)
         self.file_loaded.emit(True, True)
+        self.md_loadad.emit(self.get_cine_md())
 
     def start_comp(self, seed_curve, name_template, cur_frame, disk_dict):
         # make the connection to the ether
@@ -249,7 +281,8 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""}
 
         default_params = dict((d['name'], d['default']) for
                               d in self.spinner_lst
-                              if 'default_state' not in d or d['default_state'])
+                              if ('default_state' not in d or
+                                    d['default_state']))
         for tog in self.toggle_lst:
             default_params[tog['name']] = tog['default']
 
@@ -531,6 +564,23 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""}
         play_button.setChecked(False)
         self.play_button.pressed.connect(self.frame_spinner.stepUp)
         diag_layout.addWidget(play_button)
+
+        meta_data_group = QtGui.QVBoxLayout()
+
+        useful_button = QtGui.QPushButton('useful')
+        useful_button.clicked.connect(self.worker.set_useful)
+        useless_button = QtGui.QPushButton('useless')
+        useless_button.clicked.connect(self.worker.set_useless)
+        use_level = QtGui.QHBoxLayout()
+        use_level.addWidget(useful_button)
+        use_level.addWidget(useless_button)
+        meta_data_group.addLayout(use_level)
+
+        md_dict_disp = dict_display('cine md')
+        self.worker.md_loadad.connect(md_dict_disp.update)
+        meta_data_group.addWidget(md_dict_disp)
+
+        diag_layout.addLayout(meta_data_group)
 
         # tool box for all the controls
         diag_tool_box = QtGui.QToolBox()

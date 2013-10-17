@@ -254,3 +254,46 @@ class md_state(QtGui.QWidget):
                 lab.setText('-')
             else:
                 lab.setText(str(v))
+
+
+class dict_display(QtGui.QGroupBox):
+    """
+    A generic widget for displaying dictionaries
+    """
+    def __init__(self, title, ignore_list=None, parent=None):
+        QtGui.QGroupBox.__init__(self, title, parent=parent)
+
+        self.full_layout = QtGui.QVBoxLayout()
+        self.setLayout(self.full_layout)
+        self._ignore = set(['_id', 'fpath'])
+        self._data_list = []
+        if ignore_list is not None:
+            self._ignore.update(ignore_list)
+
+    @QtCore.Slot(dict)
+    def update(self, in_dict):
+        """
+        updates the table
+
+        Parameters
+        ----------
+        in_dict : dict
+            The dictionary to display
+        """
+        # remove
+        print 'entered update'
+        for c in self._data_list:
+            c.deleteLater()
+
+        self._data_list = []
+
+        for k, v in sorted(list(in_dict.iteritems())):
+            if k not in self._ignore:
+                tmp = QtGui.QWidget(self)
+                tmp_l = QtGui.QHBoxLayout()
+                tmp.setLayout(tmp_l)
+                tmp_l.addWidget(QtGui.QLabel(k + ':'))
+                tmp_l.addStretch()
+                tmp_l.addWidget(QtGui.QLabel(str(v)))
+                self.full_layout.addWidget(tmp)
+                self._data_list.append(tmp)

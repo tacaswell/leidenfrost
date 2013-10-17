@@ -350,3 +350,20 @@ class LFmongodb(LFDbWrapper):
         dict : the full set of meta-data for the proc
         """
         return self.coll_dict['proc'].find_one({'_id': proc_id})
+
+    def set_cine_useful(self, cine_hash, state):
+        '''
+        sets the useful flag on a cine entry
+
+        Parameters
+        ----------
+        cine_hash : str
+            cine hash
+
+        state : bool
+            True if the movie is useful
+
+        '''
+        record = self.coll_dict['movs'].find_one({'cine': cine_hash})
+        record['useful'] = state
+        self.coll_dict['movs'].save(record)
