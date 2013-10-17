@@ -335,7 +335,8 @@ class LFReaderGui(QtGui.QMainWindow):
         for k, v in prams.iteritems():
             if k in ignore_lst:
                 continue
-            param_form_layout.addRow(QtGui.QLabel(k + ':'), QtGui.QLabel(str(v)))
+            param_form_layout.addRow(QtGui.QLabel(k + ':'),
+                                     QtGui.QLabel(str(v)))
 
         def print_parameters():
             '''
