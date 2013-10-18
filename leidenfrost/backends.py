@@ -55,7 +55,8 @@ class MultiHdfBackend(object):
 
         Parameters
         ----------
-
+        fname_list : list of tuples (FilePath, frame_in, frame_out)
+           data about the
         Returns
         -------
         """
@@ -114,14 +115,14 @@ class MultiHdfBackend(object):
 
     def next(self):
         self._iter_cur_item += 1
-        if self._iter_cur_item > self.last_frame:
+        if self._iter_cur_item >= self.last_frame:
             raise StopIteration
         else:
             return self.get_frame(self._iter_cur_item)
         pass
 
     def get_frame(self, j, *args, **kwargs):
-        if j < self.first_frame or j > self.last_frame:
+        if j < self.first_frame or j >= self.last_frame:
             raise ValueError("out of range")
         for hbe, _f, _l in izip(self._h5_backends,
                                 self._first_frames,
@@ -139,7 +140,7 @@ class MultiHdfBackend(object):
                 (key.start > 0 and key.start < self.first_frame)):
                 key = slice(self.first_frame, key.stop, key.step)
             return (self.get_frame(k)
-                    for k in xrange(*key.indices(self.last_frame+1)))
+                    for k in xrange(*key.indices(self.last_frame)))
 
         else:
             return self.get_frame(key)
@@ -251,8 +252,8 @@ class HdfBackend(object):
     @property
     def first_frame(self):
         if self._first_frame is None:
-            if 'frist_frame' in self.file.attrs:
-                self._first_frame = self.file.attrs['frist_frame']
+            if 'first_frame' in self.file.attrs:
+                self._first_frame = self.file.attrs['first_frame']
             else:
                 tmp = [k for k in self.file.keys() if 'frame' in k]
                 self._first_frame = parse.parse(self._frame_str,
@@ -262,12 +263,12 @@ class HdfBackend(object):
     @property
     def last_frame(self):
         if self._last_frame is None:
-            if 'frist_frame' in self.file.attrs:
-                self._last_frame = self.file.attrs['frist_frame']
+            if 'last_frame' in self.file.attrs:
+                self._last_frame = self.file.attrs['last_frame'] + 1
             else:
                 tmp = [parse.parse(self._frame_str, k)[0]
                        for k in self.file.keys() if 'frame' in k]
-                self._last_frame = max(tmp)
+                self._last_frame = max(tmp) + 1
         return self._last_frame
 
     @property
@@ -308,7 +309,7 @@ class HdfBackend(object):
         return self._frame_str.format(j) in self.file
 
     def __len__(self):
-        return self.last_frame - self.first_frame + 1
+        return self.last_frame - self.first_frame
 
     @property
     def calibration_value(self):
@@ -378,7 +379,7 @@ class HdfBackend(object):
 
     def next(self):
         self._iter_cur_item += 1
-        if self._iter_cur_item > self.last_frame:
+        if self._iter_cur_item >= self.last_frame:
             raise StopIteration
         else:
             return self.get_frame(self._iter_cur_item)
@@ -392,7 +393,7 @@ class HdfBackend(object):
                  (key.start > 0 and key.start < self.first_frame)):
                 key = slice(self.first_frame, key.stop, key.step)
             return (self.get_frame(k)
-                    for k in xrange(*key.indices(self.last_frame+1)))
+                    for k in xrange(*key.indices(self.last_frame)))
 
         else:
             return self.get_frame(key)
