@@ -154,7 +154,8 @@ class MultiHdfBackend(object):
                 key = slice(self.first_frame, key.stop, key.step)
             return (self.get_frame(k)
                     for k in xrange(*key.indices(self.last_frame)))
-
+        elif hasattr(key, '__iter__'):
+            return (self.get_frame(k) for k in key)
         else:
             return self.get_frame(key)
 
