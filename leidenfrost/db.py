@@ -23,6 +23,7 @@ import os.path
 import pymongo
 from pymongo import MongoClient
 import bson
+from leidenfrost import FilePath
 
 
 class BackImgClash(RuntimeError):
@@ -126,6 +127,7 @@ class LFmongodb(LFDbWrapper):
                }
 
     def __init__(self, host='10.8.0.1', port=27017, disk_dict=None,
+                 i_disk_dict=None,
                  *args, **kwargs):
         LFDbWrapper.__init__(self, *args, **kwargs)
         self.connection = MongoClient(host, port)
@@ -149,16 +151,28 @@ class LFmongodb(LFDbWrapper):
                          '/media/tcaswell/leidenfrost_d': 1,
                          '/media/leidenfrost_d': 1,
                          }
+        if i_disk_dict is None:
+            # hard code in my disks
+            i_disk_dict = {0: '/media/leidenfrost_a',
+                           1: '/media/leidenfrost_c'}
+
         self.disk_dict = disk_dict
-        self.i_disk_dict = {v: k for k, v in disk_dict.items()}
+        self.i_disk_dict = i_disk_dict
 
         pass
 
     def set_disk_dict(self, disk_dict):
         """
-        Sets the dictionaries used for translating disk number -> path
+        Sets the dictionary used for translating path -> disk number
 
         """
+        self.disk_dict = disk_dict
+
+    def set_number_dict(self, i_disk_dict):
+        """
+        sets the dicitonary used to translate disk number -> path
+        """
+        self.i_disk_dict = i_disk_dict
 
     def store_movie_md(self, cine, cine_path,
                        calibration_value, calibration_unit):
@@ -189,6 +203,8 @@ class LFmongodb(LFDbWrapper):
         tmp_dict['fpath'] = f_dict
         # save the frame rate
         tmp_dict['frame_rate'] = cine.frame_rate
+        # save the length
+        tmp_dict['frames'] = len(cine)
         # save the camera version
         tmp_dict['camera'] = cine.camera_version
         self.coll_dict['movs'].insert(tmp_dict)
@@ -320,7 +336,7 @@ class LFmongodb(LFDbWrapper):
 
     def get_proc_id(self, fname):
         """
-        Given a FilePath and a cinehash, figure out the proc's id
+        Given a FilePath figure out the proc's id
 
         Parameters
         ----------
@@ -332,9 +348,15 @@ class LFmongodb(LFDbWrapper):
         id : the _id of this proc in the database
 
         """
-        return self.coll_dict['proc'].find_one({'out_file.fname': fname.fname.strip('/'),
-                                                'out_file.path': fname.path.strip('/')}
-                                                )['_id']
+
+        res = self.coll_dict['proc'].find_one({'out_file.fname':
+                                                  fname.fname.strip('/'),
+                                                'out_file.path':
+                                                  fname.path.strip('/')}
+                                                )
+        if res is None:
+            return None
+        return res['_id']
 
     def get_proc_entry(self, proc_id):
         """
@@ -367,3 +389,25 @@ class LFmongodb(LFDbWrapper):
         record = self.coll_dict['movs'].find_one({'cine': cine_hash})
         record['useful'] = state
         self.coll_dict['movs'].save(record)
+
+    def get_h5_list(self, cine_hash):
+        """
+
+
+        Parameters
+        ----------
+        cine_hash : str
+           cine hash of interest
+
+        return
+        """
+        good_proc_cur = self.coll_dict['proc'].find({'cine': cine_hash,
+                                                     'useful': True})
+        if good_proc_cur.count() == 0:
+            return []
+
+        good_proc_cur.sort('start_time_stamp', pymongo.DESCENDING)
+        return [(FilePath.from_db_dict(cc['out_file'], self.i_disk_dict),
+                                      cc['in_frame'],
+                                      cc['out_frame'])
+            for cc in good_proc_cur]

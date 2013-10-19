@@ -484,16 +484,21 @@ class Region_map(object):
         except AssertionError:
             return False
         # test fringe rings
-        if not all(_fr1 == _fr2 for _fr1, _fr2 in izip(self.fringe_rings, other.fringe_rings)):
+        if not all(_fr1 == _fr2 for _fr1, _fr2 in
+                   izip(self.fringe_rings, other.fringe_rings)):
             return False
         # test region edges
-        if not all(_r1 == _r2 for _r1, _r2 in izip(self.region_edges, other.region_edges)):
+        if not all(_r1 == _r2 for _r1, _r2 in
+                   izip(self.region_edges, other.region_edges)):
             return False
         # don't bother to test the parameters
         return True
 
     @classmethod
-    def from_backend(cls, backend, mask_fun, n_frames=None, reclassify=False, N=2**12, **kwargs):
+    def from_backend(cls, backend, mask_fun,
+                     f_slice=None,
+                     reclassify=False,
+                     N=2**12, **kwargs):
         '''
         Constructor style class method
 
@@ -504,9 +509,8 @@ class Region_map(object):
         backend : HdfBackend
             Data source
 
-        n_frames : None or int
-            The number of frames to process
-            TODO: change this to a slice object
+        f_slice : None or slice
+            slice object setting which frames from the backend should be used
 
         reclassify : bool
             If the fringes should be reclassified
@@ -527,16 +531,17 @@ class Region_map(object):
         ret : Region_map
         '''
 
-        if n_frames is None:
-            n_frames = len(backend)
+        if f_slice is None:
+            f_slice = slice(None)
         img_bck_grnd_slices = []
         fringe_rings = []
-        for j in range(n_frames):
+        for j in xrange(*f_slice.indices(len(backend))):
             if j % 1000 == 0:
                 print j
-            mbe = backend.get_frame(j, img=True, raw=reclassify)
+            mbe = backend.get_frame(j, get_img=True, raw=reclassify)
 
-            fringe_rings.append(FringeRing.from_mbe(mbe, reclassify=reclassify))
+            fringe_rings.append(FringeRing.from_mbe(mbe,
+                                                    reclassify=reclassify))
             if reclassify:
                 curve = mbe.get_next_spline()
             if hasattr(mbe, 'next_curve') and mbe.next_curve is not None:
@@ -544,10 +549,9 @@ class Region_map(object):
             else:
                 curve = mbe.curve
             img = mbe.img
-
             # convert the curve to X,Y
             XY = np.vstack(curve.q_phi_to_xy(0,
-                                             np.linspace(0, 2 * np.pi, 2 ** 12)))
+                                             np.linspace(0, 2*np.pi, N)))
             # get center
             center = np.mean(XY, 1)
             # get relative position of first point
@@ -556,8 +560,9 @@ class Region_map(object):
             th_offset = np.arctan2(first_pt[1], first_pt[0])
 
             XY = np.vstack(curve.q_phi_to_xy(0,
-                                             -th_offset + np.linspace(0, 2 * np.pi, N)))
-            img_bck_grnd_slices.append(map_coordinates(img, XY[::-1], order=2).astype(np.float16))
+                        -th_offset + np.linspace(0, 2 * np.pi, N)))
+            img_bck_grnd_slices.append(
+                map_coordinates(img, XY[::-1], order=2).astype(np.float16))
 
         working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
@@ -566,9 +571,12 @@ class Region_map(object):
 
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
-                     size_cut=100, link_threshold=5, conflict_threshold=2, **kwargs):
+                     size_cut=100, link_threshold=5,
+                     conflict_threshold=2,
+                     **kwargs):
         '''
-        Generates a Region_map object from a kymograph and a set of fringe rings
+        Generates a Region_map object from a kymograph
+        and a set of fringe rings
 
         Parameters
         ----------
@@ -1148,7 +1156,7 @@ class Region_map(object):
         # generate X array via tricksy outer product
         X = (np.ones((1, rs_h_shape[0])) *
              (np.arange(*f_slice.indices(rs_h_shape[1])).reshape(-1, 1) *
-              (t_scale / h5_backend.cine.frame_rate))).T
+              (t_scale / h5_backend.frame_rate))).T
         if 'rasterized' not in kwargs:
             kwargs['rasterized'] = True
 

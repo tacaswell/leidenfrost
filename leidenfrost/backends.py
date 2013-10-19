@@ -42,6 +42,12 @@ from leidenfrost import FilePath
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
 
+def hdf_backend_factory(cine_hash):
+    local_db = db.LFmongodb()
+    h5_lst = local_db.get_h5_list(cine_hash)
+    return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path)
+
+
 class MultiHdfBackend(object):
     """
     A class to deal with hiding the fact that we have data spread across
@@ -56,32 +62,43 @@ class MultiHdfBackend(object):
         Parameters
         ----------
         fname_list : list of tuples (FilePath, frame_in, frame_out)
-           data about the
-        Returns
-        -------
+           data about the files to be open
+
         """
+        self.db = db.LFmongodb()  # hard code the mongodb
         self._cinehash = None
         self._h5_backends = []
 
-        for fn in fname_list:
+        for fn, frame_in, frame_out in fname_list:
             tmp_be = HdfBackend(fn, cine_base_path)
             if self._cinehash is None:
                 self._cinehash = tmp_be.cine.hash
             elif tmp_be.cine.hash != self._cinehash:
                 print "This list is inconsistent dropping "
                 print fn.format
-            self._h5_backends.append(tmp_be)
+                continue
+            if (frame_in < tmp_be.first_frame or
+                 frame_out > tmp_be.last_frame):
+                print ('frame in ({}) and frame out ({}) inconsisetn with' +
+                        'first ({}) and last ({}) frames').format(
+                            frame_in, frame_out,
+                            tmp_be.first_frame, tmp_be.last_frame)
+
+            self._h5_backends.append((tmp_be, frame_in, frame_out))
 
         # these are all really cine properties and all are from the same cine
         # so we can just look at the first one.
-        self.frame_rate = self._h5_backends[0].frame_rate
-        self.calibration_value = self._h5_backends[0].calibration_value
-        self.calibration_unit = self._h5_backends[0].calibration_unit
-        self.cine_len = self._h5_backends[0].cine_len
+        # TODO replace this with a db call
+        cine_md = self.db.get_movie_md(self._cinehash)
+        self.frame_rate = cine_md['frame_rate']
+        self.calibration_value = cine_md['cal_val']
+        self.calibration_unit = cine_md['cal_unit']
+        self.cine_len = cine_md['frames']
 
         # sort out first and last frame
-        first_frames = [hbe.first_frame for hbe in self._h5_backends]
-        last_frames = [hbe.last_frame for hbe in self._h5_backends]
+        first_frames, last_frames = zip(*[(in_f, out_f)
+                                          for hbe, in_f, out_f
+                                          in self._h5_backends])
 
         tmp_flags = np.ones(self.cine_len, dtype='bool')
         for _f, _l in izip(first_frames, last_frames):
@@ -91,21 +108,19 @@ class MultiHdfBackend(object):
         self.first_frame = runs[idx]
         self.last_frame = runs[idx + 1]
 
-        self._first_frames = first_frames
-        self._last_frames = last_frames
         pass
 
     def __len__(self):
-        return self.last_frame - self.first_frame + 1
+        return self.last_frame - self.first_frame
 
     @property
     def prams(self):
         # should make this more clever
-        return self._h5_backends[0].prams
+        return self._h5_backends[0][0].prams
 
     @prams.setter
     def prams(self, prams):
-        for hbe in self._h5_backends:
+        for hbe, _, __ in self._h5_backends:
             hbe.prams = prams
         pass
 
@@ -124,9 +139,7 @@ class MultiHdfBackend(object):
     def get_frame(self, j, *args, **kwargs):
         if j < self.first_frame or j >= self.last_frame:
             raise ValueError("out of range")
-        for hbe, _f, _l in izip(self._h5_backends,
-                                self._first_frames,
-                                self._last_frames):
+        for hbe, _f, _l in self._h5_backends:
             if j >= _f and j <= _l:
                 return hbe.get_frame(j, *args, **kwargs)
         pass
@@ -337,7 +350,7 @@ class HdfBackend(object):
             print 'removing ' + '/'.join(f)
             os.remove('/'.join(f))
 
-    def get_frame(self, frame_num, raw=None, get_img=None, *args, **kwargs):
+    def get_frame(self, frame_num, raw=None, get_img=None):
         trk_lst = None
         img = None
         g = self.file[self._frame_str.format(frame_num)]
@@ -682,6 +695,7 @@ class MemBackendFrame(object):
         x, y = self.curve.q_phi_to_xy(t_q, t_phi, cross=False)
 
         if max_gap is not None:
+            # add code to shift by center shift
             if fill_density is None:
                 fill_density = 3 / max_gap
             # check for gaps
