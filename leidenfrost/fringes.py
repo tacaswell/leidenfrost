@@ -1142,18 +1142,11 @@ class Region_map(object):
         if f_slice is None:
             f_slice = slice(None)
 
-        if len(h5_backend) > rs_h_shape[1]:
-            f_slice = slice(f_slice.start,
-                            min([_f for _f in
-                                 [rs_h_shape[1], f_slice.stop]
-                                 if _f is not None]),
-                            f_slice.step)
-
         # make sure we don't load stuff we don't need
         h5_backend.prams = (False, False)
         # get the cumulative lengths
         Y = np.vstack([mbe.curve.cum_length(rs_h_shape[0])
-                       for mbe in h5_backend[f_slice]]).T
+                       for mbe in h5_backend[self.frame_indx[f_slice]]]).T
         # shift
         Y -= np.mean(Y, axis=0)
         # scale
@@ -1166,8 +1159,12 @@ class Region_map(object):
             kwargs['rasterized'] = True
 
         # create pcolormesh
-        pm = ax.pcolormesh(X, Y, self.resampled_height[:, f_slice] * h_scale, **kwargs)
-        pm.set_clim(np.array([-np.nanmax(self.height_map), -np.nanmin(self.height_map)]) * h_scale)
+        pm = ax.pcolormesh(X,
+                           Y,
+                           self.resampled_height[:, self.frame_indx[f_slice]] * h_scale,
+                           **kwargs)
+        pm.set_clim(np.array([-np.nanmax(self.height_map),
+                              -np.nanmin(self.height_map)]) * h_scale)
         # force re-draw
         ax.figure.canvas.draw()
         return pm
