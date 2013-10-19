@@ -481,6 +481,7 @@ class Region_map(object):
             np.testing.assert_equal(self.label_img, other.label_img)
             np.testing.assert_equal(self.height_map, other.height_map)
             np.testing.assert_equal(self.working_img, other.working_img)
+            np.testing.assert_equal(self.frame_index, other.frame_index)
         except AssertionError:
             return False
         # test fringe rings
@@ -567,12 +568,13 @@ class Region_map(object):
         working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
         return cls.from_working_img(working_img, fringe_rings, mask_fun,
+                                    frame_indx=np.arange(*f_slice.indices(len(backend))),
                                     **kwargs)
 
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
                      size_cut=100, link_threshold=5,
-                     conflict_threshold=2,
+                     conflict_threshold=2, frame_indx=None,
                      **kwargs):
         '''
         Generates a Region_map object from a kymograph
@@ -616,6 +618,8 @@ class Region_map(object):
         ret : Region_map
 
         '''
+        if frame_indx is None:
+            frame_indx = np.arange(working_img.shape[1])
         up_mask_dt, down_mask_dt = mask_fun(working_img, thresh)
 
         lab_bright_regions, nb_br = _label_regions(up_mask_dt,
@@ -651,19 +655,20 @@ class Region_map(object):
         height_map, set_by, fails = _boot_strap(N, fringe_rings, link_threshold,
                                                 conflict_threshold=conflict_threshold)
         RM = cls(fringe_rings, region_edges, working_img, height_map,
-                   thresh=thresh, size_cut=size_cut,
+                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx
                    **kwargs)
         # stash diagnostics about boot strapping
         RM._set_by = set_by
         RM._fails = fails
         return RM
 
-    def __init__(self, fringe_rings, region_edges, working_img, height_map,
+    def __init__(self, fringe_rings, region_edges, working_img, height_map, frame_indx,
                  **kwargs):
         self.fringe_rings = fringe_rings      # fringes group by a per-time basis
         self.region_edges = region_edges      # edges of the regions on a per-time basis
         self.working_img = working_img        # the raw image not sure why we are carrying this around)
         self.height_map = height_map          # the mapping between regions and heights
+        self.frame_indx = frame_indx          # maps the columns of working_img to frames
 
         self._height_img = None           # image of the heights
         self._label_img = None            # image of the labeled regions
@@ -1205,6 +1210,8 @@ class Region_map(object):
                                   self.working_img.dtype,
                                   compression='szip')
             h5file['working_img'][:] = self.working_img
+            # the frame index
+            h5File.create_dataset('frame_indx', data=self.frame_indx)
             # the mapping of region number to bootstrapped height
             h5file.create_dataset('height_map',
                                   self.height_map.shape,
@@ -1256,6 +1263,10 @@ class Region_map(object):
         working_img = h5file['working_img'][:]
         # get the height map
         height_map = h5file['height_map'][:]
+        if 'frame_indx' in h5file:
+            frame_indx = h5File['frame_indx'][:]
+        else:
+            frame_indx = np.arange(working_img.shape[1])
         # pull out the edges of the regions
         re_grp = h5file['region_edges']
         print 'starting region edges'
@@ -1290,11 +1301,10 @@ class Region_map(object):
                             fringe_starts, fringe_labels, fringe_ends,
                             working_img.shape[0])
 
-
         params = dict(h5file['params'].attrs)
 
         return cls(fringe_rings, region_edges, working_img,
-                   height_map, **params)
+                   height_map, frame_indx, **params)
 
     def get_frame_profile(self, j):
         '''
