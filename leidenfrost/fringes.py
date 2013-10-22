@@ -36,8 +36,6 @@ import heapq
 
 import networkx
 
-from leidenfrost.backends import HdfBEPram
-
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
 fringe_loc = namedtuple('fringe_loc', ['q', 'phi'])
 
@@ -166,7 +164,7 @@ def latex_print_pairs():
     format_dicts = [color_format_dict, charge_format_dict, hint_format_dict]
     fringe_smy_fmt_str = r'{{\color{{{0}}}{1}_{{{2}}}}}^{{{{\color{{red}}{3}}}}}'
     format_fringe = lambda x: fringe_smy_fmt_str.format(*([_f[_v] for _f, _v in
-                                                        zip(format_dicts, x)] + [fringe_type_dict[x]]))
+            zip(format_dicts, x)] + [fringe_type_dict[x]]))
 
     key_lst = []
     res_lst = []
@@ -185,11 +183,16 @@ def latex_print_pairs():
         res_lst.append(res1 + res2 + res3)
         ft_fmt = '({0}, \quad{1},\quad {2})'.format(*ft)
         print ft_fmt
-        key = r'{{\color{{red}}{0}}}&{{\color{{DodgerBlue2}}{1} }}: &{2}'.format(j, ft_fmt, format_fringe(ft))
+        key = r'{{\color{{red}}{0}}}&{{\color{{DodgerBlue2}}{1} }}: &{2}'.format(
+            j, ft_fmt, format_fringe(ft))
         key_lst.append(key)
 
-    return ('\\begin{eqnarray*}\n' + '\\\\\n'.join(key_lst) + '\n\end{eqnarray*}',
-            '\\begin{eqnarray*}\n' + '\\\\\n'.join(res_lst) + '\n\end{eqnarray*}')
+    return (('\\begin{eqnarray*}\n' +
+             '\\\\\n'.join(key_lst) +
+             '\n\end{eqnarray*}'),
+            ('\\begin{eqnarray*}\n' +
+             '\\\\\n'.join(res_lst) +
+             '\n\end{eqnarray*}'))
 
 
 ### iterator toys
@@ -223,7 +226,8 @@ class Fringe(object):
         self._rdh = None
 
         self.region = 0     #: region of the khymograph
-        self.abs_height = None   #: the height of this fringe as given by tracking in time
+        self.abs_height = None   #: the height of this fringe as given
+                                 #by tracking in time
 
     def __eq__(self, other):
         # test the object like things
@@ -325,7 +329,8 @@ class Fringe(object):
             if other is None:
                 self._rdh = np.nan
             elif other.valid_follower(self):
-                # need the negative, as we want the step from this one _to_ that one
+                # need the negative, as we want the step from this one
+                # _to_ that one
                 self._rdh = -forward_dh_dict[(other.f_class, self.f_class)]
             else:
                 self._rdh = np.nan
@@ -355,7 +360,8 @@ class FringeRing(object):
 
     def __init__(self, frame_number, f_classes, f_locs):
         self.frame_number = frame_number
-        self.fringes = [Fringe(fcls, floc, frame_number) for fcls, floc in izip(f_classes, f_locs)]
+        self.fringes = [Fringe(fcls, floc, frame_number)
+                        for fcls, floc in izip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
 
     def link_fringes(self, region_starts, region_labels, region_ends,
@@ -383,7 +389,8 @@ class FringeRing(object):
 
         '''
         # figure out which bin each fringe goes into just once
-        scaled_fringe_loc = [int((np.mod(_fr.phi, length)/(length)) * N_samples)
+        scaled_fringe_loc = [int((np.mod(_fr.phi,
+                                         length)/(length)) * N_samples)
                              for _fr in self.fringes]
         bins = [_bin_region(_n, region_starts, region_ends) for
                 _n in scaled_fringe_loc]
@@ -425,7 +432,8 @@ class FringeRing(object):
     def __eq__(self, other):
         if self.frame_number != other.frame_number:
             return False
-        return all(_f1 == _f2 for _f1, _f2 in izip(self.fringes, other.fringes))
+        return all(_f1 == _f2 for _f1, _f2
+                   in izip(self.fringes, other.fringes))
 
 
 def _get_fc_lists(mbe, reclassify):
@@ -458,17 +466,22 @@ def _get_fc_lists(mbe, reclassify):
             for t in trk_lst:
                 t.classify2()
                 if t.charge is not None:
-                    f_locs.append(fringe_loc(t.q, np.mod(t.phi + th_offset, 2 * np.pi)))
+                    f_locs.append(fringe_loc(t.q,
+                                             np.mod(t.phi + th_offset,
+                                                    2 * np.pi)))
                     f_classes.append(fringe_cls(color, t.charge, 0))
                 else:
                     junk_fringes.append(t)
     else:
         for res_lst, color in izip(mbe.res, colors):
             for charge, phi, q in izip(*res_lst):
-                f_locs.append(fringe_loc(q, np.mod(phi + th_offset, 2 * np.pi)))
+                f_locs.append(fringe_loc(q,
+                                         np.mod(phi + th_offset,
+                                                2 * np.pi)))
                 f_classes.append(fringe_cls(color, charge, 0))
 
-    f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs), key=lambda x: x[1][1]))
+    f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs),
+                                    key=lambda x: x[1][1]))
     # TODO: deal with junk fringes in sensible way
 
     return list(f_classes), list(f_locs)
@@ -567,9 +580,9 @@ class Region_map(object):
 
         working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
-        return cls.from_working_img(working_img, fringe_rings, mask_fun,
-                                    frame_indx=np.arange(*f_slice.indices(len(backend))),
-                                    **kwargs)
+        return cls.from_working_img(
+            working_img, fringe_rings, mask_fun,
+            frame_indx=np.arange(*f_slice.indices(len(backend))), **kwargs)
 
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
@@ -755,7 +768,8 @@ class Region_map(object):
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
-        ax.format_coord = self.format_factory(yscale=2*np.pi / self.working_img.shape[0])
+        ax.format_coord = self.format_factory(
+            yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
     def display_all_regions(self, ax=None, cmap='jet',
@@ -785,7 +799,8 @@ class Region_map(object):
                   origin='bottom',
                   )
         im.set_clim([1, len(self.height_map)])
-        ax.format_coord = self.format_factory(yscale=2*np.pi / self.working_img.shape[0])
+        ax.format_coord = self.format_factory(
+            yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
     def reconstruct_height_img(self):
@@ -843,14 +858,17 @@ class Region_map(object):
         image_edges = _segment_fringes(self.working_img[:, frame_num])
 
         # set up working data
-        work_data = [local_tuple([], []) for k in xrange(len(image_edges.labels))]
-        work_height_map = np.ones(len(image_edges.labels), dtype=np.float) * np.nan
+        work_data = [local_tuple([], [])
+                     for k in xrange(len(image_edges.labels))]
+        work_height_map = np.ones(len(image_edges.labels),
+                                  dtype=np.float) * np.nan
         fail_flags = np.zeros(len(image_edges.labels), dtype=np.bool)
 
         N_samples = self.working_img.shape[0]
         for _fr in FR:
             # figure out which image region the fringe falls into
-            _bin = _bin_region(int((np.mod(_fr.phi, length)/(length)) * N_samples),
+            _bin = _bin_region(int((np.mod(_fr.phi,
+                                           length)/(length)) * N_samples),
                                image_edges.starts,
                                image_edges.ends)
             # if it falls in a bin, add it to the working list
@@ -882,8 +900,8 @@ class Region_map(object):
                 # use the end
                 work_data[_bin_end].regions.append(rl)
             else:
-                # this means that the region spans two image regions, don't like this
-                # mark both image regions as bad
+                # this means that the region spans two image regions,
+                # don't like this mark both image regions as bad
                 fail_flags[_bin_end] = True
                 fail_flags[_bin_start] = True
 
@@ -896,10 +914,12 @@ class Region_map(object):
             # if we have more than 0 region in this image region
             if len(wd.regions) > 0:
                 # get the non-nan height
-                heights = [self.height_map[r] for r in wd.regions if ~np.isnan(self.height_map[r])]
+                heights = [self.height_map[r] for r in wd.regions
+                           if ~np.isnan(self.height_map[r])]
                 if len(heights) > 0:
                     trial_height = heights[0]
-                    if not __builtin__.all(trial_height == h for h in heights[1:]):
+                    if not __builtin__.all(trial_height == h
+                                           for h in heights[1:]):
                         # not all the same
                         trial_height = np.nan
 
@@ -915,21 +935,29 @@ class Region_map(object):
         work_list = deque()
         # find fringes with labeled heights and with neightbors
         for _f in FR:
-            # if the region has a height, and the fringe has unlabeled neighbors
-            if ~np.isnan(_f.abs_height) and ((_f.next_P is not None and np.isnan(_f.next_P.abs_height)) or
-                    (_f.prev_P is not None and np.isnan(_f.prev_P.abs_height))):
+            # if the region has a height, and the fringe has unlabeled
+            # neighbors
+            if (~np.isnan(_f.abs_height) and
+                ((_f.next_P is not None and np.isnan(_f.next_P.abs_height)) or
+                    (_f.prev_P is not None and
+                     np.isnan(_f.prev_P.abs_height)))):
                 work_list.append(_f)
 
         while len(work_list) > 0:
             # grab a fringe to work on
             cur = work_list.pop()
-            assert ~np.isnan(cur.abs_height), (cur.abs_height, cur.forward_dh, cur.reverse_dh)
-            # has foward link, the forward fringe is un-heighted and the forward step is valid
-            if cur.next_P is not None and np.isnan(cur.next_P.abs_height) and ~np.isnan(cur.forward_dh):
+            assert ~np.isnan(cur.abs_height), (cur.abs_height,
+                                               cur.forward_dh,
+                                               cur.reverse_dh)
+            # has foward link, the forward fringe is un-heighted and
+            # the forward step is valid
+            if (cur.next_P is not None and np.isnan(cur.next_P.abs_height) and
+                  ~np.isnan(cur.forward_dh)):
                 cur.next_P.abs_height = cur.abs_height + cur.forward_dh
                 work_list.append(cur.next_P)
             # same for reverse
-            if cur.prev_P is not None and np.isnan(cur.prev_P.abs_height) and ~np.isnan(cur.reverse_dh):
+            if (cur.prev_P is not None and np.isnan(cur.prev_P.abs_height) and
+                  ~np.isnan(cur.reverse_dh)):
                 cur.prev_P.abs_height = cur.abs_height + cur.reverse_dh
                 work_list.append(cur.prev_P)
 
@@ -941,7 +969,8 @@ class Region_map(object):
             if ~np.isnan(work_height_map[j]):
                 continue
             # did any of the fringes picked up a height
-            heights = [_fr.abs_height for _fr in wd.fringes if ~np.isnan(_fr.abs_height)]
+            heights = [_fr.abs_height for _fr in wd.fringes
+                       if ~np.isnan(_fr.abs_height)]
             if len(heights) > 0:
                 trial_height = heights[0]
                 if __builtin__.all((trial_height == h for h in heights[1:])):
@@ -967,7 +996,8 @@ class Region_map(object):
 
                 cent = ir_s_L + ((N_samples - ir_s_L) + ir_e_f)/2
                 if cent < N_samples:
-                    post_list = [[2 * np.pi * cent / N_samples], [work_height_map[0]]]
+                    post_list = [[2 * np.pi * cent / N_samples],
+                                 [work_height_map[0]]]
                 else:
                     cent = cent - N_samples
                     phi.append(2*np.pi * cent / N_samples)
@@ -975,14 +1005,16 @@ class Region_map(object):
         # non-wrapped around region
         else:
             if not np.isnan(work_height_map[-1]):
-                post_list = [[np.pi * (ir_s_L + ir_e_L) / N_samples], [work_height_map[-1]]]
+                post_list = [[np.pi * (ir_s_L + ir_e_L) / N_samples],
+                             [work_height_map[-1]]]
             if not np.isnan(work_height_map[0]):
                 phi.append(np.pi * (ir_s_f + ir_e_f) / N_samples)
                 h.append(work_height_map[0])
         # deal with middle region
         # note, 2s cancel
         _phi, _h = zip(*[(np.pi * (ir_s + ir_e) / (N_samples), _h)
-                       for (ir_s, ir_l, ir_e), _h in zip(izip(*image_edges), work_height_map)[1:-1]
+                       for (ir_s, ir_l, ir_e), _h in zip(izip(*image_edges),
+                                                         work_height_map)[1:-1]
                         if ~np.isnan(_h)])
         phi.extend(_phi)
         h.extend(_h)
@@ -990,15 +1022,11 @@ class Region_map(object):
             phi.extend(post_list[0])
             h.extend(post_list[1])
 
-        ## phi, h = zip(*[(np.pi * (ir_s + ir_e) /( N_samples), _h)
-        ##                 for (ir_s, ir_l, ir_e), _h in izip(izip(*image_edges), work_height_map)
-        ##                  if ~np.isnan(_h)])
-
         return phi, h
 
     def resample_height(self,
                         N=1024,
-                        intep_func=scipy.interpolate.InterpolatedUnivariateSpline,
+                        intep_func=None,
                         min_range=0,
                         max_range=2*np.pi):
         '''
@@ -1023,10 +1051,14 @@ class Region_map(object):
         img : np.ndarray
             Re-sampled image
         '''
+        if intep_func is None:
+            intep_func = scipy.interpolate.InterpolatedUnivariateSpline
+            #intep_func =
         tmp = []
         for j in xrange(len(self)):
             phi, h = self._frame_fringe_positions(j)
-            phi_new, h_new = _height_interpolate(phi, h, N, min_range, max_range, intep_func=intep_func)
+            phi_new, h_new = _height_interpolate(
+                phi, h, N, min_range, max_range, intep_func=intep_func)
             tmp.append(-h_new)
 
         self._resampled_height = np.vstack(tmp).T
@@ -1173,10 +1205,10 @@ class Region_map(object):
             kwargs['rasterized'] = True
 
         # create pcolormesh
-        pm = ax.pcolormesh(X,
-                           Y,
-                           self.resampled_height[:, self.frame_indx[f_slice]] * h_scale,
-                           **kwargs)
+        pm = ax.pcolormesh(
+            X, Y,
+            self.resampled_height[:, self.frame_indx[f_slice]] * h_scale,
+            **kwargs)
         pm.set_clim(np.array([-np.nanmax(self.height_map),
                               -np.nanmin(self.height_map)]) * h_scale)
         # force re-draw
@@ -1222,7 +1254,7 @@ class Region_map(object):
                                   compression='szip')
             h5file['working_img'][:] = self.working_img
             # the frame index
-            h5File.create_dataset('frame_indx', data=self.frame_indx)
+            h5file.create_dataset('frame_indx', data=self.frame_indx)
             # the mapping of region number to bootstrapped height
             h5file.create_dataset('height_map',
                                   self.height_map.shape,
@@ -1275,7 +1307,7 @@ class Region_map(object):
         # get the height map
         height_map = h5file['height_map'][:]
         if 'frame_indx' in h5file:
-            frame_indx = h5File['frame_indx'][:]
+            frame_indx = h5file['frame_indx'][:]
         else:
             frame_indx = np.arange(working_img.shape[1])
         # pull out the edges of the regions
@@ -1307,7 +1339,8 @@ class Region_map(object):
                  region_ends),
                 (fringe_starts,
                  fringe_labels,
-                 fringe_ends)) in izip(fringe_rings, region_edges, fringe_edges):
+                 fringe_ends)) in izip(
+                     fringe_rings, region_edges, fringe_edges):
             FR.link_fringes(region_starts, region_labels, region_ends,
                             fringe_starts, fringe_labels, fringe_ends,
                             working_img.shape[0])
@@ -1393,13 +1426,17 @@ class Region_map(object):
                 else:
                     region = 0
 
-                return "x:{x}({col}), y:{y}({row}), r:{reg}, h:{h}, I:{I}".format(x=col * xscale,
-                                                             y=row * yscale,
-                                                             reg=region,
-                                                    h=self.height_map[region],
-                                                    I=self.working_img[row, col],
-                                                    row=row,
-                                                    col=col)
+                return ("x:{x}({col}), " +
+                        "y:{y}({row}), " +
+                        "r:{reg}, " +
+                        "h:{h}, " +
+                        "I:{I}").format(x=col * xscale,
+                                        y=row * yscale,
+                                        reg=region,
+                                        h=self.height_map[region],
+                                        I=self.working_img[row, col],
+                                        row=row,
+                                        col=col)
             else:
                 return 'x=%1.4f, y=%1.4f' % (x, y)
         return format_coord
@@ -1407,7 +1444,8 @@ class Region_map(object):
 
 def _segment_labels(region_list, zero_thresh=2):
     '''
-    Segments the regions.  Returns list of where contiguous regions begin and end
+    Segments the regions.  Returns list of where contiguous regions begin
+    and end
 
     parameters
     ----------
@@ -1469,10 +1507,13 @@ def _segment_fringes(image_slice, thresh=.1, filter_width=3):
     filter_width : int
         width of maximum filter applied to thresholded lines
     """
-    dark = scipy.ndimage.filters.maximum_filter1d(image_slice < 1 - thresh, filter_width, mode='wrap')
-    light = scipy.ndimage.filters.maximum_filter1d(image_slice > 1 + thresh, filter_width, mode='wrap')
-    # this implements the xor logic, if both are true -> sums to 0, if neither are true stays 0,
-    # if only dark is true -> -1, if only light is true -> 1
+    dark = scipy.ndimage.filters.maximum_filter1d(image_slice < 1 - thresh,
+                                                  filter_width, mode='wrap')
+    light = scipy.ndimage.filters.maximum_filter1d(image_slice > 1 + thresh,
+                                                   filter_width, mode='wrap')
+    # this implements the xor logic, if both are true -> sums to 0, if
+    # neither are true stays 0, if only dark is true -> -1, if only
+    # light is true -> 1
     return _segment_labels(-1 * dark + light)
     ## tmp_xor = np.logical_xor(dark, light)
 
@@ -1773,8 +1814,9 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
     valid_connections = [{} for j in range(N)]
     conflict_flags = np.zeros((N,), dtype=np.uint32)
     # zip together the forward and backwards linking
-    for i, (forward_d, backward_d) in enumerate(izip(_connection_network_Nstep(N, FRs, 'f'),
-                                                     _connection_network_Nstep(N, FRs, 'r'))):
+    for i, (forward_d, backward_d) in enumerate(
+            izip(_connection_network_Nstep(N, FRs, 'f'),
+                  _connection_network_Nstep(N, FRs, 'r'))):
 
         tmp_dict = valid_connections[i]
 
@@ -1786,10 +1828,11 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
             dh = _dict_to_dh_Nstep(link_dict, threshold=connection_threshold)
             if dh is not None:
                 if dest_region in tmp_dict and tmp_dict[dest_region] != dh:
-                    print 'conflict from:{} to:{} old_dh:{} new_dh:{}'.format(i, dest_region, tmp_dict[dest_region], dh)
-                    # if we have inconsistent linking (between forward and backwards), throw
-                    # everything out
-                    # this happens
+                    print 'conflict from:{} to:{} old_dh:{} new_dh:{}'.format(
+                        i, dest_region, tmp_dict[dest_region], dh)
+                    # if we have inconsistent linking (between forward
+                    # and backwards), throw everything out this
+                    # happens
                     del tmp_dict[dest_region]
                     conflict_flags[dest_region] += 1
                     conflict_flags[i] += 1
@@ -1844,8 +1887,11 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
             set_by[b] = a
         else:
             if height_map[b] != prop_height:
-                print "from {}({}) to {}({}) proposed delta: {} current delta: {}".format(
-                    a, height_map[a], b, height_map[b], valid_connections[a][b], height_map[b] - height_map[a])
+                print ("from {}({}) to {}({}) proposed delta:" +
+                       " {} current delta: {}").format(
+                    a, height_map[a], b, height_map[b],
+                    valid_connections[a][b],
+                    height_map[b] - height_map[a])
                 fails.append((a, b))
 
     return height_map, set_by, fails
