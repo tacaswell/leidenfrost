@@ -646,34 +646,48 @@ class Region_map(object):
                  region_ends),
                 (fringe_starts,
                  fringe_labels,
-                 fringe_ends)) in izip(fringe_rings, region_edges, fringe_edges):
+                 fringe_ends)) in izip(fringe_rings,
+                                       region_edges,
+                                       fringe_edges):
             FR.link_fringes(region_starts, region_labels, region_ends,
                             fringe_starts, fringe_labels, fringe_ends,
                             working_img.shape[0])
 
         # boot strap up the heights
-        height_map, set_by, fails = _boot_strap(N, fringe_rings, link_threshold,
-                                                conflict_threshold=conflict_threshold)
+        height_map, set_by, fails = _boot_strap(N,
+                                        fringe_rings,
+                                        link_threshold,
+                                        conflict_threshold=conflict_threshold)
         RM = cls(fringe_rings, region_edges, working_img, height_map,
-                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx
+                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,
                    **kwargs)
         # stash diagnostics about boot strapping
         RM._set_by = set_by
         RM._fails = fails
         return RM
 
-    def __init__(self, fringe_rings, region_edges, working_img, height_map, frame_indx,
+    def __init__(self, fringe_rings, region_edges, working_img,
+                 height_map, frame_indx,
                  **kwargs):
-        self.fringe_rings = fringe_rings      # fringes group by a per-time basis
-        self.region_edges = region_edges      # edges of the regions on a per-time basis
-        self.working_img = working_img        # the raw image not sure why we are carrying this around)
-        self.height_map = height_map          # the mapping between regions and heights
-        self.frame_indx = frame_indx          # maps the columns of working_img to frames
+        # fringes group by a per-time basis
+        self.fringe_rings = fringe_rings
+        # edges of the regions on a per-time basis
+        self.region_edges = region_edges
+        # the raw image not sure why we are carrying this around)
+        self.working_img = working_img
+        # the mapping between regions and heights
+        self.height_map = height_map
+        # maps the columns of working_img to frames
+        self.frame_indx = frame_indx
 
-        self._height_img = None           # image of the heights
-        self._label_img = None            # image of the labeled regions
-        self._resampled_height = None     # re-sampled height image
-        self.params = kwargs              # dict to hold parameters
+        # image of the heights
+        self._height_img = None
+        # image of the labeled regions
+        self._label_img = None
+        # re-sampled height image
+        self._resampled_height = None
+        # dict to hold parameters
+        self.params = kwargs
         pass
 
     def __len__(self):
