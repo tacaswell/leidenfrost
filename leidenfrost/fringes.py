@@ -1891,8 +1891,12 @@ def filter_fun(working_img, thresh, struct=None):
         struct = [[1, 1, 1]]
         #    struct = np.ones((3, 3))
 
-    up_mask = ndi.binary_dilation(working_img > 1 + thresh, structure=struct, iterations=1)
-    down_mask = ndi.binary_dilation(working_img < 1 - thresh, structure=struct, iterations=1)
+    up_mask = ndi.binary_dilation(working_img > 1 + thresh,
+                                  structure=struct,
+                                  iterations=1)
+    down_mask = ndi.binary_dilation(working_img < 1 - thresh,
+                                    structure=struct,
+                                    iterations=1)
 
     up_mask_dt = np.logical_and(up_mask, ~down_mask)
     down_mask_dt = np.logical_and(down_mask, ~up_mask)
@@ -1907,7 +1911,13 @@ def filter_fun_orig(working_img, thresh, struct=None):
         struct = [[1, 1, 1]]
         #    struct = np.ones((3, 3))
 
-    up_mask = ndi.binary_erosion(working_img > 1 + thresh, structure=struct, iterations=1, border_value=1)
-    down_mask = ndi.binary_erosion(working_img < 1 - thresh, structure=struct, iterations=1, border_value=1)
+    up_mask = ndi.binary_erosion(working_img > 1 + thresh,
+                                 structure=struct,
+                                 iterations=1,
+                                 border_value=1)
+    down_mask = ndi.binary_erosion(working_img < 1 - thresh,
+                                   structure=struct,
+                                   iterations=1,
+                                   border_value=1)
 
     return up_mask, down_mask
