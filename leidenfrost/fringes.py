@@ -1093,7 +1093,7 @@ class Region_map(object):
                            range(len(self)))
         intp_obj = intep_func(np.vstack((phi_accum, tau_accum)).T,
                               h_accum)
-        self._resampled_height = intp_obj(
+        self._resampled_height = -intp_obj(
             np.vstack((X.ravel(), Y.ravel())).T).reshape(X.shape).T
 
         return self._resampled_height
