@@ -1052,8 +1052,8 @@ class Region_map(object):
             Re-sampled image
         '''
         if intep_func is None:
-            intep_func = scipy.interpolate.InterpolatedUnivariateSpline
-            #intep_func =
+            #intep_func = scipy.interpolate.InterpolatedUnivariateSpline
+            intep_func = scipy.interpolate.interp1d
         tmp = []
         for j in xrange(len(self)):
             phi, h = self._frame_fringe_positions(j)
@@ -1062,6 +1062,39 @@ class Region_map(object):
             tmp.append(-h_new)
 
         self._resampled_height = np.vstack(tmp).T
+
+        return self._resampled_height
+
+    def resample_height2D(self,
+                          N=1024,
+                          intep_func=None,
+                          min_th_range=0,
+                          max_th_range=2*np.pi):
+        if intep_func is None:
+            intep_func = scipy.interpolate.LinearNDInterpolator
+
+        # look into doing this rolling
+        phi_accum = []
+        h_accum = []
+        tau_accum = []
+        for j in xrange(len(self)):
+            phi, h = self._frame_fringe_positions(j)
+            phi_accum.extend(phi)
+            h_accum.extend(h)
+            # make sure edges are included
+            phi_accum.append(phi[-1] - max_th_range)
+            h_accum.append(h[-1])
+            phi_accum.append(phi[0] + max_th_range)
+            h_accum.append(h[0])
+
+            tau_accum.extend(np.ones(len(h) + 2) * j)
+
+        X, Y = np.meshgrid(np.linspace(0, max_th_range, N),
+                           range(len(self)))
+        intp_obj = intep_func(np.vstack((phi_accum, tau_accum)).T,
+                              h_accum)
+        self._resampled_height = intp_obj(
+            np.vstack((X.ravel(), Y.ravel())).T).reshape(X.shape).T
 
         return self._resampled_height
 
