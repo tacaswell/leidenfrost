@@ -201,7 +201,7 @@ class HdfBackend(object):
             self.writeable = False
 
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
-        self._prams = HdfBEPram(True, True)
+        self._prams = HdfBEPram(False, True)
         self.proc_prams = dict(self.file.attrs)
 
         if cine_base_path is not None:
