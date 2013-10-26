@@ -43,9 +43,11 @@ HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
 
 def hdf_backend_factory(cine_hash, i_disk_dict=None):
+    print i_disk_dict
     local_db = db.LFmongodb(i_disk_dict=i_disk_dict)
     h5_lst = local_db.get_h5_list(cine_hash)
-    return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path)
+    return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path,
+                           i_disk_dict=i_disk_dict)
 
 
 class MultiHdfBackend(object):
@@ -56,7 +58,7 @@ class MultiHdfBackend(object):
 
     pass
 
-    def __init__(self, fname_list, cine_base_path):
+    def __init__(self, fname_list, cine_base_path, i_disk_dict=None):
         """
 
         Parameters
@@ -64,14 +66,22 @@ class MultiHdfBackend(object):
         fname_list : list of tuples (FilePath, frame_in, frame_out)
            data about the files to be open
 
+
+        cine_base_path : string
+           base path (chroot style) of the cine files
+
+        i_disk_dict : dict, None
+           dictionary to convert disk number -> path
+
         """
-        self.db = db.LFmongodb()  # hard code the mongodb
+        self.db = db.LFmongodb(i_disk_dict=i_disk_dict)  # hard code the mongodb
         self._cinehash = None
         self._h5_backends = []
 
         for fn, frame_in, frame_out in fname_list:
             try:
-                tmp_be = HdfBackend(fn, cine_base_path)
+                tmp_be = HdfBackend(fn, cine_base_path,
+                                    i_disk_dict=i_disk_dict)
             except IOError:
                 print fn.format
                 continue
@@ -172,6 +182,7 @@ class HdfBackend(object):
                  h5_buffer_base_path=None,
                  cine_buffer_base_path=None,
                  mode='r',
+                 i_disk_dict=None,
                  *args,
                  **kwargs):
         """
@@ -217,7 +228,7 @@ class HdfBackend(object):
             self.cine_fname = None
             self.cine = None
         try:
-            self.db = db.LFmongodb()  # hard code the mongodb
+            self.db = db.LFmongodb(i_disk_dict=i_disk_dict)  # hard code the mongodb
         except:
             print 'gave up and the DB'
             # this eats _ALL_ exceptions
