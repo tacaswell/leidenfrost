@@ -2000,3 +2000,50 @@ def filter_fun_orig(working_img, thresh, struct=None):
                                    border_value=1)
 
     return up_mask, down_mask
+
+
+def texture_std_power(RM, k_list, f_slice=None):
+    """
+    Returns a measure of the texture based on the
+    variance
+
+    Parameters
+    ----------
+    k_list : list
+       The modes to extract data for
+
+    f_slice : slice or None
+       The frames to extract data for
+
+    Returns
+    -------
+    tuple : a scalar measure of the texture
+    """
+    if f_slice is None:
+        f_slice = slice(None, None, None)
+    tmp_fft = np.fft.fft(RM.resampled_height[:, f_slice], axis=0)
+    return np.var(np.abs(tmp_fft[k_list, :]), axis=1)
+
+
+def texture_std_angle(RM, k_list, f_slice=None):
+    """
+    Estimate the texture by looking at the phase of the
+    fft change
+
+    Parameters
+    ----------
+    k_list : list
+       The modes to extract data for
+
+    f_slice : slice or None
+       The frames to extract data for
+
+    """
+    if f_slice is None:
+        f_slice = slice(None, None, None)
+    print f_slice
+    tmp_fft = np.fft.fft(RM.resampled_height[:, f_slice], axis=0)
+    print tmp_fft.shape
+    angles = np.angle(tmp_fft[k_list, :])
+
+    return np.std(np.unwrap(angles, axis=1), axis=1)
