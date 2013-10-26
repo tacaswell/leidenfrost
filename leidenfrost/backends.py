@@ -70,7 +70,11 @@ class MultiHdfBackend(object):
         self._h5_backends = []
 
         for fn, frame_in, frame_out in fname_list:
-            tmp_be = HdfBackend(fn, cine_base_path)
+            try:
+                tmp_be = HdfBackend(fn, cine_base_path)
+            except IOError:
+                print fn.format
+                continue
             if self._cinehash is None:
                 self._cinehash = tmp_be.cine.hash
             elif tmp_be.cine.hash != self._cinehash:
