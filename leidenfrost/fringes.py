@@ -452,32 +452,27 @@ def _get_fc_lists(mbe, reclassify):
     f_locs = deque()
     junk_fringes = []
 
-    # convert the curve to X,Y
-    XY = np.vstack(mbe.curve.q_phi_to_xy(0,
-                                         np.linspace(0, 2 * np.pi, 2 ** 10)))
     # get center
-    center = np.mean(XY, 1)
-    # get relative position of first point
-    first_pt = center - XY[:, 0]
-    # get the off set angle of the first
-    th_offset = np.arctan2(first_pt[1], first_pt[0])
+    center = mbe.curve.cntr.reshape(2, 1)
     if reclassify:
         for color, trk_lst in izip(colors, mbe.trk_lst):
             for t in trk_lst:
                 t.classify2()
                 if t.charge is not None:
-                    f_locs.append(fringe_loc(t.q,
-                                             np.mod(t.phi + th_offset,
-                                                    2 * np.pi)))
+                    xy = mbe.curve.q_phi_to_xy(0, t.phi) - center
+                    th = np.mod(np.arctan2(xy[1], xy[0]),
+                                2*np.pi)
+                    f_locs.append(fringe_loc(t.q, th))
                     f_classes.append(fringe_cls(color, t.charge, 0))
                 else:
                     junk_fringes.append(t)
     else:
         for res_lst, color in izip(mbe.res, colors):
-            for charge, phi, q in izip(*res_lst):
-                f_locs.append(fringe_loc(q,
-                                         np.mod(phi + th_offset,
-                                                2 * np.pi)))
+            charge_lst, phi_lst, q_lst = res_lst
+            XY = mbe.curve.q_phi_to_xy(q_lst, phi_lst) - center
+            th = np.mod(np.arctan2(XY[1], XY[0]), 2*np.pi)
+            for charge, theta, q in izip(charge_lst, th, q_lst):
+                f_locs.append(fringe_loc(q, theta))
                 f_classes.append(fringe_cls(color, charge, 0))
 
     f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs),
@@ -549,6 +544,8 @@ class Region_map(object):
             f_slice = slice(None)
         img_bck_grnd_slices = []
         fringe_rings = []
+        sample_theta = np.linspace(0, 2*np.pi, N)
+        intep_func = scipy.interpolate.interp1d
         for j in xrange(*f_slice.indices(len(backend))):
             if j % 1000 == 0:
                 print j
@@ -563,20 +560,30 @@ class Region_map(object):
             else:
                 curve = mbe.curve
             img = mbe.img
-            # convert the curve to X,Y
-            XY = np.vstack(curve.q_phi_to_xy(0,
-                                             np.linspace(0, 2*np.pi, N)))
             # get center
-            center = np.mean(XY, 1)
-            # get relative position of first point
-            first_pt = center - XY[:, 0]
-            # get the off set angle of the first
-            th_offset = np.arctan2(first_pt[1], first_pt[0])
+            center = curve.cntr
 
-            XY = np.vstack(curve.q_phi_to_xy(0,
-                        -th_offset + np.linspace(0, 2 * np.pi, N)))
-            img_bck_grnd_slices.append(
-                map_coordinates(img, XY[::-1], order=2).astype(np.float16))
+            XY = np.vstack(curve.q_phi_to_xy(0, sample_theta))
+            # slice the image
+            sliced_data = map_coordinates(img, XY[::-1], order=2).astype(np.float16)
+            # sample_theta != theta so re-sample _again_
+            theta = np.arctan2(XY[1] - center[1], XY[0] - center[0])
+            theta = np.mod(theta, 2*np.pi)
+            indx = np.argsort(theta)
+
+            theta = theta[indx]
+            sliced_data = sliced_data[indx]
+            # pad so that we have one point periodic
+            theta = np.r_[theta[-1] - 2*np.pi,
+                          theta,
+                          theta[0] + 2 * np.pi]
+            sliced_data = np.r_[sliced_data[-1],
+                                sliced_data,
+                                sliced_data[0]]
+            # generate the interpolate object
+            f = intep_func(theta, sliced_data)
+            # get values and shove into accumulation list
+            img_bck_grnd_slices.append(f(sample_theta))
 
         working_img = np.vstack(img_bck_grnd_slices).T
         del img_bck_grnd_slices
