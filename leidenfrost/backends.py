@@ -43,7 +43,6 @@ HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
 
 def hdf_backend_factory(cine_hash, i_disk_dict=None):
-    print i_disk_dict
     local_db = db.LFmongodb(i_disk_dict=i_disk_dict)
     h5_lst = local_db.get_h5_list(cine_hash)
     return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path,
@@ -116,12 +115,22 @@ class MultiHdfBackend(object):
 
         tmp_flags = np.ones(self.cine_len, dtype='bool')
         for _f, _l in izip(first_frames, last_frames):
+            print _f, _l
             tmp_flags[_f:_l] = True
-        runs = np.r_[0, np.nonzero(~tmp_flags)[0], len(tmp_flags)-1]
-        idx = np.argmax(np.diff(runs))
-        self.first_frame = runs[idx]
-        self.last_frame = runs[idx + 1]
+        print np.sum(tmp_flags)
+        if np.all(tmp_flags):
+            self.first_frame = 0
+            self.last_frame = self.cine_len
+        else:
+            # this assumes that the data in continuous
+            self.first_frame = min(first_frames)
+            self.last_frame = max(last_frames)
 
+        print first_frames
+        print last_frames
+
+        print self.first_frame
+        print self.last_frame
         pass
 
     def __len__(self):
@@ -156,7 +165,7 @@ class MultiHdfBackend(object):
         for hbe, _f, _l in self._h5_backends:
             if j >= _f and j <= _l:
                 return hbe.get_frame(j, *args, **kwargs)
-        pass
+        raise Exception("frame {} not in backend".format(j))
 
     def __getitem__(self, key):
         if type(key) == slice:
