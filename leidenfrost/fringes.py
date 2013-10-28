@@ -1231,7 +1231,7 @@ class Region_map(object):
         # make sure we don't load stuff we don't need
         h5_backend.prams = (False, False)
         # get the cumulative lengths
-        Y = np.vstack([mbe.curve.cum_length(rs_h_shape[0])
+        Y = np.vstack([mbe.curve.cum_length_theta(rs_h_shape[0])
                        for mbe in h5_backend[self.frame_indx[f_slice]]]).T
         # shift
         Y -= np.mean(Y, axis=0)

@@ -715,6 +715,48 @@ class SplineCurve(object):
                                                 axis=1) ** 2,
                                             axis=0)))))
 
+    def cum_length_theta(self, N=1024):
+        """Returns the cumulative length evenly sampled in theta space.  Does by
+        evenly sampling the rim in spline units and the interpolating to
+        evenly spaced theta positions.
+
+        Parameters
+        ----------
+        N : int
+            Number of points to sample
+
+        Returns
+        -------
+        ret : ndarray
+            An ndarray of length N which is the cumulative distance
+            around the rim
+        """
+        intep_func = si.interp1d
+        cntr = self.cntr.reshape(2, 1)
+        # over sample in spline space
+        XY = si.splev(np.linspace(0, 1, 2*N), self.tck, ext=2) - cntr
+        theta = np.mod(np.arctan2(XY[1], XY[0]), 2*np.pi)
+        indx = np.argsort(theta)
+        XY = XY[:, indx]
+        theta = theta[indx]
+        # pad one past the end
+        theta = np.r_[theta[-1] - 2*np.pi,
+                        theta,
+                        theta[0] + 2 * np.pi]
+        XY = np.r_[XY[:, -1], XY, XY[:, 0]]
+        # the sample points
+        sample_theta = np.linspace(0, 2*np.p, N)
+        # re-sample
+        XY_resample = np.vstack([intep_func(theta, _xy)(sample_theta) for
+                                 _xy in XY])
+        return np.concatenate(([0],
+                               np.cumsum(
+                                    np.sqrt(
+                                         np.sum(
+                                             np.diff(XY_resample,
+                                                     axis=1) ** 2,
+                                             axis=0)))))
+
 
 def find_rim_fringes(curve, lfimg, s_width, s_num,
                      smooth_rng=2, oversample=4, *args, **kwargs):
