@@ -73,7 +73,8 @@ class MultiHdfBackend(object):
            dictionary to convert disk number -> path
 
         """
-        self.db = db.LFmongodb(i_disk_dict=i_disk_dict)  # hard code the mongodb
+        # hard code the mongodb
+        self.db = db.LFmongodb(i_disk_dict=i_disk_dict)
         self._cinehash = None
         self._h5_backends = []
 
@@ -115,9 +116,8 @@ class MultiHdfBackend(object):
 
         tmp_flags = np.ones(self.cine_len, dtype='bool')
         for _f, _l in izip(first_frames, last_frames):
-            print _f, _l
             tmp_flags[_f:_l] = True
-        print np.sum(tmp_flags)
+
         if np.all(tmp_flags):
             self.first_frame = 0
             self.last_frame = self.cine_len
@@ -125,13 +125,6 @@ class MultiHdfBackend(object):
             # this assumes that the data in continuous
             self.first_frame = min(first_frames)
             self.last_frame = max(last_frames)
-
-        print first_frames
-        print last_frames
-
-        print self.first_frame
-        print self.last_frame
-        pass
 
     def __len__(self):
         return self.last_frame - self.first_frame
