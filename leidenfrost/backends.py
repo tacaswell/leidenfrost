@@ -36,6 +36,7 @@ import parse
 
 import leidenfrost.db as db
 import leidenfrost.infra as infra
+import leidenfrost.file_help as lffh
 
 from leidenfrost import FilePath
 
@@ -687,7 +688,8 @@ class MemBackendFrame(object):
 
         _params_cache = (mix_in_count, pix_err, max_gap)
 
-        if _params_cache == self._params_cache and self._next_curve is not None:
+        if (_params_cache == self._params_cache and
+              self._next_curve is not None):
             return self._next_curve
         else:
             self._params_cache = _params_cache
@@ -899,21 +901,12 @@ def copy_to_buffer_disk(fname, buffer_base_path):
         raise Exception("can not buffer to self!!")
     new_fname = change_base_path(fname, buffer_base_path)
     buff_path = '/'.join(new_fname[:2])
-    ensure_path_exists(buff_path)
+    lffh.ensure_path_exists(buff_path)
     src_fname = '/'.join(fname)
     buf_fname = '/'.join(new_fname)
     if not os.path.exists(buf_fname):
         shutil.copy2(src_fname, buf_fname)
     return new_fname
-
-
-def ensure_path_exists(path):
-    '''ensures that a given path exists, throws error if
-    path points to a file'''
-    if not os.path.exists(path):
-        os.makedirs(path)
-    if os.path.isfile(path):
-        raise Exception("there is a file where you think there is a path!")
 
 
 def change_base_path(fpath, new_base_path):
