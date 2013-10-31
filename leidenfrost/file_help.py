@@ -18,6 +18,7 @@
 import os
 import cine
 from leidenfrost import FilePath
+import shutil
 
 
 def get_h5_lst(base_path, search_path):
@@ -41,3 +42,39 @@ def get_cine_hashes(base_path, search_path):
     cine_hash = [cine.Cine(cn.format).hash for cn in cine_fnames]
 
     return zip(cine_fnames, cine_hash)
+
+
+def copy_file(fname_src, fname_dest):
+    '''
+    Copies file given by `fname_src` to `fname_dest`.
+
+    makes sure all needed directories exist in between
+
+    Does not copy if file exists at `fname_dest`
+    Parameters
+    ----------
+    fname_src : FilePath
+        source file
+
+    fname_dest: FilePath
+        destination file
+
+    '''
+    src_path = os.path.abspath(fname_src.format)
+    dest_path = os.path.abspath(fname_dest.format)
+    if (src_path == dest_path):
+        raise Exception("can not buffer to self!!")
+    ensure_path_exists(os.path.join(*fname_dest[:2]))
+    if not os.path.exists(dest_path):
+        shutil.copy2(src_path, dest_path)
+    else:
+        print "file exists, copy failed"
+
+
+def ensure_path_exists(path):
+    '''ensures that a given path exists, throws error if
+    path points to a file'''
+    if not os.path.exists(path):
+        os.makedirs(path)
+    if os.path.isfile(path):
+        raise Exception("there is a file where you think there is a path!")
