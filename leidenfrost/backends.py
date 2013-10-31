@@ -103,7 +103,7 @@ class MultiHdfBackend(object):
         # these are all really cine properties and all are from the same cine
         # so we can just look at the first one.
         # TODO replace this with a db call
-        cine_md = self.db.get_movie_md(self._cinehash
+        cine_md = self.db.get_movie_md(self._cinehash)
         self.frame_rate = cine_md['frame_rate']
         self.calibration_value = cine_md['cal_val']
         self.calibration_unit = cine_md['cal_unit']
