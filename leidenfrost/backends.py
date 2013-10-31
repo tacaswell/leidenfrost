@@ -649,7 +649,7 @@ class MemBackendFrame(object):
         else:
             self.params = {}
 
-        self.next_curve = copy.copy(next_curve)
+        self._next_curve = copy.copy(next_curve)
         self._params_cache = None
         self.img = img
         self.mix_in_count = None
@@ -673,6 +673,12 @@ class MemBackendFrame(object):
                 self._frame_str = 'frame_{:05}'
         pass
 
+    @property
+    def next_curve(self):
+        if self._next_curve is None:
+            self.get_next_spline(**self.params)
+        return self._next_curve
+
     def get_extent(self, curve_extent=True):
         if self.img is not None and not curve_extent:
             return [0, self.img.shape[1], 0, self.img.shape[0]]
@@ -688,8 +694,8 @@ class MemBackendFrame(object):
 
         _params_cache = (mix_in_count, pix_err, max_gap)
 
-        if _params_cache == self._params_cache and self.next_curve is not None:
-            return self.next_curve
+        if _params_cache == self._params_cache and self._next_curve is not None:
+            return self._next_curve
         else:
             self._params_cache = _params_cache
 
@@ -776,7 +782,7 @@ class MemBackendFrame(object):
             print '          reusing old one'
             new_curve = self.curve
 
-        self.next_curve = new_curve
+        self._next_curve = new_curve
 
         return new_curve
 
@@ -847,7 +853,7 @@ class MemBackendFrame(object):
                                     self.trk_lst[0],
                                     self.trk_lst[1],
                                     self.curve,
-                                    next_curve=self.next_curve,
+                                    next_curve=self._next_curve,
                                     md_args=md_args)
         del group
 
