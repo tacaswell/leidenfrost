@@ -47,7 +47,7 @@ def hdf_backend_factory(cine_hash, i_disk_dict=None):
     local_db = db.LFmongodb(i_disk_dict=i_disk_dict)
     h5_lst = local_db.get_h5_list(cine_hash)
     return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path,
-                           i_disk_dict=i_disk_dict)
+                           i_disk_dict=i_disk_dict, cache_path='/mnt/cache')
 
 
 class MultiHdfBackend(object):
@@ -58,7 +58,8 @@ class MultiHdfBackend(object):
 
     pass
 
-    def __init__(self, fname_list, cine_base_path, i_disk_dict=None):
+    def __init__(self, fname_list, cine_base_path, i_disk_dict=None,
+                 cache_path=None):
         """
 
         Parameters
@@ -85,9 +86,15 @@ class MultiHdfBackend(object):
             # if all of frames have been hit, don't further procs
             if np.all(tmp_flags):
                 break
+
+            if cache_path is not None:
+                    tmp_fn = fn._replace(base_path=cache_path)
+                    if os.path.isfile(tmp_fn.format):
+                        fn = tmp_fn
             try:
                 tmp_be = HdfBackend(fn, cine_base_path,
                                     i_disk_dict=i_disk_dict)
+
             except IOError:
                 print fn.format
                 continue
@@ -183,8 +190,6 @@ class HdfBackend(object):
     def __init__(self,
                  fname,
                  cine_base_path=None,
-                 h5_buffer_base_path=None,
-                 cine_buffer_base_path=None,
                  mode='r',
                  i_disk_dict=None,
                  *args,
@@ -201,13 +206,9 @@ class HdfBackend(object):
         cine_buffer_base_path: str or `None`
             If not `None`, base path for buffering the cine file
         """
-        self.fname = fname
         self._iter_cur_item = -1
-        self.buffers = []
         self.file = None
-        if h5_buffer_base_path is not None:
-            fname = copy_to_buffer_disk(fname, h5_buffer_base_path)
-            self.buffers.append(fname)
+
         if mode == 'rw':
             self.file = h5py.File(fname.format, 'r+')
             self.writeable = True
@@ -223,16 +224,13 @@ class HdfBackend(object):
             self.cine_fname = FilePath(cine_base_path,
                                        self.file.attrs['cine_path'],
                                        self.file.attrs['cine_fname'])
-            if cine_buffer_base_path is not None:
-                self.cine_fname = copy_to_buffer_disk(self.cine_fname,
-                                                      cine_buffer_base_path)
-                self.buffers.append(self.cine_fname)
             self.cine = cine.Cine('/'.join(self.cine_fname))
         else:
             self.cine_fname = None
             self.cine = None
         try:
-            self.db = db.LFmongodb(i_disk_dict=i_disk_dict)  # hard code the mongodb
+            # hard code the mongodb
+            self.db = db.LFmongodb(i_disk_dict=i_disk_dict)
         except:
             print 'gave up and the DB'
             # this eats _ALL_ exceptions
@@ -366,9 +364,6 @@ class HdfBackend(object):
     def __del__(self):
         if self.file:
             self.file.close()
-        for f in self.buffers:
-            print 'removing ' + '/'.join(f)
-            os.remove('/'.join(f))
 
     def get_frame(self, frame_num, raw=None, get_img=None):
         trk_lst = None
@@ -893,21 +888,6 @@ class MemBackendFrame(object):
         z, th_new = infra.construct_corrected_profile((th, ch))
 
         return x, y, z
-
-
-def copy_to_buffer_disk(fname, buffer_base_path):
-    '''fname is a FilePath (or a 3 tuple with the layout
-    (base_path, path, fname) '''
-    if os.path.abspath(fname.base_path) == os.path.abspath(buffer_base_path):
-        raise Exception("can not buffer to self!!")
-    new_fname = change_base_path(fname, buffer_base_path)
-    buff_path = '/'.join(new_fname[:2])
-    lffh.ensure_path_exists(buff_path)
-    src_fname = '/'.join(fname)
-    buf_fname = '/'.join(new_fname)
-    if not os.path.exists(buf_fname):
-        shutil.copy2(src_fname, buf_fname)
-    return new_fname
 
 
 def change_base_path(fpath, new_base_path):
