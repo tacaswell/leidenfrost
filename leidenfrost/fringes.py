@@ -507,7 +507,8 @@ class Region_map(object):
     def from_backend(cls, backend, mask_fun,
                      f_slice=None,
                      reclassify=False,
-                     N=2**12, **kwargs):
+                     N=2**12, status_output=False,
+                     **kwargs):
         '''
         Constructor style class method
 
@@ -547,7 +548,7 @@ class Region_map(object):
         sample_theta = np.linspace(0, 2*np.pi, N)
         intep_func = scipy.interpolate.interp1d
         for j in xrange(*f_slice.indices(len(backend))):
-            if j % 1000 == 0:
+            if status_output and (j % 1000 == 0):
                 print j
             mbe = backend.get_frame(j, get_img=True, raw=reclassify)
 
@@ -1830,7 +1831,7 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
     return connections
 
 
-def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
+def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=False):
     """
     An improved boot-strap operation
 
@@ -1868,8 +1869,10 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
             dh = _dict_to_dh_Nstep(link_dict, threshold=connection_threshold)
             if dh is not None:
                 if dest_region in tmp_dict and tmp_dict[dest_region] != dh:
-                    print 'conflict from:{} to:{} old_dh:{} new_dh:{}'.format(
-                        i, dest_region, tmp_dict[dest_region], dh)
+                    if status_output:
+                        print ("conflict from: {} to: {} " +
+                               "old_dh: {} new_dh: {}").format(
+                                    i, dest_region, tmp_dict[dest_region], dh)
                     # if we have inconsistent linking (between forward
                     # and backwards), throw everything out this
                     # happens
@@ -1880,7 +1883,8 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
                 tmp_dict[dest_region] = dh
 
     black_list = np.flatnonzero(conflict_flags > conflict_threshold)
-    print "black list length: {}".format(len(black_list))
+    if status_output:
+        print "black list length: {}".format(len(black_list))
     for bl in black_list:
         # we don't want to try any connections with the black-listed regions
         # nuke it's outward connections
@@ -1927,11 +1931,12 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold):
             set_by[b] = a
         else:
             if height_map[b] != prop_height:
-                print ("from {}({}) to {}({}) proposed delta:" +
-                       " {} current delta: {}").format(
-                    a, height_map[a], b, height_map[b],
-                    valid_connections[a][b],
-                    height_map[b] - height_map[a])
+                if status_output:
+                    print ("from {}({}) to {}({}) proposed delta:" +
+                           " {} current delta: {}").format(
+                        a, height_map[a], b, height_map[b],
+                        valid_connections[a][b],
+                        height_map[b] - height_map[a])
                 fails.append((a, b))
 
     return height_map, set_by, fails
@@ -1961,7 +1966,7 @@ def _label_regions(mask, size_cut):
 
     sizes = ndi.sum(mask, lab_regions, range(nb + 1))
     mask_sizes = sizes < size_cut
-    print len(sizes), sum(mask_sizes)
+    #    print len(sizes), sum(mask_sizes)
 
     remove_pix = mask_sizes[lab_regions]
     lab_regions[remove_pix] = 0
@@ -1991,7 +1996,7 @@ def filter_fun(working_img, thresh, struct=None):
 
 
 def filter_fun_orig(working_img, thresh, struct=None):
-    print 'threshold {}'.format(thresh)
+
     if struct is None:
         #        struct = ndi.morphology.generate_binary_structure(2, 1)
         struct = [[1, 1, 1]]
