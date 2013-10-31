@@ -1482,7 +1482,7 @@ class Region_map(object):
                         "I:{I}").format(x=col * xscale,
                                         y=row * yscale,
                                         reg=region,
-                                        h=self.height_map[region],
+                                        h=-self.height_map[region],
                                         rs_h=rs_h,
                                         I=self.working_img[row, col],
                                         row=row,
