@@ -952,7 +952,7 @@ def setup_spline_fitter(fname, bck_img=None):
 def _fit_quad_to_peak(x, y):
     """
     Fits a quadratic to the data points handed in
-    to the from y = b[0](x-b[1]) + b[2]
+    to the from y = b[0](x-b[1])**2 + b[2]
 
     x -- locations
     y -- values
