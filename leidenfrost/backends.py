@@ -46,7 +46,7 @@ HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 def hdf_backend_factory(cine_hash, i_disk_dict=None):
     local_db = db.LFmongodb(i_disk_dict=i_disk_dict)
     h5_lst = local_db.get_h5_list(cine_hash)
-    return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path,
+    return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path, cine_hash=cine_hash,
                            i_disk_dict=i_disk_dict, cache_path='/mnt/cache')
 
 
@@ -58,7 +58,7 @@ class MultiHdfBackend(object):
 
     pass
 
-    def __init__(self, fname_list, cine_base_path, i_disk_dict=None,
+    def __init__(self, fname_list, cine_base_path, cine_hash, i_disk_dict=None,
                  cache_path=None):
         """
 
@@ -77,8 +77,13 @@ class MultiHdfBackend(object):
         """
         # hard code the mongodb
         self.db = db.LFmongodb(i_disk_dict=i_disk_dict)
-        self._cinehash = None
+        self._cinehash = cine_hash
         self._h5_backends = []
+        cine_md = self.db.get_movie_md(self._cinehash)
+        self.frame_rate = cine_md['frame_rate']
+        self.calibration_value = cine_md['cal_val']
+        self.calibration_unit = cine_md['cal_unit']
+        self.cine_len = cine_md['frames']
 
         tmp_flags = np.zeros(self.cine_len, dtype='bool')
 
@@ -99,9 +104,7 @@ class MultiHdfBackend(object):
                 print fn.format
                 continue
             tmp_flags[frame_in:frame_out] = True
-            if self._cinehash is None:
-                self._cinehash = tmp_be.cine.hash
-            elif tmp_be.cine.hash != self._cinehash:
+            if tmp_be.cine.hash != self._cinehash:
                 print "This list is inconsistent dropping "
                 print fn.format
                 continue
@@ -117,11 +120,6 @@ class MultiHdfBackend(object):
         # these are all really cine properties and all are from the same cine
         # so we can just look at the first one.
         # TODO replace this with a db call
-        cine_md = self.db.get_movie_md(self._cinehash)
-        self.frame_rate = cine_md['frame_rate']
-        self.calibration_value = cine_md['cal_val']
-        self.calibration_unit = cine_md['cal_unit']
-        self.cine_len = cine_md['frames']
 
         # sort out first and last frame
         first_frames, last_frames = zip(*[(in_f, out_f)
