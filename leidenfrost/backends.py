@@ -79,13 +79,19 @@ class MultiHdfBackend(object):
         self._cinehash = None
         self._h5_backends = []
 
+        tmp_flags = np.zeros(self.cine_len, dtype='bool')
+
         for fn, frame_in, frame_out in fname_list:
+            # if all of frames have been hit, don't further procs
+            if np.all(tmp_flags):
+                break
             try:
                 tmp_be = HdfBackend(fn, cine_base_path,
                                     i_disk_dict=i_disk_dict)
             except IOError:
                 print fn.format
                 continue
+            tmp_flags[frame_in:frame_out] = True
             if self._cinehash is None:
                 self._cinehash = tmp_be.cine.hash
             elif tmp_be.cine.hash != self._cinehash:
@@ -114,11 +120,6 @@ class MultiHdfBackend(object):
         first_frames, last_frames = zip(*[(in_f, out_f)
                                           for hbe, in_f, out_f
                                           in self._h5_backends])
-
-        tmp_flags = np.ones(self.cine_len, dtype='bool')
-        for _f, _l in izip(first_frames, last_frames):
-            tmp_flags[_f:_l] = True
-
         if np.all(tmp_flags):
             self.first_frame = 0
             self.last_frame = self.cine_len
