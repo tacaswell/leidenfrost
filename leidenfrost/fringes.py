@@ -759,7 +759,7 @@ class Region_map(object):
         ax.set_xlabel(' '.join([r'$\tau$', t_units.strip()]))
         ax.set_ylabel(r'$\theta$')
 
-        ax.imshow(height_img,
+        ax.imshow(-height_img,
                   interpolation='none',
                   cmap=my_cmap,
                   extent=[0, (height_img.shape[1] - 1) * t_scale,
@@ -776,7 +776,7 @@ class Region_map(object):
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
-        ax.format_coord = self.format_factory(
+        ax.format_coord = self.format_factory(xscale=t_scale,
             yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
@@ -807,7 +807,7 @@ class Region_map(object):
                   origin='bottom',
                   )
         im.set_clim([1, len(self.height_map)])
-        ax.format_coord = self.format_factory(
+        ax.format_coord = self.format_factory(xscale=t_scale,
             yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
@@ -1144,7 +1144,8 @@ class Region_map(object):
                       aspect='auto',
                       origin='bottom',
                       alpha=alpha)
-
+        ax.format_coord = self.format_factory(xscale=t_scale,
+            yscale=2*np.pi / self.working_img.shape[0])
         ax.figure.canvas.draw()
 
     def display_region(self, n, ax=None):
@@ -1467,14 +1468,22 @@ class Region_map(object):
                 else:
                     region = 0
 
+                rs_h = ''
+                if self._resampled_height is not None:
+                    r = int(row *
+                            (self._resampled_height.shape[0] /
+                             self.working_img.shape[0]))
+                    rs_h = self._resampled_height[r, col]
                 return ("x:{x}({col}), " +
                         "y:{y}({row}), " +
                         "r:{reg}, " +
                         "h:{h}, " +
+                        "h_rs:{rs_h}, " +
                         "I:{I}").format(x=col * xscale,
                                         y=row * yscale,
                                         reg=region,
                                         h=self.height_map[region],
+                                        rs_h=rs_h,
                                         I=self.working_img[row, col],
                                         row=row,
                                         col=col)
