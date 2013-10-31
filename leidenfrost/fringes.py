@@ -33,7 +33,7 @@ from bisect import bisect
 import scipy
 import types
 import heapq
-
+from mpl_toolkits.axes_grid1 import Grid
 import networkx
 
 fringe_cls = namedtuple('fringe_cls', ['color', 'charge', 'hint'])
@@ -2091,3 +2091,47 @@ def texture_std_angle(RM, k_list, f_slice=None):
     angles = np.angle(tmp_fft[k_list, :])
 
     return np.std(np.unwrap(angles, axis=1), axis=1)
+
+
+def make_kymo_mode_panels(_rm, ax_lst, k_list, hbe,
+                          fix_scale=True, cmap='gray', extent=None):
+    assert len(k_list) == len(ax_lst)
+
+    m = _rm.resampled_height.shape[0]
+    s = np.linspace(0, 1, m)
+
+    tmp_fft = np.fft.fft(_rm.resampled_height, axis=0) / m
+
+    if fix_scale:
+        h_range = np.abs(np.nanmax(_rm.height_map) - np.nanmin(_rm.height_map))
+        vmin = -h_range / 2
+        vmax = h_range / 2
+    else:
+        vmin = vmax = None
+    for ax, k in zip(ax_lst, k_list):
+        k_kymo = 2*(tmp_fft[k, :].real.reshape(-1, 1) * np.cos(s*k * 2*np.pi) -
+                    tmp_fft[k, :].imag.reshape(-1, 1) * np.sin(s*k * 2*np.pi))
+        ax.imshow(k_kymo.T, cmap=cmap,
+                  interpolation='none',
+                  aspect='auto',
+                  vmin=vmin, vmax=vmax, extent=extent, origin='bottom')
+    #        ax.set_aspect('auto', adjustable='box')
+    #       ax.colorbar(im)
+
+
+def make_kymo_mode_figure(_rm, hbe, k_list=None, **kwargs):
+    """
+    Makes figure with mode kymos
+    """
+    if k_list is None:
+        k_list = [1, 2, 3, 4]
+    fig = plt.figure(figsize=(3.375*2 + .25, 3.375*2 + .25))
+
+    full_grid = Grid(fig, nrows_ncols=(len(k_list) + 2, 1),
+                     rect=[.1, .1, .85, .85],
+                     share_all=True, axes_pad=.1)
+
+    _rm.display_height(ax=full_grid[0], t_scale=1/hbe.frame_rate)
+    _rm.display_height_resampled(ax=full_grid[1], t_scale=1/hbe.frame_rate)
+    make_kymo_mode_panels(full_grid[2:], k_list, _rm, hbe,
+                          extent=[0, len(_rm) / hbe.frame_rate, 0, 2*np.pi])
