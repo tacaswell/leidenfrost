@@ -411,3 +411,28 @@ class LFmongodb(LFDbWrapper):
                                       cc['in_frame'],
                                       cc['out_frame'])
             for cc in good_proc_cur]
+
+
+def get_useful_proc():
+    db = LFmongodb()
+
+    good_dict = {}
+
+    # find all cines marked as 'useful'
+    for cine_cur in db.coll_dict['movs'].find({'useful': True}):
+        cine_hash = cine_cur['cine']
+        # find all proc for this cine marked as useful
+        good_proc_cur = db.coll_dict['proc'].find({'cine': cine_hash,
+                                                   'useful': True})
+        # if there are none, move on
+        if good_proc_cur.count() == 0:
+            continue
+        # sort them by time (newest first)
+        good_proc_cur.sort('start_time_stamp', pymongo.DESCENDING)
+        # shove results into dict
+        good_dict[cine_hash] = (cine_cur['fpath'],
+                                cine_cur['frames'],
+                                [(cc['out_file'], (cc['in_frame'],
+                                                   cc['out_frame']))
+                                 for cc in good_proc_cur])
+    return good_dict
