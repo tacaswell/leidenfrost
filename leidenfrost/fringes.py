@@ -854,6 +854,10 @@ class Region_map(object):
     def _frame_fringe_positions(self,
                            frame_num,
                             length=2*np.pi):
+        """
+        Returns the locations of where fringes folding in all available
+        information
+        """
         local_tuple = namedtuple('local_tuple', ['regions', 'fringes'])
         # get fringe ring
         FR = self.fringe_rings[frame_num]
