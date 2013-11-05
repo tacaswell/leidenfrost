@@ -93,10 +93,11 @@ class MultiHdfBackend(object):
                 break
 
             if cache_path is not None:
-                    tmp_fn = fn._replace(base_path=cache_path)
-                    if os.path.isfile(tmp_fn.format):
-                        fn = tmp_fn
+                tmp_fn = fn._replace(base_path=cache_path)
+                if os.path.isfile(tmp_fn.format):
+                    fn = tmp_fn
             try:
+                print "trying to open", fn.format
                 tmp_be = HdfBackend(fn, cine_base_path,
                                     i_disk_dict=i_disk_dict)
 
