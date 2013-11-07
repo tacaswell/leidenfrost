@@ -877,12 +877,26 @@ class Region_map(object):
         return tmp
 
     def _frame_fringe_positions(self,
-                           frame_num,
-                            length=2*np.pi):
+                            frame_num,
+                            thresh=.05,
+                            filter_width=1):
         """
         Returns the locations of where fringes folding in all available
         information
+
+        Parameters
+        ----------
+        frame_num : int
+            The frame to work on
+
+        thresh : float
+            Passed through to _segment_fringes
+
+        filter_width : int
+            Passed through to _segment_fringes
+
         """
+        length = 2*np.pi
         local_tuple = namedtuple('local_tuple', ['regions', 'fringes'])
         # get fringe ring
         FR = self.fringe_rings[frame_num]
@@ -892,7 +906,9 @@ class Region_map(object):
         # get the region edges
         region_edges = self.region_edges[frame_num]
         # get image edges
-        image_edges = _segment_fringes(self.working_img[:, frame_num])
+        image_edges = _segment_fringes(self.working_img[:, frame_num],
+                                       thresh=thresh,
+                                       filter_width=filter_width)
 
         # set up working data
         work_data = [local_tuple([], [])
