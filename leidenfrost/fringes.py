@@ -893,7 +893,7 @@ class Region_map(object):
                                      image_edges.starts,
                                      image_edges.ends)
             # get the image region that the region start is in
-            _bin_end = _bin_region(rs,
+            _bin_end = _bin_region(re,
                                    image_edges.starts,
                                    image_edges.ends)
             # if they are in the same bin yay !
