@@ -381,6 +381,15 @@ class FringeRing(object):
         region_ends : list_like
             The sample where the regions end
 
+        fringe_starts : list-like
+            the sample where the fringe starts in the image
+
+        fringe_labels : list-like
+            The labels on the image fringe
+
+        fringe_ends : list_like
+            The sample where the image fringe ends
+
         N_samples : int
             The number of samples
 
@@ -415,9 +424,25 @@ class FringeRing(object):
             # handle the linking
             if fbin_back is None or fbin_front is None:
                 continue
+
+            # make sure the link is even valid
+            if not fringe_back.valid_follower(fringe_front):
+                continue
+
             # make sure we are in adjacent fringes
+            fl_max = len(fringe_labels)
             if (fbin_back + 1 == fbin_front) or (fbin_front == 0 and
-                                    fbin_back == len(fringe_labels) - 1):
+                                    fbin_back == fl_max - 1):
+                fringe_back.insert_ahead(fringe_front)
+            # add special case for jumping over extreama one fringe
+            # between them and they are the same color and opposite
+            # change
+            elif (((fbin_back + 2 == fbin_front) or (fbin_front == 0 and
+                    fbin_back == fl_max - 2)) and
+                    ((fringe_front.f_class.color ==
+                         fringe_back.f_class.color) and
+                    (fringe_front.f_class.charge ==
+                     -fringe_back.f_class.charge))):
                 fringe_back.insert_ahead(fringe_front)
 
     def __iter__(self):
