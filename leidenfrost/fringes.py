@@ -2392,8 +2392,10 @@ class IS_FS_recon(object):
                               for k in xrange(1, max_N+1)])
 
         # add bounds to make the interpolation happy
-        pad = 1
-        _phi = np.hstack((phi[-pad::-1] - max_range, phi, phi[:pad:-1] + max_range))
+        pad = 2
+        _phi = np.hstack((phi[-pad::-1] - max_range,
+                          phi,
+                          phi[:pad:-1] + max_range))
         _h = np.hstack((h[-pad::-1], h, h[:pad:-1]))
 
         # do first FFT pass
@@ -2404,7 +2406,7 @@ class IS_FS_recon(object):
 
         # truncate fft values
         A_n = tmp_fft[:max_N+1]
-
+        prev_err = None
         # loop a bunch more times
         for j in range(iters):
             # pull out constant
@@ -2416,6 +2418,12 @@ class IS_FS_recon(object):
                               A_list.imag * sin_list, axis=0) + A0
             # compute error
             error_h = h - re_con
+            curr_err = np.abs(np.mean(error_h))
+            if prev_err is not None:
+                # if the error isn't really improving, bail
+                if 1 - curr_err / prev_err < .001:
+                    break
+            prev_err = curr_err
             # add padding to error so that the interpolation is happy
             _h = np.hstack((error_h[-pad::-1], error_h, error_h[:pad:-1]))
             # compute FFT of error
