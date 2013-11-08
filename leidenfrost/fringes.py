@@ -25,6 +25,7 @@ from matplotlib import cm
 import matplotlib
 import fractions
 import scipy.ndimage as ndi
+import scipy.signal
 from scipy.ndimage.interpolation import map_coordinates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -591,7 +592,9 @@ class Region_map(object):
 
             XY = np.vstack(curve.q_phi_to_xy(0, sample_theta))
             # slice the image
-            sliced_data = map_coordinates(img, XY[::-1], order=2).astype(np.float16)
+            sliced_data = map_coordinates(img,
+                                          XY[::-1],
+                                          order=2).astype(np.float16)
             # sample_theta != theta so re-sample _again_
             theta = np.arctan2(XY[1] - center[1], XY[0] - center[0])
             theta = np.mod(theta, 2*np.pi)
@@ -734,6 +737,9 @@ class Region_map(object):
         self._resampled_height = None
         # dict to hold parameters
         self.params = kwargs
+
+        self._rs_func = self._resample_height2D_savgol
+        self._rs_kwargs = dict()
         pass
 
     def __len__(self):
@@ -755,13 +761,6 @@ class Region_map(object):
         if self._label_img is None:
             self._label_img = self.reconstruct_label_img()
         return self._label_img
-
-    # make getting resampled height easy
-    @property
-    def resampled_height(self):
-        if self._resampled_height is None:
-            self._resampled_height = self.resample_height()
-        return self._resampled_height
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True,
                        alpha=.65, t_scale=1, t_units=''):
@@ -1061,7 +1060,14 @@ class Region_map(object):
 
         return phi, h
 
-    def resample_height(self,
+    # make getting resampled height easy
+    @property
+    def resampled_height(self):
+        if self._resampled_height is None:
+            self._resampled_height = self._rs_func(**self._rs_kwargs)
+        return self._resampled_height
+
+    def _resample_height_1D(self,
                         N=1024,
                         intep_func=None,
                         min_range=0,
@@ -1098,15 +1104,19 @@ class Region_map(object):
                 phi, h, N, min_range, max_range, intep_func=intep_func)
             tmp.append(-h_new)
 
-        self._resampled_height = np.vstack(tmp).T
+        ret = np.vstack(tmp).T
 
-        return self._resampled_height
+        return ret
 
-    def resample_height2D(self,
+    def _resample_height2D(self,
                           N=1024,
                           intep_func=None,
                           min_th_range=0,
-                          max_th_range=2*np.pi):
+                          max_th_range=2*np.pi,
+                          scale=2*np.pi / 100):
+        """
+        Interpolates
+        """
         if intep_func is None:
             intep_func = scipy.interpolate.LinearNDInterpolator
 
@@ -1118,22 +1128,65 @@ class Region_map(object):
             phi, h = self._frame_fringe_positions(j)
             phi_accum.extend(phi)
             h_accum.extend(h)
+            tau_accum.extend(np.ones(len(h)) * j * scale)
             # make sure edges are included
-            phi_accum.append(phi[-1] - max_th_range)
-            h_accum.append(h[-1])
-            phi_accum.append(phi[0] + max_th_range)
-            h_accum.append(h[0])
-
-            tau_accum.extend(np.ones(len(h) + 2) * j)
+            if len(phi) > 0:
+                phi_accum.append(phi[-1] - max_th_range)
+                h_accum.append(h[-1])
+                phi_accum.append(phi[0] + max_th_range)
+                h_accum.append(h[0])
+                tau_accum.extend([j * scale] * 2)
 
         X, Y = np.meshgrid(np.linspace(0, max_th_range, N),
-                           range(len(self)))
+                           np.arange(len(self), dtype='float') * scale)
         intp_obj = intep_func(np.vstack((phi_accum, tau_accum)).T,
                               h_accum)
-        self._resampled_height = -intp_obj(
+        ret = -intp_obj(
             np.vstack((X.ravel(), Y.ravel())).T).reshape(X.shape).T
 
-        return self._resampled_height
+        return ret
+
+    def _resample_height2D_savgol(self, k_window=15, k_order=2,
+                                t_window=5, t_order=2, **kwargs):
+        """
+        Does 2D interpolation on the theta, tau location of the fringe/regions
+
+        Applies a Savitzky-Golay in both the k (along the rim at fixed
+        time) and t (fixed location through time) to the result to smooth
+        out junk.
+
+        This seems to be the most robust method.  Relies on a local
+        modification to scipy.signal.savgol_filter to allow wrap as
+        a mode
+
+        Parameters
+        ----------
+        k_window : odd int
+            Size of the window used for along rim filtering
+
+        k_order : positive int
+            The order polynomial used for along rim filtering
+
+        t_window : odd int
+            Size of the window used for along rim filtering
+
+        t_order : positive int
+            The order polynomial used for along rim filtering
+        """
+        raw_int = self._resample_height2D(**kwargs)
+        return scipy.signal.savgol_filter(
+                    scipy.signal.savgol_filter(raw_int,
+                                               k_window, k_order, axis=0,
+                                               mode='wrap'),
+                 t_window, t_order, axis=1)
+
+    def _resample_height2D_fft_filter(self, k_band=20, scale=None,
+                                      **kwargs):
+
+        raw_int = self._resample_height2D(**kwargs)
+        fft_tmp = np.fft.fft(raw_int, axis=1)
+        fft_tmp[:, (k_band+1):-k_band] = 0
+        return np.fft.ifft(fft_tmp, axis=1).T.real
 
     def display_height_resampled(self, ax=None, cmap='jet',
                                  bckgnd=True, alpha=.65,
