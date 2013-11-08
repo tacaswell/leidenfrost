@@ -892,7 +892,9 @@ class Region_map(object):
         region_edges = self.region_edges[frame_num]
         # get image edges
         image_edges = _segment_fringes(self.working_img[:, frame_num])
-
+        if len(image_edges.labels) < 5:
+            # not enough to do anything with, bail
+            return [], []
         # set up working data
         work_data = [local_tuple([], [])
                      for k in xrange(len(image_edges.labels))]
