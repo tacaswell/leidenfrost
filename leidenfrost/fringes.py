@@ -1383,7 +1383,7 @@ class Region_map(object):
                                   compression='szip')
             h5file['working_img'][:] = self.working_img
             # create circs data set
-            if circs is not None:
+            if self.circs is not None:
                 h5file.create_dataset('circs',
                                     self.circs.shape,
                                     self.circs.dtype,
