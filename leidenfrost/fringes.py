@@ -718,7 +718,7 @@ class Region_map(object):
         return RM
 
     def __init__(self, fringe_rings, region_edges, working_img,
-                 height_map, frame_indx, circs
+                 height_map, frame_indx, circs,
                  **kwargs):
         # fringes group by a per-time basis
         self.fringe_rings = fringe_rings
