@@ -21,6 +21,7 @@ import time
 import copy
 import logging
 import os
+import datetime
 
 import numpy as np
 
@@ -28,7 +29,8 @@ import leidenfrost
 import leidenfrost.db as ldb
 import leidenfrost.fringes as lf
 import leidenfrost.backends as lb
-
+import leidenfrost.file_help as lffh
+import leidenfrost.db as ldb
 
 class TimeoutException(Exception):
     pass
@@ -222,3 +224,54 @@ def _proc_h5_to_RM(h5_backend, RM_params, cine_base_path=None):
     RM = lf.Region_map.from_backend(h5_backend, **RM_params)
 
     return RM, h5_backend
+
+
+def process_split_RM(k, cache_path, RM_params,
+                     i_disk_dict,
+                     section_per_sec=2):
+    """
+    Processes fringes -> region_map by segment and saves the result to
+    disk
+
+    Snarfs all exceptions
+
+    Parameters
+    ----------
+    k : cine_hash
+        The move to work on
+
+    RM_params : dict
+        Paramaters to pass to Region_map.from_backend
+
+    i_disk_dict : dict
+       mapping between disk number -> disk path
+
+    section_per_sec : int, optional
+       The number of segments per second
+    """
+    db = ldb.LFmongodb(i_disk_dict=i_disk_dict)
+    v = db.get_movie_md(k)
+
+    # make the hdf backend object to
+    hbe = lb.hdf_backend_factory(k, i_disk_dict=i_disk_dict)
+    # set up steps to half second chunks
+    N_step = S_step = hbe.frame_rate // section_per_sec
+    out_path_template = leidenfrost.FilePath(cache_path,
+                                 datetime.date.today().isoformat(),
+                                 '')
+    # make sure the path exists
+    lffh.ensure_path_exists(out_path_template.format)
+    for j in xrange(hbe.first_frame, hbe.last_frame - S_step, N_step):
+        # make output name
+        out_path = out_path_template._replace(
+            fname='RM_{}_{:06}-{:06}_{}.h5'.format(k,
+                                                   j,
+                                                   j+N_step,
+                                                   v['fpath']['fname'][:-5]))
+
+        # compute the RM
+        _rm = lf.Region_map.from_backend(hbe,
+                                         f_slice=slice(j, j + S_step),
+                                         **RM_params)
+        # write it out to disk
+        _rm.write_to_hdf(out_path)

@@ -25,6 +25,7 @@ from matplotlib import cm
 import matplotlib
 import fractions
 import scipy.ndimage as ndi
+import scipy.signal
 from scipy.ndimage.interpolation import map_coordinates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -572,6 +573,9 @@ class Region_map(object):
         fringe_rings = []
         sample_theta = np.linspace(0, 2*np.pi, N)
         intep_func = scipy.interpolate.interp1d
+        circs = []
+        # get calibration value in mm
+        cal_val = backend.calibration_value * 1e-3
         for j in xrange(*f_slice.indices(len(backend))):
             if status_output and (j % 1000 == 0):
                 print j
@@ -588,10 +592,12 @@ class Region_map(object):
             img = mbe.img
             # get center
             center = curve.cntr
-
+            circs.append(curve.circ * cal_val)
             XY = np.vstack(curve.q_phi_to_xy(0, sample_theta))
             # slice the image
-            sliced_data = map_coordinates(img, XY[::-1], order=2).astype(np.float16)
+            sliced_data = map_coordinates(img,
+                                          XY[::-1],
+                                          order=2).astype(np.float16)
             # sample_theta != theta so re-sample _again_
             theta = np.arctan2(XY[1] - center[1], XY[0] - center[0])
             theta = np.mod(theta, 2*np.pi)
@@ -615,12 +621,13 @@ class Region_map(object):
         del img_bck_grnd_slices
         return cls.from_working_img(
             working_img, fringe_rings, mask_fun,
-            frame_indx=np.arange(*f_slice.indices(len(backend))), **kwargs)
+            frame_indx=np.arange(*f_slice.indices(len(backend))),
+            circs=np.array(circs), **kwargs)
 
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
                      size_cut=100, link_threshold=5,
-                     conflict_threshold=2, frame_indx=None,
+                     conflict_threshold=2, frame_indx=None,circs=None,
                      **kwargs):
         '''
         Generates a Region_map object from a kymograph
@@ -705,7 +712,7 @@ class Region_map(object):
                                         link_threshold,
                                         conflict_threshold=conflict_threshold)
         RM = cls(fringe_rings, region_edges, working_img, height_map,
-                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,
+                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,circs=circs,
                    **kwargs)
         # stash diagnostics about boot strapping
         RM._set_by = set_by
@@ -713,7 +720,7 @@ class Region_map(object):
         return RM
 
     def __init__(self, fringe_rings, region_edges, working_img,
-                 height_map, frame_indx,
+                 height_map, frame_indx, circs,
                  **kwargs):
         # fringes group by a per-time basis
         self.fringe_rings = fringe_rings
@@ -734,6 +741,10 @@ class Region_map(object):
         self._resampled_height = None
         # dict to hold parameters
         self.params = kwargs
+        # a numpy array with the circumference of each frame
+        self.circs = circs
+        self._rs_func = self._resample_height2D_savgol
+        self._rs_kwargs = dict()
         pass
 
     def __len__(self):
@@ -755,13 +766,6 @@ class Region_map(object):
         if self._label_img is None:
             self._label_img = self.reconstruct_label_img()
         return self._label_img
-
-    # make getting resampled height easy
-    @property
-    def resampled_height(self):
-        if self._resampled_height is None:
-            self._resampled_height = self.resample_height()
-        return self._resampled_height
 
     def display_height(self, ax=None, cmap='jet', bckgnd=True,
                        alpha=.65, t_scale=1, t_units=''):
@@ -909,6 +913,10 @@ class Region_map(object):
         image_edges = _segment_fringes(self.working_img[:, frame_num],
                                        thresh=thresh,
                                        filter_width=filter_width)
+
+        if len(image_edges.labels) < 5:
+            # not enough to do anything with, bail
+            return [], []
 
         # set up working data
         work_data = [local_tuple([], [])
@@ -1077,7 +1085,14 @@ class Region_map(object):
 
         return phi, h
 
-    def resample_height(self,
+    # make getting resampled height easy
+    @property
+    def resampled_height(self):
+        if self._resampled_height is None:
+            self._resampled_height = self._rs_func(**self._rs_kwargs)
+        return self._resampled_height
+
+    def _resample_height_1D(self,
                         N=1024,
                         intep_func=None,
                         min_range=0,
@@ -1114,15 +1129,19 @@ class Region_map(object):
                 phi, h, N, min_range, max_range, intep_func=intep_func)
             tmp.append(-h_new)
 
-        self._resampled_height = np.vstack(tmp).T
+        ret = np.vstack(tmp).T
 
-        return self._resampled_height
+        return ret
 
-    def resample_height2D(self,
+    def _resample_height2D(self,
                           N=1024,
                           intep_func=None,
                           min_th_range=0,
-                          max_th_range=2*np.pi):
+                          max_th_range=2*np.pi,
+                          scale=2*np.pi / 100):
+        """
+        Interpolates
+        """
         if intep_func is None:
             intep_func = scipy.interpolate.LinearNDInterpolator
 
@@ -1134,22 +1153,65 @@ class Region_map(object):
             phi, h = self._frame_fringe_positions(j)
             phi_accum.extend(phi)
             h_accum.extend(h)
+            tau_accum.extend(np.ones(len(h)) * j * scale)
             # make sure edges are included
-            phi_accum.append(phi[-1] - max_th_range)
-            h_accum.append(h[-1])
-            phi_accum.append(phi[0] + max_th_range)
-            h_accum.append(h[0])
-
-            tau_accum.extend(np.ones(len(h) + 2) * j)
+            if len(phi) > 0:
+                phi_accum.append(phi[-1] - max_th_range)
+                h_accum.append(h[-1])
+                phi_accum.append(phi[0] + max_th_range)
+                h_accum.append(h[0])
+                tau_accum.extend([j * scale] * 2)
 
         X, Y = np.meshgrid(np.linspace(0, max_th_range, N),
-                           range(len(self)))
+                           np.arange(len(self), dtype='float') * scale)
         intp_obj = intep_func(np.vstack((phi_accum, tau_accum)).T,
                               h_accum)
-        self._resampled_height = -intp_obj(
+        ret = -intp_obj(
             np.vstack((X.ravel(), Y.ravel())).T).reshape(X.shape).T
 
-        return self._resampled_height
+        return ret
+
+    def _resample_height2D_savgol(self, k_window=15, k_order=2,
+                                t_window=5, t_order=2, **kwargs):
+        """
+        Does 2D interpolation on the theta, tau location of the fringe/regions
+
+        Applies a Savitzky-Golay in both the k (along the rim at fixed
+        time) and t (fixed location through time) to the result to smooth
+        out junk.
+
+        This seems to be the most robust method.  Relies on a local
+        modification to scipy.signal.savgol_filter to allow wrap as
+        a mode
+
+        Parameters
+        ----------
+        k_window : odd int
+            Size of the window used for along rim filtering
+
+        k_order : positive int
+            The order polynomial used for along rim filtering
+
+        t_window : odd int
+            Size of the window used for along rim filtering
+
+        t_order : positive int
+            The order polynomial used for along rim filtering
+        """
+        raw_int = self._resample_height2D(**kwargs)
+        return scipy.signal.savgol_filter(
+                    scipy.signal.savgol_filter(raw_int,
+                                               k_window, k_order, axis=0,
+                                               mode='wrap'),
+                 t_window, t_order, axis=1)
+
+    def _resample_height2D_fft_filter(self, k_band=20, scale=None,
+                                      **kwargs):
+
+        raw_int = self._resample_height2D(**kwargs)
+        fft_tmp = np.fft.fft(raw_int, axis=1)
+        fft_tmp[:, (k_band+1):-k_band] = 0
+        return np.fft.ifft(fft_tmp, axis=1).T.real
 
     def display_height_resampled(self, ax=None, cmap='jet',
                                  bckgnd=True, alpha=.65,
@@ -1307,7 +1369,7 @@ class Region_map(object):
         # this will blow up if the file exists
         with closing(h5py.File(out_file.format, mode)) as h5file:
 
-            h5file.attrs['ver'] = '0.2'
+            h5file.attrs['ver'] = '0.3'
             # store all the md passed in
 
             if md_dict is not None:
@@ -1340,8 +1402,18 @@ class Region_map(object):
                                   self.working_img.dtype,
                                   compression='szip')
             h5file['working_img'][:] = self.working_img
+            # create circs data set
+            if self.circs is not None:
+                h5file.create_dataset('circs',
+                                    self.circs.shape,
+                                    self.circs.dtype,
+                                    compression='szip')
+                h5file['circs'][:] = self.circs
+
             # the frame index
-            h5file.create_dataset('frame_indx', data=self.frame_indx)
+            if self.frame_indx is not None:
+                h5file.create_dataset('frame_indx', data=self.frame_indx)
+
             # the mapping of region number to bootstrapped height
             h5file.create_dataset('height_map',
                                   self.height_map.shape,
@@ -1376,6 +1448,7 @@ class Region_map(object):
     @classmethod
     def from_hdf(cls, in_file):
         VER_DICT = {'0.2': cls._from_hdf_0_2,
+                    '0.3': cls._from_hdf_0_2
                     }
 
         with closing(h5py.File(in_file.format, 'r')) as h5file:
@@ -1397,6 +1470,10 @@ class Region_map(object):
             frame_indx = h5file['frame_indx'][:]
         else:
             frame_indx = np.arange(working_img.shape[1])
+        if 'circs' in h5file:
+            circs = h5file['circs'][:]
+        else:
+            circs = None
         # pull out the edges of the regions
         re_grp = h5file['region_edges']
         print 'starting region edges'
@@ -1435,7 +1512,7 @@ class Region_map(object):
         params = dict(h5file['params'].attrs)
 
         return cls(fringe_rings, region_edges, working_img,
-                   height_map, frame_indx, **params)
+                   height_map, frame_indx, circs, **params)
 
     def get_frame_profile(self, j):
         '''
@@ -2355,8 +2432,10 @@ class IS_FS_recon(object):
                               for k in xrange(1, max_N+1)])
 
         # add bounds to make the interpolation happy
-        pad = 1
-        _phi = np.hstack((phi[-pad::-1] - max_range, phi, phi[:pad:-1] + max_range))
+        pad = 2
+        _phi = np.hstack((phi[-pad::-1] - max_range,
+                          phi,
+                          phi[:pad:-1] + max_range))
         _h = np.hstack((h[-pad::-1], h, h[:pad:-1]))
 
         # do first FFT pass
@@ -2367,7 +2446,7 @@ class IS_FS_recon(object):
 
         # truncate fft values
         A_n = tmp_fft[:max_N+1]
-
+        prev_err = None
         # loop a bunch more times
         for j in range(iters):
             # pull out constant
@@ -2379,6 +2458,12 @@ class IS_FS_recon(object):
                               A_list.imag * sin_list, axis=0) + A0
             # compute error
             error_h = h - re_con
+            curr_err = np.abs(np.mean(error_h))
+            if prev_err is not None:
+                # if the error isn't really improving, bail
+                if 1 - curr_err / prev_err < .001:
+                    break
+            prev_err = curr_err
             # add padding to error so that the interpolation is happy
             _h = np.hstack((error_h[-pad::-1], error_h, error_h[:pad:-1]))
             # compute FFT of error

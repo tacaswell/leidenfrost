@@ -30,24 +30,25 @@ import cine
 
 import copy
 
-import shutil
 import collections
 import parse
 
 import leidenfrost.db as db
 import leidenfrost.infra as infra
-import leidenfrost.file_help as lffh
+
 
 from leidenfrost import FilePath
 
 HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
 
-def hdf_backend_factory(cine_hash, i_disk_dict=None):
+def hdf_backend_factory(cine_hash,
+                        i_disk_dict=None,
+                        cache_path='/mnt/cache'):
     local_db = db.LFmongodb(i_disk_dict=i_disk_dict)
     h5_lst = local_db.get_h5_list(cine_hash)
     return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path, cine_hash=cine_hash,
-                           i_disk_dict=i_disk_dict, cache_path='/mnt/cache')
+                           i_disk_dict=i_disk_dict, cache_path=cache_path)
 
 
 class MultiHdfBackend(object):

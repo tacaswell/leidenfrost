@@ -18,6 +18,7 @@
 import collections
 import os.path
 import copy
+import git
 
 
 class FilePath(collections.namedtuple('FilePath',
@@ -70,3 +71,14 @@ def convert_base_path(in_file_path, disk_dict):
     '''
     return in_file_path._replace(
         base_path=disk_dict.get(in_file_path.base_path, None))
+
+
+def git_version():
+    path, _ = os.path.split(__file__)
+    repo = git.Repo(path)
+    sha = str(repo.head.commit)
+    if repo.is_dirty():
+        sha += '_dirty'
+    return sha
+
+__version__ = git_version()
