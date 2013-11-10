@@ -574,6 +574,8 @@ class Region_map(object):
         sample_theta = np.linspace(0, 2*np.pi, N)
         intep_func = scipy.interpolate.interp1d
         circs = []
+        # get calibration value in mm
+        cal_val = backend.calibration_value * 1e-3
         for j in xrange(*f_slice.indices(len(backend))):
             if status_output and (j % 1000 == 0):
                 print j
@@ -590,7 +592,7 @@ class Region_map(object):
             img = mbe.img
             # get center
             center = curve.cntr
-            circs.append(curve.circ)
+            circs.append(curve.circ * cal_val)
             XY = np.vstack(curve.q_phi_to_xy(0, sample_theta))
             # slice the image
             sliced_data = map_coordinates(img,
