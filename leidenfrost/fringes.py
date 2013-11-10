@@ -578,7 +578,7 @@ class Region_map(object):
             if status_output and (j % 1000 == 0):
                 print j
             mbe = backend.get_frame(j, get_img=True, raw=reclassify)
-            circs.append(mbe.next_curve.circ)
+
             fringe_rings.append(FringeRing.from_mbe(mbe,
                                                     reclassify=reclassify))
             if reclassify:
@@ -590,7 +590,7 @@ class Region_map(object):
             img = mbe.img
             # get center
             center = curve.cntr
-
+            circs.append(curve.circ)
             XY = np.vstack(curve.q_phi_to_xy(0, sample_theta))
             # slice the image
             sliced_data = map_coordinates(img,
