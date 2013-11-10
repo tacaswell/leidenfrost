@@ -573,11 +573,12 @@ class Region_map(object):
         fringe_rings = []
         sample_theta = np.linspace(0, 2*np.pi, N)
         intep_func = scipy.interpolate.interp1d
+        circs = []
         for j in xrange(*f_slice.indices(len(backend))):
             if status_output and (j % 1000 == 0):
                 print j
             mbe = backend.get_frame(j, get_img=True, raw=reclassify)
-
+            circs.append(mbe.next_curve.circ)
             fringe_rings.append(FringeRing.from_mbe(mbe,
                                                     reclassify=reclassify))
             if reclassify:
@@ -618,12 +619,13 @@ class Region_map(object):
         del img_bck_grnd_slices
         return cls.from_working_img(
             working_img, fringe_rings, mask_fun,
-            frame_indx=np.arange(*f_slice.indices(len(backend))), **kwargs)
+            frame_indx=np.arange(*f_slice.indices(len(backend))),
+            circs=np.array(circs), **kwargs)
 
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
                      size_cut=100, link_threshold=5,
-                     conflict_threshold=2, frame_indx=None,
+                     conflict_threshold=2, frame_indx=None,circs=None,
                      **kwargs):
         '''
         Generates a Region_map object from a kymograph
@@ -708,7 +710,7 @@ class Region_map(object):
                                         link_threshold,
                                         conflict_threshold=conflict_threshold)
         RM = cls(fringe_rings, region_edges, working_img, height_map,
-                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,
+                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,circs=circs,
                    **kwargs)
         # stash diagnostics about boot strapping
         RM._set_by = set_by
@@ -716,7 +718,7 @@ class Region_map(object):
         return RM
 
     def __init__(self, fringe_rings, region_edges, working_img,
-                 height_map, frame_indx,
+                 height_map, frame_indx, circs
                  **kwargs):
         # fringes group by a per-time basis
         self.fringe_rings = fringe_rings
@@ -737,7 +739,8 @@ class Region_map(object):
         self._resampled_height = None
         # dict to hold parameters
         self.params = kwargs
-
+        # a numpy array with the circumference of each frame
+        self.circs = circs
         self._rs_func = self._resample_height2D_savgol
         self._rs_kwargs = dict()
         pass
@@ -1346,7 +1349,7 @@ class Region_map(object):
         # this will blow up if the file exists
         with closing(h5py.File(out_file.format, mode)) as h5file:
 
-            h5file.attrs['ver'] = '0.2'
+            h5file.attrs['ver'] = '0.3'
             # store all the md passed in
 
             if md_dict is not None:
@@ -1379,8 +1382,18 @@ class Region_map(object):
                                   self.working_img.dtype,
                                   compression='szip')
             h5file['working_img'][:] = self.working_img
+            # create circs data set
+            if circs is not None:
+                h5file.create_dataset('circs',
+                                    self.circs.shape,
+                                    self.circs.dtype,
+                                    compression='szip')
+                h5file['circs'][:] = self.circs
+
             # the frame index
-            h5file.create_dataset('frame_indx', data=self.frame_indx)
+            if self.frame_indx is not None:
+                h5file.create_dataset('frame_indx', data=self.frame_indx)
+
             # the mapping of region number to bootstrapped height
             h5file.create_dataset('height_map',
                                   self.height_map.shape,
@@ -1415,6 +1428,7 @@ class Region_map(object):
     @classmethod
     def from_hdf(cls, in_file):
         VER_DICT = {'0.2': cls._from_hdf_0_2,
+                    '0.3': cls._from_hdf_0_2
                     }
 
         with closing(h5py.File(in_file.format, 'r')) as h5file:
@@ -1436,6 +1450,10 @@ class Region_map(object):
             frame_indx = h5file['frame_indx'][:]
         else:
             frame_indx = np.arange(working_img.shape[1])
+        if 'circs' in h5file:
+            circs = h5file['circs'][:]
+        else:
+            circs = None
         # pull out the edges of the regions
         re_grp = h5file['region_edges']
         print 'starting region edges'
@@ -1474,7 +1492,7 @@ class Region_map(object):
         params = dict(h5file['params'].attrs)
 
         return cls(fringe_rings, region_edges, working_img,
-                   height_map, frame_indx, **params)
+                   height_map, frame_indx, circs, **params)
 
     def get_frame_profile(self, j):
         '''
