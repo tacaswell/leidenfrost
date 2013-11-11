@@ -271,6 +271,11 @@ class LFmongodb(LFDbWrapper):
         record['timeout'] = True
         self.coll_dict['proc'].save(record)
 
+    def error_proc(self, id):
+        record = self.coll_dict['proc'].find_one({'_id': id})
+        record['error'] = True
+        self.coll_dict['proc'].save(record)
+
     def flag_proc_useful(self, id):
         record = self.coll_dict['proc'].find_one({'_id': id})
         record['useful'] = True

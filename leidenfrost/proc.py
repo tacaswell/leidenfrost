@@ -153,9 +153,11 @@ def proc_cine_to_h5(ch, hdf_fname_template, params, seed_curve):
     except Exception as e:
         # handle all exceptions we should get
         logger.warn(str(e))
+        db.error_proc(_id)
     except:
         # handle everything else
         logger.warn('raised exception not derived from Exception')
+        db.error_proc(_id)
     else:
         # if we ran through the full movie, mark it done (yay)
         db.finish_proc(_id)
