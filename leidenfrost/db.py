@@ -419,7 +419,7 @@ def get_useful_proc():
     good_dict = {}
 
     # find all cines marked as 'useful'
-    for cine_cur in db.coll_dict['movs'].find():
+    for cine_cur in db.coll_dict['movs'].find({'useful': True}):
         cine_hash = cine_cur['cine']
         # find all proc for this cine marked as useful
         good_proc_cur = db.coll_dict['proc'].find({'cine': cine_hash,
