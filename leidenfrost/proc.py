@@ -40,14 +40,12 @@ def _timeout_handler(signum, frame):
     raise TimeoutException()
 
 
-def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
+def proc_cine_to_h5(ch, hdf_fname_template, params, seed_curve):
     """
     Processes a cine path -> h5
 
     Parameters
     ----------
-    cine_fname : FilePath
-        The cine file of interest
     ch : str
         Hash of the cine_fname
 
@@ -61,8 +59,9 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
         The first frame to process
 
     """
+    i_disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
     # make data base communication object
-    db = ldb.LFmongodb()
+    db = ldb.LFmongodb(i_disk_dict=i_disk_dict)
     # set up logging stuff
     logger = logging.getLogger('proc_cine_frame_' + str(os.getpid()))
     logger.setLevel(logging.DEBUG)
@@ -71,9 +70,11 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     params = copy.copy(params)
 
     # convert disk
-    disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
     hdf_fname_template = leidenfrost.convert_base_path(hdf_fname_template,
-                                                       disk_dict)
+                                                       i_disk_dict)
+    cine_md = db.get_movie_md(ch)
+    cine_fname = leidenfrost.FilePath.from_db_dict(cine_md['fpath'], i_disk_dict)
+
     # sort out output files names
     h5_fname = hdf_fname_template._replace(
         fname=cine_fname.fname.replace('cine', 'h5'))
