@@ -277,7 +277,9 @@ class LFReaderGui(QtGui.QMainWindow):
         #self.status_text.setText(label)
 
         self.frame_spinner.setRange(self.reader.first_frame,
-                                    self.reader.last_frame)
+                                    self.reader.last_frame - 1)
+        self._in_out_select.set_limit(self.reader.first_frame,
+                                      self.reader.last_frame)
         self.frame_spinner.setValue(self.reader.first_frame)
         self.max_frame_label.setText(str(self.reader.last_frame))
         self.max_cine_label.setText(str(self.reader.cine_len() - 1))
@@ -443,7 +445,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.show_track_graphs.toggled.connect(self.graphs_window.setVisible)
 
         in_out_select = frame_range_selector(self.frame_spinner)
-
+        self._in_out_select = in_out_select
         def tmp(x, y):
             print x, y
             print "start: {} end: {}".format(x, y)
