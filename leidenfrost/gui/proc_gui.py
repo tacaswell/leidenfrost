@@ -138,7 +138,7 @@ class LFWorker(QtCore.QObject):
 
     def start_comp(self, seed_curve, name_template, cur_frame, disk_dict):
         # make the connection to the ether
-        lb_view = Client(profile='vpn').load_balanced_view()
+        lb_view = Client(profile='vpn', sshserver='10.8.0.1').load_balanced_view()
         # grab a copy of the paramters
         proc_prams = copy.copy(self.process_backend.params)
         # put in the start_frame
@@ -250,7 +250,17 @@ class LFGui(QtGui.QMainWindow):
           'togglable': True,
           'default_state': True,
           'tooltip': """The maximum fractional change in the circumference of
-successive rims.  If exceeded, the previous seed-curve is re-used"""}
+successive rims.  If exceeded, the previous seed-curve is re-used"""},
+         {'name': 'end_frame',
+          'min': -1,
+          'max': 2**31 - 1,
+          'step': 1,
+          'type': np.int,
+          'default': -1,
+          'togglable': True,
+          'default_state': False,
+          'tooltip': """The last frame to process to"""},
+
     ]
 
     toggle_lst = [

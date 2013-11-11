@@ -30,7 +30,7 @@ import leidenfrost.db as ldb
 import leidenfrost.fringes as lf
 import leidenfrost.backends as lb
 import leidenfrost.file_help as lffh
-import leidenfrost.db as ldb
+
 
 class TimeoutException(Exception):
     pass
@@ -83,6 +83,10 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
         fname=h5_fname.fname.replace('h5', 'log')).format)
 
     start_frame = params.pop('start_frame', 0)
+    end_frame = params.pop('end_frame', -1)
+    if end_frame > 0 and end_frame < start_frame:
+        raise Exception("invalid start and end frames")
+
     max_circ_change_frac = params.pop('max_circ_change', None)
 
     if os.path.isfile(h5_fname.format):
@@ -99,13 +103,16 @@ def proc_cine_to_h5(cine_fname, ch, hdf_fname_template, params, seed_curve):
     file_out = hfb.file
     logger.info('created file')
 
+    if end_frame == -1:
+        end_frame = len(stack)
+
     old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
 
     try:
         lh.setFormatter(formatter)
         logger.addHandler(lh)
 
-        for j in xrange(start_frame, len(stack)):
+        for j in xrange(start_frame, end_frame):
             # set a 30s window, if the frame does not finish on 30s, kill it
             if hfb.contains_frame(j):
                 logger.warn('deleting existing frame {0}'.format(j))
