@@ -627,7 +627,8 @@ class Region_map(object):
     @classmethod
     def from_working_img(cls, working_img, fringe_rings, mask_fun, thresh,
                      size_cut=100, link_threshold=5,
-                     conflict_threshold=2, frame_indx=None,circs=None,
+                     conflict_threshold=2, frame_indx=None,
+                     circs=None,
                      **kwargs):
         '''
         Generates a Region_map object from a kymograph
@@ -712,7 +713,8 @@ class Region_map(object):
                                         link_threshold,
                                         conflict_threshold=conflict_threshold)
         RM = cls(fringe_rings, region_edges, working_img, height_map,
-                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,circs=circs,
+                   thresh=thresh, size_cut=size_cut, frame_indx=frame_indx,
+                   circs=circs,
                    **kwargs)
         # stash diagnostics about boot strapping
         RM._set_by = set_by
@@ -739,6 +741,8 @@ class Region_map(object):
         self._label_img = None
         # re-sampled height image
         self._resampled_height = None
+        # quality measure on interpolation
+        self._qd = None
         # dict to hold parameters
         self.params = kwargs
         # a numpy array with the circumference of each frame
@@ -1088,15 +1092,25 @@ class Region_map(object):
     # make getting resampled height easy
     @property
     def resampled_height(self):
+        # if we don't have a cached copy of the resampled height
         if self._resampled_height is None:
-            self._resampled_height = self._rs_func(**self._rs_kwargs)
+            # do the resampleing
+            _resampled_height = self._rs_func(**self._rs_kwargs)
+            # if we get a tuple back, unpack it
+            if isinstance(_resampled_height, tuple):
+                self._resampled_height, self._qd = _resampled_height
+            # or set the quality measure to None
+            else:
+                self._resampled_height = _resampled_height
+                self._qd = None
         return self._resampled_height
 
     def _resample_height_1D(self,
                         N=1024,
                         intep_func=None,
                         min_range=0,
-                        max_range=2*np.pi):
+                        max_range=2*np.pi,
+                        suppress_diagnostic=False):
         '''
         Returns a re-sampled and interpolated version of the height map.
 
@@ -1123,24 +1137,31 @@ class Region_map(object):
             #intep_func = scipy.interpolate.InterpolatedUnivariateSpline
             intep_func = scipy.interpolate.interp1d
         tmp = []
+        quality_measure = np.zeros(len(self))
         for j in xrange(len(self)):
             phi, h = self._frame_fringe_positions(j)
             phi_new, h_new = _height_interpolate(
                 phi, h, N, min_range, max_range, intep_func=intep_func)
             tmp.append(-h_new)
+            quality_measure[j] = len(phi)
 
         ret = np.vstack(tmp).T
-
-        return ret
+        if suppress_diagnostic:
+            return ret
+        return ret, quality_measure
 
     def _resample_height2D(self,
                           N=1024,
                           intep_func=None,
                           min_th_range=0,
                           max_th_range=2*np.pi,
-                          scale=2*np.pi / 100):
+                          scale=2*np.pi / 100,
+                          suppress_diagnostic=False):
         """
-        Interpolates
+        Interpolates the height surface based on where there
+        is a point were we can determine the height.  This is either
+        from there being a continuous region in the kymograph or from
+        counting fringes from known regions.
         """
         if intep_func is None:
             intep_func = scipy.interpolate.LinearNDInterpolator
@@ -1149,27 +1170,37 @@ class Region_map(object):
         phi_accum = []
         h_accum = []
         tau_accum = []
+        quality_measure = np.zeros(len(self))
         for j in xrange(len(self)):
+            # get out the points from this frame
             phi, h = self._frame_fringe_positions(j)
+            # record how many points we had at each time step
+            quality_measure[j] = len(phi)
+            # add to the accumulation lists
             phi_accum.extend(phi)
             h_accum.extend(h)
             tau_accum.extend(np.ones(len(h)) * j * scale)
-            # make sure edges are included
+            # make sure edges are included so the convex hull around
+            # the data points is larger than the region we want to
+            # interpolate on
             if len(phi) > 0:
                 phi_accum.append(phi[-1] - max_th_range)
                 h_accum.append(h[-1])
                 phi_accum.append(phi[0] + max_th_range)
                 h_accum.append(h[0])
                 tau_accum.extend([j * scale] * 2)
-
+        # set up new sample points
         X, Y = np.meshgrid(np.linspace(0, max_th_range, N),
                            np.arange(len(self), dtype='float') * scale)
+        # make the interpolation object
         intp_obj = intep_func(np.vstack((phi_accum, tau_accum)).T,
                               h_accum)
+        # do the interpolation
         ret = -intp_obj(
             np.vstack((X.ravel(), Y.ravel())).T).reshape(X.shape).T
-
-        return ret
+        if suppress_diagnostic:
+            return ret
+        return ret, quality_measure
 
     def _resample_height2D_savgol(self, k_window=15, k_order=2,
                                 t_window=5, t_order=2, **kwargs):
@@ -1198,20 +1229,33 @@ class Region_map(object):
         t_order : positive int
             The order polynomial used for along rim filtering
         """
-        raw_int = self._resample_height2D(**kwargs)
-        return scipy.signal.savgol_filter(
+        if 'suppress_diagnostic' in kwargs and kwargs['suppress_diagnostic']:
+            raw_int = self._resample_height2D(**kwargs)
+            qd = None
+
+        raw_int, qd = self._resample_height2D(**kwargs)
+        filtered_int = scipy.signal.savgol_filter(
                     scipy.signal.savgol_filter(raw_int,
                                                k_window, k_order, axis=0,
                                                mode='wrap'),
                  t_window, t_order, axis=1)
+        if qd is None:
+            return filtered_int
+
+        return filtered_int, qd
 
     def _resample_height2D_fft_filter(self, k_band=20, scale=None,
                                       **kwargs):
-
-        raw_int = self._resample_height2D(**kwargs)
+        if 'suppress_diagnostic' in kwargs and kwargs['suppress_diagnostic']:
+            raw_int = self._resample_height2D(**kwargs)
+            qd = None
+        raw_int, qd = self._resample_height2D(**kwargs)
         fft_tmp = np.fft.fft(raw_int, axis=1)
         fft_tmp[:, (k_band+1):-k_band] = 0
-        return np.fft.ifft(fft_tmp, axis=1).T.real
+        if qd is None:
+            return np.fft.ifft(fft_tmp, axis=1).T.real
+
+        return np.fft.ifft(fft_tmp, axis=1).T.real, qd
 
     def display_height_resampled(self, ax=None, cmap='jet',
                                  bckgnd=True, alpha=.65,
