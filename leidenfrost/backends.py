@@ -165,7 +165,7 @@ class MultiHdfBackend(object):
         if j < self.first_frame or j >= self.last_frame:
             raise ValueError("out of range")
         for hbe, _f, _l in self._h5_backends:
-            if j >= _f and j <= _l:
+            if j >= _f and j < _l:
                 return hbe.get_frame(j, *args, **kwargs)
         raise Exception("frame {} not in backend".format(j))
 
