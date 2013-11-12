@@ -138,7 +138,8 @@ class LFWorker(QtCore.QObject):
 
     def start_comp(self, seed_curve, name_template, cur_frame, disk_dict):
         # make the connection to the ether
-        lb_view = Client(profile='vpn', sshserver='10.8.0.1').load_balanced_view()
+        lb_view = Client(profile='vpn',
+                         sshserver='10.8.0.1').load_balanced_view()
         # grab a copy of the paramters
         proc_prams = copy.copy(self.process_backend.params)
         # put in the start_frame
