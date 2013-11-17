@@ -295,7 +295,7 @@ class HdfBackend(object):
     def last_frame(self):
         if self._last_frame is None:
             if 'last_frame' in self.file.attrs:
-                self._last_frame = self.file.attrs['last_frame'] + 1
+                self._last_frame = self.file.attrs['last_frame']
             else:
                 tmp = [parse.parse(self._frame_str, k)[0]
                        for k in self.file.keys() if 'frame' in k]
@@ -328,6 +328,10 @@ class HdfBackend(object):
         if self.contains_frame(j):
             del self.file[self._frame_str.format(j)]
         self.num_frames = len([k for k in self.file.keys() if 'frame' in k])
+        tmp = [parse.parse(self._frame_str, k)[0]
+                for k in self.file.keys() if 'frame' in k]
+        self._last_frame = max(tmp) + 1
+        self.file.attrs['last_frame'] = self._last_frame
 
     def contains_frame(self, j):
         '''Returns if frame `j` is saved in the hdf file
