@@ -495,11 +495,12 @@ def _get_fc_lists(mbe, reclassify):
     else:
         for res_lst, color in izip(mbe.res, colors):
             charge_lst, phi_lst, q_lst = res_lst
-            XY = mbe.curve.q_phi_to_xy(q_lst, phi_lst) - center
-            th = np.mod(np.arctan2(XY[1], XY[0]), 2*np.pi)
-            for charge, theta, q in izip(charge_lst, th, q_lst):
-                f_locs.append(fringe_loc(q, theta))
-                f_classes.append(fringe_cls(color, charge, 0))
+            if len(q_lst) > 0:
+                XY = mbe.curve.q_phi_to_xy(q_lst, phi_lst) - center
+                th = np.mod(np.arctan2(XY[1], XY[0]), 2*np.pi)
+                for charge, theta, q in izip(charge_lst, th, q_lst):
+                    f_locs.append(fringe_loc(q, theta))
+                    f_classes.append(fringe_cls(color, charge, 0))
 
     f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs),
                                     key=lambda x: x[1][1]))
