@@ -2310,7 +2310,8 @@ class IS_FS_recon(object):
     data
     """
     @classmethod
-    def reconstruct_iterative(cls, phi, h, target_error, start_N=3, bound_N=15, iters=25):
+    def reconstruct_iterative(cls, phi, h, target_error,
+                              start_N=3, bound_N=15, iters=25):
         """
         reconstruct a band-limited a curve from unevenly
         sampled points
@@ -2522,8 +2523,12 @@ class IS_FS_recon(object):
         return cls(A_n)
 
     def __init__(self, A_n):
-        self.A_n = np.asarray(A_n)
+        self._A_n = np.asarray(A_n)
         self.N = len(A_n)
+
+    @property
+    def A_n(self):
+        return self._A_n
 
     @property
     def max_N(self):
@@ -2542,8 +2547,8 @@ class IS_FS_recon(object):
         cos_list = np.vstack([k**deriv * np.cos(k * th)
                               for k in xrange(1, self.N)])
 
-        A0 = self.A_n[0].real if deriv == 0 else 0
-        A_list = self.A_n[1:].reshape(-1, 1)
+        A0 = self._A_n[0].real if deriv == 0 else 0
+        A_list = self._A_n[1:].reshape(-1, 1)
 
         # there has to be a better way to write this
         deriv = deriv % 4
