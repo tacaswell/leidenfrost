@@ -59,7 +59,7 @@ def proc_cine_to_h5(ch, hdf_fname_template, params, seed_curve):
         The first frame to process
 
     """
-    i_disk_dict = {0: u'/media/leidenfrost_a', 1: u'/media/leidenfrost_c'}
+    i_disk_dict = {0: u'/media/tcaswell/leidenfrost_a', 1: u'/media/tcaswell/leidenfrost_c'}
     # make data base communication object
     db = ldb.LFmongodb(i_disk_dict=i_disk_dict)
     # set up logging stuff
