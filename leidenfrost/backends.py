@@ -111,8 +111,8 @@ class MultiHdfBackend(object):
                 print fn.format
                 continue
             if (frame_in < tmp_be.first_frame or
-                 frame_out > tmp_be.last_frame):
-                print ('frame in ({}) and frame out ({}) inconsisetn with' +
+                 frame_out > tmp_be.last_frame + 1):
+                print ('frame in ({}) and frame out ({}) inconsistent with' +
                         'first ({}) and last ({}) frames').format(
                             frame_in, frame_out,
                             tmp_be.first_frame, tmp_be.last_frame)
