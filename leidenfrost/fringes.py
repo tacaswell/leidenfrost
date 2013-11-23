@@ -2563,3 +2563,94 @@ class IS_FS_recon(object):
 
         return 2*np.sum(A_list.real * a -
                         A_list.imag * b, axis=0) + A0
+
+
+def reconstruct_height(work_key, rm_dict, db, laser_lambda=.6328):
+    prev_fr = None
+    prev_h = None
+    h_shift = 0
+    h_accum = []
+    prev_qd = None
+    md = db.get_movie_md(work_key)
+
+    h_recon = np.ones(md['frames'], dtype=np.float32)*np.nan
+
+    for (rd_data,
+             qd,
+             (in_fr, out_fr)) in rm_dict[work_key]:
+
+        if rd_data is None:
+            h_accum.apend(0)
+            continue
+
+        ((L, ptp, h), A_list) = rd_data
+        frame_index = np.arange(in_fr, out_fr)
+        nan_mask = np.isnan(h)
+        # pad out the nans,
+        nan_mask = scipy.ndimage.maximum_filter1d(nan_mask, 100)
+        if np.all(nan_mask):
+            # reset the back-checking, have a totally dead region
+            prev_fr = None
+            prev_h = None
+            print 'all nan'
+            continue
+        if np.sum(np.diff(nan_mask)) > 2:
+            print 'two region'
+            raise Exception("miracle has occured")
+
+        h = h * (laser_lambda/4)  # convert to um
+        nan_mask = ~nan_mask   # invert nan_mask
+
+        h = h[nan_mask]
+        frame_index = frame_index[nan_mask]
+
+        if prev_fr is None:
+            # stash the good edges of this frame
+            prev_fr = frame_index[[0, -1]]
+            # and the height
+            prev_h = h
+            prev_qd = qd
+            cur_start, cur_end = frame_index[[0, -1]]
+            cur_end += 1
+            h_recon[cur_start:cur_end] = h + h_shift
+            h_accum.append(h_shift)
+        else:
+            prev_start, prev_end = prev_fr
+            cur_start, cur_end = frame_index[[0, -1]]
+            cur_end += 1
+            if cur_start > prev_end:
+                # no overlap, reset linking
+                h_shift = (-h[0] + prev_h[-1])
+
+                prev_fr = None
+                prev_h = None
+                prev_qd = None
+            else:
+
+                left_buffer = 0
+                right_buff = 1
+
+                overlap_count = np.min((prev_end - cur_start, len(h),
+                                        len(prev_h)))
+                overlap_diff = prev_h[-overlap_count:] - h[:overlap_count]
+
+                h_shift = np.mean(overlap_diff[left_buffer: -right_buff])
+
+            h = h + h_shift
+            h_accum.append(h_shift)
+            if prev_h is None:
+                h_recon[cur_start:cur_end] = h
+            else:
+
+                h_recon[cur_start: cur_start + overlap_count] = np.where(
+                    prev_qd[-overlap_count:] > qd[:overlap_count],
+                    prev_h[-overlap_count:],
+                    h[:overlap_count])
+
+                h_recon[cur_start+overlap_count:cur_end] = h[overlap_count:]
+
+            prev_h = h
+            prev_fr = (cur_start, cur_end)
+            prev_qd = qd
+
+    return h_recon, h_accum
