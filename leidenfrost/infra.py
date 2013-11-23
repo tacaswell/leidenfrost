@@ -743,9 +743,9 @@ class SplineCurve(object):
         theta = np.r_[theta[-1] - 2*np.pi,
                         theta,
                         theta[0] + 2 * np.pi]
-        XY = np.r_[XY[:, -1], XY, XY[:, 0]]
+        XY = np.c_[XY[:, -1:], XY, XY[:, :1]]
         # the sample points
-        sample_theta = np.linspace(0, 2*np.p, N)
+        sample_theta = np.linspace(0, 2*np.pi, N)
         # re-sample
         XY_resample = np.vstack([intep_func(theta, _xy)(sample_theta) for
                                  _xy in XY])
