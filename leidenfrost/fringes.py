@@ -2325,8 +2325,8 @@ class IS_FS_recon(object):
             The sample points.  Assumed to be in range [0, 2*np.pi)
 
         target_error : float
-            The average difference between the reconstruction and the input data.  Stops
-            iterating when hit
+            The average difference between the reconstruction
+            and the input data.  Stops iterating when hit
 
         start_N : int, optional
             The initial bandwidth.  Defaults to 3
@@ -2359,7 +2359,9 @@ class IS_FS_recon(object):
         h = h[indx]
         # add bounds to make the interpolation happy
         pad = 1
-        _phi = np.hstack((phi[-pad::-1] - max_range, phi, phi[:pad:-1] + max_range))
+        _phi = np.hstack((phi[-pad::-1] - max_range,
+                          phi,
+                          phi[:pad:-1] + max_range))
         _h = np.hstack((h[-pad::-1], h, h[:pad:-1]))
 
         # do first FFT pass
