@@ -19,6 +19,8 @@ import os
 import cine
 from leidenfrost import FilePath
 import shutil
+from collections import defaultdict
+import parse
 
 
 def get_h5_lst(base_path, search_path):
@@ -78,3 +80,21 @@ def ensure_path_exists(path):
         os.makedirs(path)
     if os.path.isfile(path):
         raise Exception("there is a file where you think there is a path!")
+
+
+def get_split_rm(base_path):
+    res_dict = defaultdict(list)
+    for dirpath, dirnames, fnames in os.walk(base_path):
+        for ff in fnames:
+            if ff[:2] == 'RM':
+                rr = parse.parse('RM_{key}_{start_f:d}-{end_f:d}_{name}.h5', ff)
+
+                res_dict[rr['key']].append((rr['start_f'], rr['end_f'],
+                                              FilePath(base_path,
+                                              dirpath[len(base_path) + 1:]
+                                              , ff)))
+
+    for k, v in res_dict.items():
+        v.sort()
+
+    return res_dict
