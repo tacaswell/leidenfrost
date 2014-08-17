@@ -1,24 +1,23 @@
-#Copyright 2013 Thomas A Caswell
-#tcaswell@uchicago.edu
-#http://jfi.uchicago.edu/~tcaswell
+# Copyright 2013 Thomas A Caswell
+# tcaswell@uchicago.edu
+# http://jfi.uchicago.edu/~tcaswell
 #
-#This program is free software; you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation; either version 3 of the License, or (at
-#your option) any later version.
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or (at
+# your option) any later version.
 #
-#This program is distributed in the hope that it will be useful, but
-#WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-#General Public License for more details.
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
 #
-#You should have received a copy of the GNU General Public License
-#along with this program; if not, see <http://www.gnu.org/licenses>.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses>.
 
 import collections
 import os.path
 import copy
-import git
 
 
 class FilePath(collections.namedtuple('FilePath',
@@ -71,14 +70,3 @@ def convert_base_path(in_file_path, disk_dict):
     '''
     return in_file_path._replace(
         base_path=disk_dict.get(in_file_path.base_path, None))
-
-
-def git_version():
-    path, _ = os.path.split(__file__)
-    repo = git.Repo(path)
-    sha = str(repo.head.commit)
-    if repo.is_dirty():
-        sha += '_dirty'
-    return sha
-
-__version__ = git_version()
