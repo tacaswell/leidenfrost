@@ -11,6 +11,7 @@ setup(
     author='Thomas A Caswell',
     author_email='tcaswell@uchicago.edu',
     url='https://github.com/tacaswell/leidenfrost',
-    packages=["leidenfrost"],
-    install_requires=['numpy', 'six', 'scipy', 'trackpy']
+    packages=["leidenfrost", "leidenfrost.gui", 'cine',
+              'find_peaks'],
+    requires=['numpy', 'six', 'scipy', 'pymongo', 'h5py', 'networkx', 'parse', 'ipython', 'pyzmq'],
     )
