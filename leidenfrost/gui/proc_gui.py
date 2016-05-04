@@ -18,6 +18,8 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
+from builtins import zip
+from builtins import str
 
 import os
 import copy
@@ -512,13 +514,13 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
     def _get_cur_parametrs(self):
         tmp_dict = {}
         # get parameters out of spin boxes
-        for key, sb in self.param_spin_dict.iteritems():
+        for key, sb in self.param_spin_dict.items():
 
             if sb.isEnabled():
                 tmp_dict[key] = sb.value()
 
         # get toggle switch values
-        for key, cb in self.param_checkbox_dict.iteritems():
+        for key, cb in self.param_checkbox_dict.items():
 
             tmp_dict[key] = bool(cb.checkState())
 

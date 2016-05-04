@@ -1,4 +1,5 @@
 from __future__ import print_function
+from builtins import zip
 #Copyright 2013 Thomas A Caswell
 #tcaswell@uchicago.edu
 #http://jfi.uchicago.edu/~tcaswell
@@ -44,7 +45,7 @@ def get_cine_hashes(base_path, search_path):
     cine_fnames.sort(key=lambda x: x[-1])
     cine_hash = [cine.Cine(cn.format).hash for cn in cine_fnames]
 
-    return zip(cine_fnames, cine_hash)
+    return list(zip(cine_fnames, cine_hash))
 
 
 def copy_file(fname_src, fname_dest):

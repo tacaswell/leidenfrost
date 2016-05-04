@@ -15,6 +15,8 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division, print_function
+from builtins import str
+from builtins import range
 import signal
 import time
 
@@ -113,7 +115,7 @@ def proc_cine_to_h5(ch, hdf_fname_template, params, seed_curve):
         lh.setFormatter(formatter)
         logger.addHandler(lh)
 
-        for j in xrange(start_frame, end_frame):
+        for j in range(start_frame, end_frame):
             # set a 30s window, if the frame does not finish on 30s, kill it
             if hfb.contains_frame(j):
                 logger.warn('deleting existing frame {0}'.format(j))
@@ -271,7 +273,7 @@ def process_split_RM(k, cache_path, RM_params,
                                  '')
     # make sure the path exists
     lffh.ensure_path_exists(out_path_template.format)
-    for j in xrange(hbe.first_frame, hbe.last_frame - S_step, N_step):
+    for j in range(hbe.first_frame, hbe.last_frame - S_step, N_step):
         # make output name
         out_path = out_path_template._replace(
             fname='RM_{}_{:06}-{:06}_{}.h5'.format(k,

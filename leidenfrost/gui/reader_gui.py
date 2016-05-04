@@ -18,6 +18,9 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
+from builtins import zip
+from builtins import str
+from builtins import object
 
 import os
 
@@ -336,7 +339,7 @@ class LFReaderGui(QtGui.QMainWindow):
         param_form_layout = QtGui.QFormLayout()
         ignore_lst = ['tck0', 'tck1', 'tck2', 'center',
                       'cine_path', 'cine_fname', 'cine_hash']
-        for k, v in prams.iteritems():
+        for k, v in prams.items():
             if k in ignore_lst:
                 continue
             param_form_layout.addRow(QtGui.QLabel(k + ':'),
@@ -349,7 +352,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
             '''
             ignore_lst = ['tck0', 'tck1', 'tck2', 'center']
-            for k, v in prams.iteritems():
+            for k, v in prams.items():
                 if k in ignore_lst:
                     continue
                 print("| {key} | {val} |".format(key=k, val=v))
@@ -491,7 +494,7 @@ class LFReaderGui(QtGui.QMainWindow):
         self.canvas.setParent(self.main_frame)
 
         def track_plot(axes_lst, trk):
-            q, phi, v = zip(*[(p.q, p.phi, p.v) for p in trk.points])
+            q, phi, v = list(zip(*[(p.q, p.phi, p.v) for p in trk.points]))
 
             axes_lst[0].cla()
             axes_lst[0].plot(q, phi)

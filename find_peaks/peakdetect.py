@@ -1,3 +1,7 @@
+from __future__ import division
+from builtins import zip
+from builtins import range
+from past.utils import old_div
 import numpy as np
 import multiprocessing
 import itertools
@@ -60,7 +64,7 @@ def kill_procs():
 
 def _datacheck_peakdetect(x_axis, y_axis):
     if x_axis is None:
-        x_axis = range(len(y_axis))
+        x_axis = list(range(len(y_axis)))
 
     if len(y_axis) != len(x_axis):
         raise ValueError(
@@ -304,7 +308,7 @@ def peakdetect_parabole(y_axis, x_axis, min_pts=4, max_pts=25, R2_cut=.1, is_rin
 
     res_dict = {-1: [], 1: [], 0: []}
 
-    for ((a, b, c), e), (x, y) in itertools.izip(res_list, work_list):
+    for ((a, b, c), e), (x, y) in zip(res_list, work_list):
         if e > R2_cut:
             res_dict[np.sign(a)].append((b, c))
         else:

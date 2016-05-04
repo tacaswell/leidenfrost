@@ -16,6 +16,12 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
 from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import zip
+from builtins import range
+from builtins import object
 
 
 import time
@@ -138,7 +144,7 @@ class Point1D_circ(Point):
         return 'q: %0.2f, phi: %0.2f' % (self.q, self.phi)
 
     def __str__(self):
-        return unicode(self).encode('utf-8')
+        return str(self).encode('utf-8')
 
     __repr__ = __unicode__
 
@@ -187,7 +193,7 @@ class lf_Track(Track):
         else:
             kwargs['color'] = 'c'
 
-        ax.plot(*zip(*[(p.q, p.phi) for p in self.points]), **kwargs)
+        ax.plot(*list(zip(*[(p.q, p.phi) for p in self.points])), **kwargs)
 
     def plot_trk_img(self, curve, ax, **kwargs):
         '''
@@ -198,7 +204,7 @@ class lf_Track(Track):
 
         Plots the track, in x-y  coordinates, onto `ax`
         '''
-        q, phi = zip(*[(p.q, p.phi) for p in self.points])
+        q, phi = list(zip(*[(p.q, p.phi) for p in self.points]))
         x, y = curve.q_phi_to_xy(q, phi) + 0.5
         mark_charge = False
         if mark_charge:
@@ -246,7 +252,7 @@ class lf_Track(Track):
         # blow up the quad fit
         if min_len < 5:
             min_len = 5
-        phi, q = zip(*[(p.phi, p.q) for p in self.points])
+        phi, q = list(zip(*[(p.phi, p.q) for p in self.points]))
         q = np.asarray(q)
         # if the track is less than 25, don't try to classify
 
@@ -322,7 +328,7 @@ class lf_Track(Track):
         Returns the (x, y) coordinates of the points on the track
         based on the conversion using curve"""
 
-        return curve.q_phi_to_xy(*zip(*[(p.q, p.phi) for p in self.points]))
+        return curve.q_phi_to_xy(*list(zip(*[(p.q, p.phi) for p in self.points])))
 
 
 class spline_fitter(object):
@@ -372,10 +378,8 @@ class spline_fitter(object):
 
     def remove_pt(self, loc):
         if len(self.pt_lst) > 0:
-            self.pt_lst.pop(np.argmin(map(lambda x:
-                                          np.sqrt((x[0] - loc[0]) ** 2 +
-                                                  (x[1] - loc[1]) ** 2),
-                                          self.pt_lst)))
+            self.pt_lst.pop(np.argmin([np.sqrt((x[0] - loc[0]) ** 2 +
+                                                  (x[1] - loc[1]) ** 2) for x in self.pt_lst]))
 
     def redraw(self):
         if len(self.pt_lst) > 5:
@@ -390,7 +394,7 @@ class spline_fitter(object):
             self.sp_plot.set_xdata([])
             self.sp_plot.set_ydata([])
         if len(self.pt_lst) > 0:
-            x, y = zip(*self.pt_lst)
+            x, y = list(zip(*self.pt_lst))
         else:
             x, y = [], []
         self.pt_plot.set_xdata(x)
@@ -470,7 +474,7 @@ class SplineCurve(object):
 
         if type(points) is np.ndarray:
             # make into a list
-            pt_lst = zip(*points)
+            pt_lst = list(zip(*points))
             # get center
             center = np.mean(points, axis=1).reshape(2, 1)
         else:
@@ -625,11 +629,10 @@ class SplineCurve(object):
 
         # if cross, then
         if cross:
-            data_out = zip(
-                *map(lambda q_: ((x + q_ * nx).reshape(phi_shape),
-                                 (y + q_ * ny).reshape(phi_shape)),
-                q)
-            )
+            data_out = list(zip(
+                *[((x + q_ * nx).reshape(phi_shape),
+                                 (y + q_ * ny).reshape(phi_shape)) for q_ in q]
+            ))
         else:
 
             data_out = np.vstack([(x + q * nx).reshape(phi_shape),
@@ -847,8 +850,8 @@ def proc_frame(curve, img, s_width, s_num, search_range, min_tlen=5, **kwargs):
     tim = [t for t in tim if len(t) > min_tlen]
     tam = [t for t in tam if len(t) > min_tlen]
 
-    trk_res = (zip(*[(t.charge, t.phi) for t in tim if t.charge is not None]),
-               zip(*[(t.charge, t.phi) for t in tam if t.charge is not None]))
+    trk_res = (list(zip(*[(t.charge, t.phi) for t in tim if t.charge is not None])),
+               list(zip(*[(t.charge, t.phi) for t in tam if t.charge is not None])))
 
     _t1 = time.time()
 

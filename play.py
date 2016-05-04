@@ -16,6 +16,9 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
 from __future__ import print_function
+from builtins import zip
+from builtins import range
+from builtins import object
 
 import PIL.Image
 import numpy as np
@@ -32,11 +35,11 @@ def extract_image(fname):
     im = PIL.Image.open(fname)
     img_sz = im.size[::-1]
 
-    if 277 in im.tag.keys():
+    if 277 in list(im.tag.keys()):
         chans = im.tag[277][0]
     else:
         chans = 1
-    if 258 in im.tag.keys():
+    if 258 in list(im.tag.keys()):
         bpp = im.tag[258]
     else:
         bpp = 16
@@ -44,7 +47,7 @@ def extract_image(fname):
     if chans == 1:
         return np.reshape(im.getdata(),img_sz).astype(BPP_LOOKUP(bpp[0])).T
     else:
-        return np.reshape(map(lambda x: x[0],im.getdata()),img_sz).astype(BPP_LOOKUP[bpp[0]]).T
+        return np.reshape([x[0] for x in im.getdata()],img_sz).astype(BPP_LOOKUP[bpp[0]]).T
 
 def gen_circle(x,y,r,theta =None):
     if theta is None:

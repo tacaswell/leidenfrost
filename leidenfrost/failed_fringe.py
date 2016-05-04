@@ -18,7 +18,10 @@
 
 from __future__ import division
 from __future__ import print_function
-from itertools import izip, product, tee, cycle, islice
+from builtins import next
+from builtins import zip
+from builtins import object
+from itertools import product, tee, cycle, islice
 from leidenfrost.fringes import valid_follow_dict, valid_precede_dict, pairwise_periodic, fringe_loc, forward_dh_dict
 
 import numpy as np
@@ -32,7 +35,7 @@ def pairwise(iterable):
     """
     a, b = tee(iterable)
     next(b, None)
-    return izip(a, b)
+    return zip(a, b)
 
 
 def triple_wise_periodic(iterable):
@@ -46,7 +49,7 @@ def triple_wise_periodic(iterable):
     next(c, None)
     next(c, None)
 
-    return izip(a, b, c)
+    return zip(a, b, c)
 
 
 def triple_wise(iterable):
@@ -59,7 +62,7 @@ def triple_wise(iterable):
     next(c, None)
     next(c, None)
 
-    return izip(a, b, c)
+    return zip(a, b, c)
 
 
 # ganked from docs
@@ -70,7 +73,7 @@ def roundrobin(*iterables):
     """
     # Recipe credited to George Sakkis
     pending = len(iterables)
-    nexts = cycle(iter(it).next for it in iterables)
+    nexts = cycle(iter(it).__next__ for it in iterables)
     while pending:
         try:
             for next in nexts:
@@ -164,9 +167,9 @@ def _hinting_only(run, locs):
         trial_run = list(run)
         trial_locs = list(locs)
         # apply all of the hints
-        for hint, z_r in izip(trial_hints, zero_runs):
+        for hint, z_r in zip(trial_hints, zero_runs):
             cur_slice = slice(*z_r)
-            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in izip(trial_run[cur_slice], hint)]
+            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in zip(trial_run[cur_slice], hint)]
         d = list(is_valid_3(*p) for p in triple_wise(trial_run))
 
         if all(d):
@@ -213,9 +216,9 @@ def _valid_run_fixes_with_hinting(run, locs):
         trial_run = list(run)
         trial_locs = list(locs)
         # apply all of the hints
-        for hint, z_r in izip(trial_hints, zero_runs):
+        for hint, z_r in zip(trial_hints, zero_runs):
             cur_slice = slice(*z_r)
-            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in izip(trial_run[cur_slice], hint)]
+            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in zip(trial_run[cur_slice], hint)]
         d = list(is_valid_3(*p) for p in triple_wise(trial_run))
 
         if all(d):
@@ -234,9 +237,9 @@ def _valid_run_fixes_with_hinting(run, locs):
         trial_run = list(run)
         trial_locs = list(locs)
         # apply all of the hints
-        for hint, z_r in izip(trial_hints, zero_runs):
+        for hint, z_r in zip(trial_hints, zero_runs):
             cur_slice = slice(*z_r)
-            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in izip(trial_run[cur_slice], hint)]
+            trial_run[cur_slice] = [_f._replace(hint=th) for _f, th in zip(trial_run[cur_slice], hint)]
         d = list(is_valid_3(*p) for p in triple_wise(trial_run))
 
         # add the edges back (that got cut-off by the triple iterator
@@ -247,9 +250,9 @@ def _valid_run_fixes_with_hinting(run, locs):
         slices = [slice(*_r) for _r in res]
 
         valid_sub_regions = [_valid_run_fixes(trial_run[s_], trial_locs[s_]) for s_ in slices]
-        v_sub_runs, v_locs = zip(*valid_sub_regions)
+        v_sub_runs, v_locs = list(zip(*valid_sub_regions))
         for vsr_prod in product(*v_sub_runs):
-            for vsr, s_, vsl in izip(vsr_prod[::-1], slices[::-1], v_locs[::-1]):
+            for vsr, s_, vsl in zip(vsr_prod[::-1], slices[::-1], v_locs[::-1]):
                 # do this loop backwards so slices stay valid
                 l_trial_runs = list(trial_run)
                 l_trial_locs = list(trial_locs)
@@ -269,7 +272,7 @@ def _valid_run_fixes_with_hinting(run, locs):
     # fact that some of our 0 charge fringes are miss-identified (really should fix this in
     # the location/classify step, but alea iacta est.
 
-    striped_run, striped_locs = zip(*[(_r, _l) for _r, _l in zip(run, locs) if _r.charge != 0])
+    striped_run, striped_locs = list(zip(*[(_r, _l) for _r, _l in zip(run, locs) if _r.charge != 0]))
     d = list(is_valid_3(*p) for p in triple_wise(striped_run))
 
     # add the edges back (that got cut-off by the triple iterator
@@ -280,9 +283,9 @@ def _valid_run_fixes_with_hinting(run, locs):
     slices = [slice(*_r) for _r in res]
 
     valid_sub_regions = [_valid_run_fixes(striped_run[s_], striped_locs[s_]) for s_ in slices]
-    v_sub_runs, v_locs = zip(*valid_sub_regions)
+    v_sub_runs, v_locs = list(zip(*valid_sub_regions))
     for vsr_prod in product(*v_sub_runs):
-        for vsr, s_, vsl in izip(vsr_prod[::-1], slices[::-1], v_locs[::-1]):
+        for vsr, s_, vsl in zip(vsr_prod[::-1], slices[::-1], v_locs[::-1]):
             # do this loop backwards so slices stay valid
             l_trial_runs = list(striped_run)
             l_trial_locs = list(striped_locs)
@@ -305,7 +308,7 @@ def _valid_run_fixes(run, locs):
 
     possible_insertions = []
     possible_locs = []
-    for (a, b), (a_loc, b_loc) in izip(pairwise(run), pairwise(locs)):
+    for (a, b), (a_loc, b_loc) in zip(pairwise(run), pairwise(locs)):
         # make this a look up!
         pi = set(valid_follow_dict[a]) & set(valid_precede_dict[b])
         possible_insertions.append(pi)
@@ -363,9 +366,9 @@ def _clean_fringes(f_classes, f_locs):
         best_lst = None
         min_miss = np.inf
         zero_count = 0
-        prop_c_lsts, prop_l_lsts = zip(*fixes)
+        prop_c_lsts, prop_l_lsts = list(zip(*fixes))
 
-        for p_cls, p_loc in izip(product(*prop_c_lsts), product(*prop_l_lsts)):
+        for p_cls, p_loc in zip(product(*prop_c_lsts), product(*prop_l_lsts)):
             # get a copy of the list so we can mutate it
             working_class_lst = list(f_classes)
             working_locs_lst = list(f_locs)
@@ -442,7 +445,7 @@ class FringeRing(object):
         lines = []
         for color, c in zip([-1, 1], colors):
             for charge, s in zip([-1, 0, 1], shapes):
-                phi, q = zip(*[(fr.phi, fr.q) for fr in self.fringes if fr.color == color and fr.charge == charge])
+                phi, q = list(zip(*[(fr.phi, fr.q) for fr in self.fringes if fr.color == color and fr.charge == charge]))
                 x, y = self.curve.q_phi_to_xy(q, phi)
                 lines.extend(ax.plot(x, y, linestyle='none', marker=s, color=c))
         return lines

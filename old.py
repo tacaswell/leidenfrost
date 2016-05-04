@@ -1,4 +1,10 @@
 from __future__ import print_function
+from __future__ import division
+from builtins import zip
+from builtins import str
+from builtins import range
+from builtins import object
+from past.utils import old_div
 import cine
 import hashlib
 import numpy as np
@@ -66,7 +72,7 @@ def plot_plst_data(p_lst):
     ''' makes a graph for the position, radius, angle, etc from the list of ellipse parameters'''
 
     print('hi')
-    a, b, t0, x0, y0 = zip(*p_lst)
+    a, b, t0, x0, y0 = list(zip(*p_lst))
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(a, label='a')

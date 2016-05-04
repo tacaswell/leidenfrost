@@ -16,8 +16,15 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
 from __future__ import print_function
-import __builtin__
-from itertools import tee, izip, cycle
+from future import standard_library
+standard_library.install_aliases()
+from builtins import next
+from builtins import str
+from builtins import zip
+from builtins import range
+from builtins import object
+import builtins
+from itertools import tee, cycle
 from collections import namedtuple, defaultdict, deque
 
 from contextlib import closing
@@ -46,7 +53,7 @@ class Region_Edges(namedtuple('Region_Edges', ['starts', 'labels', 'ends'])):
     __slots__ = ()
 
     def __eq__(self, other):
-        return all(np.all(_s == _o) for _s, _o in izip(self, other))
+        return all(np.all(_s == _o) for _s, _o in zip(self, other))
 
 # set up all the look-up dictionaries
 # list of the needed combinations
@@ -206,7 +213,7 @@ def pairwise_periodic(iterable):
     a, b = tee(iterable)
     b = cycle(b)
     next(b, None)
-    return izip(a, b)
+    return zip(a, b)
 
 
 class Fringe(object):
@@ -340,7 +347,7 @@ class Fringe(object):
 
 
 def format_fringe_txt(f):
-    return ''.join([_d[_f] for _d, _f in izip([{1: 'B', -1: 'D'},
+    return ''.join([_d[_f] for _d, _f in zip([{1: 'B', -1: 'D'},
                                                {1: 'L', 0: '_', -1: 'R'},
                                                {1: 'P', 0: '_', -1: 'S'}], f)])
 
@@ -363,7 +370,7 @@ class FringeRing(object):
     def __init__(self, frame_number, f_classes, f_locs):
         self.frame_number = frame_number
         self.fringes = [Fringe(fcls, floc, frame_number)
-                        for fcls, floc in izip(f_classes, f_locs)]
+                        for fcls, floc in zip(f_classes, f_locs)]
         self.fringes.sort(key=lambda x: x.phi)
 
     def link_fringes(self, region_starts, region_labels, region_ends,
@@ -411,7 +418,7 @@ class FringeRing(object):
 
         for ((fringe_back, bin_back, fbin_back),
              (fringe_front, bin_front, fbin_front)) in\
-                pairwise_periodic(izip(self.fringes, bins, f_bins)):
+                pairwise_periodic(zip(self.fringes, bins, f_bins)):
 
             fringe_back.abs_height = np.nan
 
@@ -460,7 +467,7 @@ class FringeRing(object):
         if self.frame_number != other.frame_number:
             return False
         return all(_f1 == _f2 for _f1, _f2
-                   in izip(self.fringes, other.fringes))
+                   in zip(self.fringes, other.fringes))
 
 
 def _get_fc_lists(mbe, reclassify):
@@ -482,7 +489,7 @@ def _get_fc_lists(mbe, reclassify):
     # get center
     center = mbe.curve.cntr.reshape(2, 1)
     if reclassify:
-        for color, trk_lst in izip(colors, mbe.trk_lst):
+        for color, trk_lst in zip(colors, mbe.trk_lst):
             for t in trk_lst:
                 t.classify2()
                 if t.charge is not None:
@@ -494,17 +501,17 @@ def _get_fc_lists(mbe, reclassify):
                 else:
                     junk_fringes.append(t)
     else:
-        for res_lst, color in izip(mbe.res, colors):
+        for res_lst, color in zip(mbe.res, colors):
             charge_lst, phi_lst, q_lst = res_lst
             if len(q_lst) > 0:
                 XY = mbe.curve.q_phi_to_xy(q_lst, phi_lst) - center
                 th = np.mod(np.arctan2(XY[1], XY[0]), 2*np.pi)
-                for charge, theta, q in izip(charge_lst, th, q_lst):
+                for charge, theta, q in zip(charge_lst, th, q_lst):
                     f_locs.append(fringe_loc(q, theta))
                     f_classes.append(fringe_cls(color, charge, 0))
 
-    f_classes, f_locs = zip(*sorted(zip(f_classes, f_locs),
-                                    key=lambda x: x[1][1]))
+    f_classes, f_locs = list(zip(*sorted(zip(f_classes, f_locs),
+                                    key=lambda x: x[1][1])))
     # TODO: deal with junk fringes in sensible way
 
     return list(f_classes), list(f_locs)
@@ -522,11 +529,11 @@ class Region_map(object):
             return False
         # test fringe rings
         if not all(_fr1 == _fr2 for _fr1, _fr2 in
-                   izip(self.fringe_rings, other.fringe_rings)):
+                   zip(self.fringe_rings, other.fringe_rings)):
             return False
         # test region edges
         if not all(_r1 == _r2 for _r1, _r2 in
-                   izip(self.region_edges, other.region_edges)):
+                   zip(self.region_edges, other.region_edges)):
             return False
         # don't bother to test the parameters
         return True
@@ -578,7 +585,7 @@ class Region_map(object):
         circs = []
         # get calibration value in mm
         cal_val = backend.calibration_value * 1e-3
-        for j in xrange(*f_slice.indices(len(backend))):
+        for j in range(*f_slice.indices(len(backend))):
             if status_output and (j % 1000 == 0):
                 print(j)
             mbe = backend.get_frame(j, get_img=True, raw=reclassify)
@@ -702,7 +709,7 @@ class Region_map(object):
                  region_ends),
                 (fringe_starts,
                  fringe_labels,
-                 fringe_ends)) in izip(fringe_rings,
+                 fringe_ends)) in zip(fringe_rings,
                                        region_edges,
                                        fringe_edges):
             FR.link_fringes(region_starts, region_labels, region_ends,
@@ -926,7 +933,7 @@ class Region_map(object):
 
         # set up working data
         work_data = [local_tuple([], [])
-                     for k in xrange(len(image_edges.labels))]
+                     for k in range(len(image_edges.labels))]
         work_height_map = np.ones(len(image_edges.labels),
                                   dtype=np.float) * np.nan
         fail_flags = np.zeros(len(image_edges.labels), dtype=np.bool)
@@ -985,7 +992,7 @@ class Region_map(object):
                            if ~np.isnan(self.height_map[r])]
                 if len(heights) > 0:
                     trial_height = heights[0]
-                    if not __builtin__.all(trial_height == h
+                    if not builtins.all(trial_height == h
                                            for h in heights[1:]):
                         # not all the same
                         trial_height = np.nan
@@ -1040,7 +1047,7 @@ class Region_map(object):
                        if ~np.isnan(_fr.abs_height)]
             if len(heights) > 0:
                 trial_height = heights[0]
-                if __builtin__.all((trial_height == h for h in heights[1:])):
+                if builtins.all((trial_height == h for h in heights[1:])):
                     work_height_map[j] = trial_height
 
         if np.all(np.isnan(work_height_map)):
@@ -1079,10 +1086,10 @@ class Region_map(object):
                 h.append(work_height_map[0])
         # deal with middle region
         # note, 2s cancel
-        _phi, _h = zip(*[(np.pi * (ir_s + ir_e) / (N_samples), _h)
-                       for (ir_s, ir_l, ir_e), _h in zip(izip(*image_edges),
+        _phi, _h = list(zip(*[(np.pi * (ir_s + ir_e) / (N_samples), _h)
+                       for (ir_s, ir_l, ir_e), _h in zip(zip(*image_edges),
                                                          work_height_map)[1:-1]
-                        if ~np.isnan(_h)])
+                        if ~np.isnan(_h)]))
         phi.extend(_phi)
         h.extend(_h)
         if post_list is not None:
@@ -1140,7 +1147,7 @@ class Region_map(object):
             intep_func = scipy.interpolate.interp1d
         tmp = []
         quality_measure = np.zeros(len(self))
-        for j in xrange(len(self)):
+        for j in range(len(self)):
             phi, h = self._frame_fringe_positions(j)
             phi_new, h_new = _height_interpolate(
                 phi, h, N, min_range, max_range, intep_func=intep_func)
@@ -1173,7 +1180,7 @@ class Region_map(object):
         h_accum = []
         tau_accum = []
         quality_measure = np.zeros(len(self))
-        for j in xrange(len(self)):
+        for j in range(len(self)):
             # get out the points from this frame
             phi, h = self._frame_fringe_positions(j)
             # record how many points we had at each time step
@@ -1419,7 +1426,7 @@ class Region_map(object):
             # store all the md passed in
 
             if md_dict is not None:
-                for key, val in md_dict.iteritems():
+                for key, val in md_dict.items():
                     if val is None:
                         continue
                     if isinstance(val, types.FunctionType):
@@ -1433,7 +1440,7 @@ class Region_map(object):
 
             # save the parametrs
             param_grp = h5file.create_group('params')
-            for key, val in self.params.iteritems():
+            for key, val in self.params.items():
                 if val is None:
                     continue
                 try:
@@ -1469,14 +1476,14 @@ class Region_map(object):
             fr_c_grp = h5file.create_group('fringe_classes')
             fr_l_grp = h5file.create_group('fringe_locs')
             re_grp = h5file.create_group('region_edges')
-            for FR, region_edges in izip(self.fringe_rings, self.region_edges):
+            for FR, region_edges in zip(self.fringe_rings, self.region_edges):
                 f_class = np.vstack([fr.f_class for fr in FR])
                 f_loc = np.vstack([fr.f_loc for fr in FR])
                 re_data = np.vstack(region_edges)
                 frame_number = fr.frame_number
                 dset_names = ["f_class_{frn:07}".format(frn=frame_number),
                               "f_loc_{frn:07}".format(frn=frame_number)]
-                for n, v, t, _g in izip(dset_names,
+                for n, v, t, _g in zip(dset_names,
                                     [f_class, f_loc],
                                     [np.int8, np.float],
                                     [fr_c_grp, fr_l_grp]):
@@ -1535,7 +1542,7 @@ class Region_map(object):
         fringe_rings = [FringeRing(int(_cn.split('_')[-1]),
                                   [fringe_cls(*_c) for _c in fr_c_grp[_cn][:]],
                                   [fringe_loc(*_l) for _l in fr_l_grp[_ln][:]])
-                                  for _cn, _ln in izip(fr_c_grp, fr_l_grp)
+                                  for _cn, _ln in zip(fr_c_grp, fr_l_grp)
                                   ]
 
         fringe_edges = [_segment_fringes(fringe_slice)
@@ -1549,7 +1556,7 @@ class Region_map(object):
                  region_ends),
                 (fringe_starts,
                  fringe_labels,
-                 fringe_ends)) in izip(
+                 fringe_ends)) in zip(
                      fringe_rings, region_edges, fringe_edges):
             FR.link_fringes(region_starts, region_labels, region_ends,
                             fringe_starts, fringe_labels, fringe_ends,
@@ -1596,7 +1603,7 @@ class Region_map(object):
 
         '''
         return (((start + end) / (2 * self._scale), self.height_map[label])
-                  for start, label, end in izip(*self.region_edges[j])
+                  for start, label, end in zip(*self.region_edges[j])
                   if not np.isnan(self.height_map[label]))
 
     def error_check(self):
@@ -1835,7 +1842,7 @@ def _dict_to_dh_Nstep(input_d, threshold=15):
     if len(input_d) > 1 or len(input_d) == 0:
         return None
 
-    ((k, v), ) = input_d.items()
+    ((k, v), ) = list(input_d.items())
     if v > threshold:
         return k
 
@@ -2033,7 +2040,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
     conflict_flags = np.zeros((N,), dtype=np.uint32)
     # zip together the forward and backwards linking
     for i, (forward_d, backward_d) in enumerate(
-            izip(_connection_network_Nstep(N, FRs, 'f'),
+            zip(_connection_network_Nstep(N, FRs, 'f'),
                   _connection_network_Nstep(N, FRs, 'r'))):
 
         tmp_dict = valid_connections[i]
@@ -2073,7 +2080,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
 
     # network computation interlude
     G = networkx.Graph()
-    for n in xrange(N):
+    for n in range(N):
         G.add_node(n)
 
     for n, g in enumerate(valid_connections):
@@ -2084,7 +2091,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
     res = networkx.connected_component_subgraphs(G)
 
     # pick a node in the largest connected component
-    start = res[0].node.keys()[0]
+    start = list(res[0].node.keys())[0]
 
     # clear height map
     height_map = np.ones(N, dtype=np.float32) * np.nan
@@ -2141,7 +2148,7 @@ def _label_regions(mask, size_cut):
         if top_lab != bot_lab and top_lab != 0 and bot_lab != 0:
             lab_regions[lab_regions == bot_lab] = top_lab
 
-    sizes = ndi.sum(mask, lab_regions, range(nb + 1))
+    sizes = ndi.sum(mask, lab_regions, list(range(nb + 1)))
     mask_sizes = sizes < size_cut
     #    print len(sizes), sum(mask_sizes)
 
@@ -2375,9 +2382,9 @@ class IS_FS_recon(object):
 
         # set this up once to save computation
         sin_list = np.vstack([np.sin(k * phi)
-                              for k in xrange(1, max_N+1)])
+                              for k in range(1, max_N+1)])
         cos_list = np.vstack([np.cos(k * phi)
-                              for k in xrange(1, max_N+1)])
+                              for k in range(1, max_N+1)])
 
         not_done_flag = True
         # truncate fft values
@@ -2425,9 +2432,9 @@ class IS_FS_recon(object):
 
                 # set this up once to save computation
                 sin_list = np.vstack([np.sin(k * phi)
-                                      for k in xrange(1, max_N+1)])
+                                      for k in range(1, max_N+1)])
                 cos_list = np.vstack([np.cos(k * phi)
-                                      for k in xrange(1, max_N+1)])
+                                      for k in range(1, max_N+1)])
 
         # create callable object with the reconstructed coefficients
         return cls(A_n)
@@ -2476,9 +2483,9 @@ class IS_FS_recon(object):
 
         # set this up once to save computation
         sin_list = np.vstack([np.sin(k * phi)
-                              for k in xrange(1, max_N+1)])
+                              for k in range(1, max_N+1)])
         cos_list = np.vstack([np.cos(k * phi)
-                              for k in xrange(1, max_N+1)])
+                              for k in range(1, max_N+1)])
 
         # add bounds to make the interpolation happy
         pad = 2
@@ -2546,9 +2553,9 @@ class IS_FS_recon(object):
         """
         th = np.asarray(th)
         sin_list = np.vstack([k**deriv * np.sin(k * th)
-                              for k in xrange(1, self.N)])
+                              for k in range(1, self.N)])
         cos_list = np.vstack([k**deriv * np.cos(k * th)
-                              for k in xrange(1, self.N)])
+                              for k in range(1, self.N)])
 
         A0 = self._A_n[0].real if deriv == 0 else 0
         A_list = self._A_n[1:].reshape(-1, 1)

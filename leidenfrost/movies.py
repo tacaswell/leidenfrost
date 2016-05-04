@@ -16,6 +16,10 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 from __future__ import division
+from builtins import str
+from builtins import zip
+from builtins import range
+from builtins import object
 
 import fractions
 
@@ -81,7 +85,7 @@ class AnimateHdf(object):
         # do the animation
         self.ani = animation.FuncAnimation(fig,
                                            self._update_figure,
-                                           range(min_frame, max_frame - 1, step),
+                                           list(range(min_frame, max_frame - 1, step)),
                                            interval=25)
 
     def save(self, fpath):

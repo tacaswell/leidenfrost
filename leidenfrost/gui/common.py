@@ -1,4 +1,6 @@
 from __future__ import print_function
+from builtins import str
+from builtins import range
 #Copyright 2013 Thomas A Caswell
 #tcaswell@uchicago.edu
 #http://jfi.uchicago.edu/~tcaswell
@@ -21,7 +23,7 @@ from __future__ import print_function
 import PySide.QtCore as QtCore
 import PySide.QtGui as QtGui
 import os.path
-from itertools import izip
+
 
 from leidenfrost import FilePath
 
@@ -99,7 +101,7 @@ class numbered_paths(QtGui.QWidget):
         self.path_widgets = []
         layout = QtGui.QVBoxLayout()
         self.setLayout(layout)
-        for j in xrange(N):
+        for j in range(N):
             tmp = directory_selector('Disk {}'.format(j))
             self.path_widgets.append(tmp)
             layout.addWidget(tmp)
@@ -208,7 +210,7 @@ class frame_range_selector(QtGui.QWidget):
 
     @QtCore.Slot()
     def _update(self):
-        for val, lab in izip((self._start, self._end),
+        for val, lab in zip((self._start, self._end),
                              (self._start_lab, self._end_lab)):
             if val is None:
                 lab.setText('-')
@@ -248,7 +250,7 @@ class md_state(QtGui.QWidget):
         out_val = md_dict.get('out_frame', None)
         use_val = md_dict.get('useful', None)
 
-        for v, lab in izip((in_val, out_val, use_val),
+        for v, lab in zip((in_val, out_val, use_val),
                            (self._in_label, self._out_label,
                             self._useful_lab)):
             if v is None:
@@ -288,7 +290,7 @@ class dict_display(QtGui.QGroupBox):
 
         self._data_list = []
 
-        for k, v in sorted(list(in_dict.iteritems())):
+        for k, v in sorted(list(in_dict.items())):
             if k not in self._ignore:
                 tmp = QtGui.QWidget(self)
                 tmp_l = QtGui.QHBoxLayout()

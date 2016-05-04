@@ -1,6 +1,11 @@
 from __future__ import print_function
+from __future__ import division
+from builtins import str
+from builtins import zip
+from builtins import range
+from past.utils import old_div
 from multiprocessing import Process, JoinableQueue
-from itertools import izip
+
 import argparse
 import signal
 import logging
@@ -112,7 +117,7 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template, max_circ_change_frac=Non
         # move the logging to the top
 
         try:
-            for j in xrange(start_frame, len(stack)):
+            for j in range(start_frame, len(stack)):
                 # set a 30s window, if the frame does not finish on 30s, kill it
                 if hfb.contains_frame(j):
                     logger.warn('deleting existing frame {0}'.format(j))

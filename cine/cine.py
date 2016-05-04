@@ -10,6 +10,12 @@
 ###############################################################################
 
 from __future__ import absolute_import
+from __future__ import division
+from builtins import str
+from builtins import map
+from builtins import range
+from builtins import object
+from past.utils import old_div
 import time
 import struct
 
@@ -203,10 +209,10 @@ SETUP_FIELDS = [
     ('description', '4096s')
 ]
 
-T64_F = lambda x: int(x) / 2.**32
-T64_F_ms = lambda x: '%.3f' % (float(x.rstrip('L')) / 2.**32)
+T64_F = lambda x: old_div(int(x), 2.**32)
+T64_F_ms = lambda x: '%.3f' % (old_div(float(x.rstrip('L')), 2.**32))
 T64_S = lambda s: lambda t: time.strftime(s,
-             time.localtime(float(t.rstrip('L'))/2.**32))
+             time.localtime(old_div(float(t.rstrip('L')),2.**32)))
 
 
 def fix_frame(f):
@@ -399,7 +405,7 @@ class Cine(object):
 
     def __getitem__(self, key):
         if type(key) == slice:
-            return map(self.get_frame, range(self.image_count)[key])
+            return list(map(self.get_frame, list(range(self.image_count))[key]))
 
         return self.get_frame(key)
 
@@ -417,7 +423,7 @@ class Cine(object):
         self._iter_current_frame = -1
         return self
 
-    def next(self):
+    def __next__(self):
         self._iter_current_frame += 1
         if self._iter_current_frame >= self.image_count:
             raise StopIteration
@@ -431,7 +437,7 @@ class Cine(object):
         return self.fn
 
     def __str__(self):
-        return unicode(self).encode('utf-8')
+        return str(self).encode('utf-8')
 
     __repr__ = __unicode__
 

@@ -17,9 +17,15 @@
 
 from __future__ import division
 from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import zip
+from builtins import str
+from builtins import range
+from builtins import object
 import itertools
-from itertools import izip
-import cPickle
+
+import pickle
 import os
 
 import numpy as np
@@ -125,9 +131,9 @@ class MultiHdfBackend(object):
         # TODO replace this with a db call
 
         # sort out first and last frame
-        first_frames, last_frames = zip(*[(in_f, out_f)
+        first_frames, last_frames = list(zip(*[(in_f, out_f)
                                           for hbe, in_f, out_f
-                                          in self._h5_backends])
+                                          in self._h5_backends]))
         if np.all(tmp_flags):
             self.first_frame = 0
             self.last_frame = self.cine_len
@@ -154,7 +160,7 @@ class MultiHdfBackend(object):
         self._iter_cur_item = self.first_frame - 1
         return self
 
-    def next(self):
+    def __next__(self):
         self._iter_cur_item += 1
         if self._iter_cur_item >= self.last_frame:
             raise StopIteration
@@ -179,7 +185,7 @@ class MultiHdfBackend(object):
                 (key.start > 0 and key.start < self.first_frame)):
                 key = slice(self.first_frame, key.stop, key.step)
             return (self.get_frame(k)
-                    for k in xrange(*key.indices(self.last_frame)))
+                    for k in range(*key.indices(self.last_frame)))
         elif hasattr(key, '__iter__'):
             return (self.get_frame(k) for k in key)
         else:
@@ -410,7 +416,7 @@ class HdfBackend(object):
         self._iter_cur_item = self.first_frame - 1
         return self
 
-    def next(self):
+    def __next__(self):
         self._iter_cur_item += 1
         if self._iter_cur_item >= self.last_frame:
             raise StopIteration
@@ -426,7 +432,7 @@ class HdfBackend(object):
                  (key.start > 0 and key.start < self.first_frame)):
                 key = slice(self.first_frame, key.stop, key.step)
             return (self.get_frame(k)
-                    for k in xrange(*key.indices(self.last_frame)))
+                    for k in range(*key.indices(self.last_frame)))
 
         else:
             return self.get_frame(key)
@@ -470,7 +476,7 @@ class ProcessBackend(object):
         '''
         self = cls()
         tmp_file = h5py.File('/'.join(h5_fname), 'r')
-        keys_lst = tmp_file.attrs.keys()
+        keys_lst = list(tmp_file.attrs.keys())
         lc_req_args = ['tck0', 'tck1', 'tck2']
         h5_req_args = ['cine_path', 'cine_fname']
         cls._verify_params(keys_lst, extra_req=(lc_req_args + h5_req_args))
@@ -485,7 +491,7 @@ class ProcessBackend(object):
                                    self.params.pop('cine_fname'))
         self.cine_ = cine.Cine('/'.join(self.cine_fname))
 
-        if 'bck_img' in tmp_file.keys():
+        if 'bck_img' in list(tmp_file.keys()):
             self.bck_img = tmp_file['bck_img'][:]
         else:
             self.bck_img = infra.gen_bck_img('/'.join(self.cine_fname))
@@ -575,7 +581,7 @@ class ProcessBackend(object):
     def write_config(self, seed_curve, cur_frame=None):
         if self.db is None:
             raise RuntimeError("need a valid db object to do this")
-        tmpcurve_dict = dict((lab, cPickle.dumps(_tck))
+        tmpcurve_dict = dict((lab, pickle.dumps(_tck))
                              for lab, _tck in zip(['tck0', 'tck1', 'tck2'],
                                                   seed_curve.tck))
 
@@ -801,7 +807,7 @@ class MemBackendFrame(object):
             _dark_dict.update(dark_dict)
 
         lines = []
-        for tk_l, kwargs in izip(self.trk_lst, (_dark_dict, _bright_dict)):
+        for tk_l, kwargs in zip(self.trk_lst, (_dark_dict, _bright_dict)):
             lines.extend([t.plot_trk_img(self.curve,
                                          ax, **kwargs)
                           for t in tk_l
@@ -854,10 +860,10 @@ class MemBackendFrame(object):
         del group
 
     def get_profile(self):
-        ch, th = zip(*sorted([(t.charge, t.phi) for
+        ch, th = list(zip(*sorted([(t.charge, t.phi) for
                               t in itertools.chain(*self.trk_lst) if
                               t.charge and len(t) > 15],
-                             key=lambda x: x[-1]))
+                             key=lambda x: x[-1])))
 
         dh, th_new = infra.construct_corrected_profile((th, ch))
 
@@ -870,11 +876,11 @@ class MemBackendFrame(object):
 
     def get_xyz_points(self, min_track_length=15):
 
-        X, Y, ch, th = zip(
+        X, Y, ch, th = list(zip(
             *sorted([tuple(t.get_xy(self.curve)) + (t.charge, t.phi) for
                      t in itertools.chain(*self.trk_lst) if
                      t.charge and len(t) > 15],
-                    key=lambda x: x[-1]))
+                    key=lambda x: x[-1])))
 
         dh, th_new = infra.construct_corrected_profile((th, ch))
         Z = [z * np.ones(x.shape) for z, x in zip(dh, X)]
@@ -882,10 +888,10 @@ class MemBackendFrame(object):
         return X, Y, Z
 
     def get_xyz_curve(self, min_track_length=15):
-        q, ch, th = zip(*sorted([(t.q, t.charge, t.phi) for
+        q, ch, th = list(zip(*sorted([(t.q, t.charge, t.phi) for
                                  t in itertools.chain(*self.trk_lst) if
                                  t.charge and len(t) > min_track_length],
-                                key=lambda x: x[-1]))
+                                key=lambda x: x[-1])))
 
         # scale the radius
         x, y = self.curve.q_phi_to_xy(q, th)

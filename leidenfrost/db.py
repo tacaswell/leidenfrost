@@ -15,10 +15,13 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division, print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import object
 
 
 from datetime import datetime
-import cPickle
+import pickle
 import os.path
 import pymongo
 from pymongo import MongoClient
@@ -217,7 +220,7 @@ class LFmongodb(LFDbWrapper):
         record = self.coll_dict['bck_img'].find_one({'cine': cine_hash})
         if record is None:
             return None
-        return cPickle.loads(record['bck_img'])
+        return pickle.loads(record['bck_img'])
 
     def store_background_img(self, cine_hash, bck_img, overwrite=False):
         # test if it exists, add that logic
