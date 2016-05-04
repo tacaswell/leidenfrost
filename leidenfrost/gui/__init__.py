@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 #Copyright 2013 Thomas A Caswell
 #tcaswell@uchicago.edu
 #http://jfi.uchicago.edu/~tcaswell
@@ -15,5 +16,5 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
-from proc_gui import LFGui
-from reader_gui import LFReaderGui
+from .proc_gui import LFGui
+from .reader_gui import LFReaderGui

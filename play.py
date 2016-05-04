@@ -15,6 +15,7 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
+from __future__ import print_function
 
 import PIL.Image
 import numpy as np
@@ -39,7 +40,7 @@ def extract_image(fname):
         bpp = im.tag[258]
     else:
         bpp = 16
-    print chans,bpp
+    print(chans,bpp)
     if chans == 1:
         return np.reshape(im.getdata(),img_sz).astype(BPP_LOOKUP(bpp[0])).T
     else:

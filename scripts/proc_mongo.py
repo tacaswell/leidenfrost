@@ -1,3 +1,4 @@
+from __future__ import print_function
 from multiprocessing import Process, JoinableQueue
 from itertools import izip
 import argparse
@@ -60,8 +61,8 @@ class worker(Process):
             except Exception as E:
                 # we want to catch _EVERYTHING_ so errors don't blow
                 # up the other computations with it
-                print "on file {}".format(cine_fname.fname)
-                print E
+                print("on file {}".format(cine_fname.fname))
+                print(E)
 
             self.work_queue.task_done()
 
@@ -77,7 +78,7 @@ def proc_cine_fname(cine_fname, ch, hdf_fname_template, max_circ_change_frac=Non
     config_dict_lst = db.get_unproced_configs(ch)
 
     for config_dict in config_dict_lst:
-        print cine_fname
+        print(cine_fname)
 
         h5_fname = hdf_fname_template._replace(fname=cine_fname.fname.replace('cine', 'h5'))
 
@@ -221,7 +222,7 @@ if __name__ == '__main__':
 
     # put the work in the queue
     for (cf, ch), hdf_fname_template in cine_fnames:
-        print 'adding {}/{} to work queue'.format(cf.path, cf.fname)
+        print('adding {}/{} to work queue'.format(cf.path, cf.fname))
         WORK_QUEUE.put((cf, ch, hdf_fname_template))
 
     # poison the worker processes

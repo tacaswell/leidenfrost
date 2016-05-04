@@ -17,6 +17,7 @@
 
 
 from __future__ import division
+from __future__ import print_function
 from itertools import izip, product, tee, cycle, islice
 from leidenfrost.fringes import valid_follow_dict, valid_precede_dict, pairwise_periodic, fringe_loc, forward_dh_dict
 
@@ -384,7 +385,7 @@ def _clean_fringes(f_classes, f_locs):
             if np.abs(miss_count) < min_miss:
                 min_miss = np.abs(miss_count)
                 best_lst = (working_class_lst, working_locs_lst)
-        print zero_count, '/', np.prod([len(_p) for _p in prop_l_lsts])
+        print(zero_count, '/', np.prod([len(_p) for _p in prop_l_lsts]))
         f_classes, f_locs = best_lst
     return f_classes, f_locs
 
@@ -500,8 +501,8 @@ def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_se
     if len(source) == 0:
         tmp_accum = cur_accum + len(dest) * max_search_range
         if tmp_accum < best_accum:
-            print best_accum, len(source), len(dest), len(cur_order)
-            print cur_order
+            print(best_accum, len(source), len(dest), len(cur_order))
+            print(cur_order)
             # we have a winner
             best_order = cur_order[:]      # get a copy
             best_order.extend([1] * len(dest))
@@ -513,8 +514,8 @@ def _link_run(best_accum, best_order, cur_accum, cur_order, source, dest, max_se
     if len(dest) == 0:
         tmp_accum = cur_accum + len(source) * max_search_range
         if tmp_accum < best_accum:
-            print best_accum, len(source), len(dest), len(cur_order)
-            print cur_order
+            print(best_accum, len(source), len(dest), len(cur_order))
+            print(cur_order)
             best_order = cur_order[:]      # get a copy
             best_order.extend([1] * len(source))
             return best_order, tmp_accum
@@ -588,7 +589,7 @@ def link_run(source, dest, max_search_range):
     wsource = list(source)
     wdest = list(dest)
     res = []
-    print best_order
+    print(best_order)
     for r in best_order:
         if r == 0:
             res.append((wsource.pop(0), wdest.pop(0)))

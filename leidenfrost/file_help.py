@@ -1,3 +1,4 @@
+from __future__ import print_function
 #Copyright 2013 Thomas A Caswell
 #tcaswell@uchicago.edu
 #http://jfi.uchicago.edu/~tcaswell
@@ -70,7 +71,7 @@ def copy_file(fname_src, fname_dest):
     if not os.path.exists(dest_path):
         shutil.copy2(src_path, dest_path)
     else:
-        print "file exists, copy failed"
+        print("file exists, copy failed")
 
 
 def ensure_path_exists(path):

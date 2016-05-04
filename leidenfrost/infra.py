@@ -15,12 +15,13 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
+from __future__ import print_function
 
 
 import time
 from collections import namedtuple
 import numpy as np
-import cPickle
+import pickle as cPickle
 
 import numpy.fft as fft
 import matplotlib.pyplot as plt
@@ -41,6 +42,7 @@ import weakref
 
 from . import FilePath
 import leidenfrost.db as ldb
+from functools import reduce
 
 
 class TooFewPointsException(Exception):
@@ -403,7 +405,7 @@ class spline_fitter(object):
 
     def return_SplineCurve(self):
         curve = SplineCurve.from_pts(self.pt_lst, pix_err=self.pix_err)
-        print curve.circ
+        print(curve.circ)
         return curve
 
 
@@ -412,7 +414,7 @@ def gen_bck_img(fname):
     c_test = cine.Cine(fname)
     bck_img = reduce(lambda x, y: x + y, c_test,
                      np.zeros(c_test.get_frame(0).shape))
-    print c_test.len()
+    print(c_test.len())
     bck_img /= c_test.len()
     # hack to deal with
     bck_img[bck_img == 0] = .001

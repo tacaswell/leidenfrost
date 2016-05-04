@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 
 import leidenfrost.infra as li
@@ -23,7 +24,7 @@ else:
     hdf_base_path = cine_base_path
 
 hdf_fname = FilePath(hdf_base_path, args.hdf_path, args.hdf_fname)
-print hdf_fname.format
+print(hdf_fname.format)
 
 
 stack, seed_curve = li.ProcessBackend.from_hdf_file(cine_base_path, hdf_fname)

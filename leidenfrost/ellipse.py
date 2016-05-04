@@ -16,6 +16,7 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 from __future__ import division
+from __future__ import print_function
 
 import numpy as np
 import scipy.odr as sodr
@@ -156,7 +157,7 @@ def gap_filler(x, y, R, center, fill_density=0.1):
     N = int((theta_end - theta_start) * fill_density * (ap + bp) / 2)
     #    print theta_start, theta_end, (ap + bp) / 2, N
     if N < 1:
-        print 'gap_filler: under fill'
+        print('gap_filler: under fill')
         N = 1
 
     theta_list = np.linspace(theta_start, theta_end, N + 2)[1:-1]

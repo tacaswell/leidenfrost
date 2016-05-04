@@ -16,6 +16,8 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
 
 import os
 
@@ -27,7 +29,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 
-from common import directory_selector
+from .common import directory_selector
 
 from collections import defaultdict
 
@@ -106,10 +108,10 @@ class LFReaderWriter(QtCore.QObject):
     @QtCore.slot()
     def save_frame(self):
         if self.mbe is None:
-            print 'no frame to save'
+            print('no frame to save')
             return
         if self.contains_frame(self.cur_frame):
-            print 'current frame exists in file, not saving'
+            print('current frame exists in file, not saving')
         self.mbe.write_to_hdf(self.hdf_backend.file)
 
     @QtCore.Slot(backends.FilePath, backends.FilePath, dict, dict)

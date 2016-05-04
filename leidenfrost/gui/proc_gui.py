@@ -16,6 +16,8 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
 
 import os
 import copy
@@ -30,8 +32,8 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from common import directory_selector, numbered_paths, base_path_path_selector
-from common import dict_display
+from .common import directory_selector, numbered_paths, base_path_path_selector
+from .common import dict_display
 from collections import defaultdict
 
 import numpy as np
@@ -62,8 +64,8 @@ class LFWorker(QtCore.QObject):
         try:
             self.db = ldb.LFmongodb()
         except Exception as e:
-            print e
-            print 'no database for you!'
+            print(e)
+            print('no database for you!')
 
     @QtCore.Slot(int, infra.SplineCurve)
     def proc_frame(self, ind, curve):
@@ -74,8 +76,8 @@ class LFWorker(QtCore.QObject):
                     ind, curve)
                 self.frame_proced.emit(True, True)
             except Exception as e:
-                print e
-                print 'something is borked'
+                print(e)
+                print('something is borked')
                 self.frame_proced.emit(False, False)
 
     @QtCore.Slot()
@@ -92,11 +94,11 @@ class LFWorker(QtCore.QObject):
 
     def get_cine_md(self):
         if self.db is not None and self.process_backend is not None:
-            print 'trying to grab md'
+            print('trying to grab md')
             md_dict = self.db.get_movie_md(self.process_backend.cine_.hash)
-            print 'trying to grabed md'
+            print('trying to grabed md')
             return md_dict
-        print 'md not attempted to grab from DB'
+        print('md not attempted to grab from DB')
         return {}
 
     def get_mbe(self):
@@ -150,7 +152,7 @@ class LFWorker(QtCore.QObject):
         as_res = lb_view.apply_async(leidenfrost.proc.proc_cine_to_h5,
                             self.process_backend.cine_.hash,
                             name_template, proc_prams, seed_curve)
-        print 'fired: {}'.format(as_res.msg_id)
+        print('fired: {}'.format(as_res.msg_id))
 
 
 class LFGui(QtGui.QMainWindow):
@@ -343,9 +345,9 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
                 self.proc_this_frame_acc.setEnabled(True)
                 self.start_comp_acc.setEnabled(True)
             else:
-                print 'no spline!?'
+                print('no spline!?')
         except:
-            print 'spline fitter not ready'
+            print('spline fitter not ready')
             self.cur_curve = None
 
     # def update_param(self, key, val):
@@ -353,7 +355,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
 
     def _proc_this_frame(self):
 
-        print 'entered _proc_this_frame'
+        print('entered _proc_this_frame')
         self.prog_bar.show()
         self.diag.setEnabled(False)
         self.draw_fringes = True
@@ -484,7 +486,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         while (self.paths_dict['cine base path'] is None or
                 (not (self.paths_dict['cine base path'] ==
                       fname[:len(self.paths_dict['cine base path'])]))):
-            print 'please set base_dir'
+            print('please set base_dir')
             self.directory_actions['cine base path'].trigger()
 
         self.prog_bar.show()
@@ -625,7 +627,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
                 spin_box = QtGui.QDoubleSpinBox(parent=self)
                 spin_box.setDecimals(spin_prams['prec'])
             else:
-                print s_type
+                print(s_type)
                 continue
 
             # properties of spin box
@@ -830,7 +832,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         if self.im is not None:
             self.im.remove()
         self.im = None
-        print 'entered redraw'
+        print('entered redraw')
 
         # clear the lines we have
         for ln in self.fringe_lines:

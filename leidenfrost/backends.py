@@ -16,6 +16,7 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 from __future__ import division
+from __future__ import print_function
 import itertools
 from itertools import izip
 import cPickle
@@ -98,24 +99,24 @@ class MultiHdfBackend(object):
                 if os.path.isfile(tmp_fn.format):
                     fn = tmp_fn
             try:
-                print "trying to open", fn.format
+                print("trying to open", fn.format)
                 tmp_be = HdfBackend(fn, cine_base_path,
                                     i_disk_dict=i_disk_dict)
 
             except IOError:
-                print fn.format
+                print(fn.format)
                 continue
             tmp_flags[frame_in:frame_out] = True
             if tmp_be.cine.hash != self._cinehash:
-                print "This list is inconsistent dropping "
-                print fn.format
+                print("This list is inconsistent dropping ")
+                print(fn.format)
                 continue
             if (frame_in < tmp_be.first_frame or
                  frame_out > tmp_be.last_frame + 1):
-                print ('frame in ({}) and frame out ({}) inconsistent with' +
+                print(('frame in ({}) and frame out ({}) inconsistent with' +
                         'first ({}) and last ({}) frames').format(
                             frame_in, frame_out,
-                            tmp_be.first_frame, tmp_be.last_frame)
+                            tmp_be.first_frame, tmp_be.last_frame))
 
             self._h5_backends.append((tmp_be, frame_in, frame_out))
 
@@ -232,7 +233,7 @@ class HdfBackend(object):
             # hard code the mongodb
             self.db = db.LFmongodb(i_disk_dict=i_disk_dict)
         except:
-            print 'gave up and the DB'
+            print('gave up and the DB')
             # this eats _ALL_ exceptions
             self.db = None
 
@@ -450,7 +451,7 @@ class ProcessBackend(object):
         try:
             self.db = db.LFmongodb()  # hard code the mongodb
         except:
-            print 'gave up and DB'
+            print('gave up and DB')
             # this eats _ALL_ exceptions
             self.db = None
         self.ver = ver
@@ -597,10 +598,10 @@ class ProcessBackend(object):
             try:
                 file_out.attrs[key] = val
             except TypeError:
-                print 'key: ' + key + ' can not be gracefully shoved into'
-                print ' an hdf object, please reconsider your life choices'
+                print('key: ' + key + ' can not be gracefully shoved into')
+                print(' an hdf object, please reconsider your life choices')
             except Exception as e:
-                print "FAILURE WITH HDF: " + e.__str__()
+                print("FAILURE WITH HDF: " + e.__str__())
 
         # make sure there is a start frame
         file_out.attrs['start_frame'] = start_frame
@@ -653,7 +654,7 @@ class MemBackendFrame(object):
             new_res = []
             for t_ in self.res:
                 if len(t_) == 0:
-                    print t_
+                    print(t_)
                     continue
                 tmp = ~np.isnan(t_[0])
                 tmp_lst = [np.array(r)[tmp] for r in t_]
@@ -773,8 +774,8 @@ class MemBackendFrame(object):
                                                need_sort=False,
                                                **kwargs)
         except infra.TooFewPointsException:
-            print 'should never hit this, not enough points to make new spline'
-            print '          reusing old one'
+            print('should never hit this, not enough points to make new spline')
+            print('          reusing old one')
             new_curve = self.curve
 
         self._next_curve = new_curve
@@ -944,8 +945,8 @@ def _read_frame_tracks_from_file_res(parent_group):
             tmp_q = tmp_trk_res[:, 2]
             res_lst.append((tmp_charge, tmp_phi, tmp_q))
         except Exception as E:
-            print E
-            print n_mod
+            print(E)
+            print(n_mod)
 
     if len(res_lst) != 2:
         res_lst = None
@@ -1022,8 +1023,8 @@ def _write_frame_tracks_to_file(parent_group,
         try:
             parent_group.attrs[key] = val
         except TypeError:
-            print 'key: ' + key + ' can not be gracefully shoved into '
-            print 'an hdf object, please reconsider your life choices'
+            print('key: ' + key + ' can not be gracefully shoved into ')
+            print('an hdf object, please reconsider your life choices')
     for t_lst, n_mod in zip((t_min_lst, t_max_lst), name_mod):
         if write_raw_data:
             # get total number of points

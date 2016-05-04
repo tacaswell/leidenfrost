@@ -9,4 +9,5 @@
 
 ################################################################################
 
-from cine import *
+from __future__ import absolute_import
+from .cine import *

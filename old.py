@@ -1,3 +1,4 @@
+from __future__ import print_function
 import cine
 import hashlib
 import numpy as np
@@ -64,7 +65,7 @@ def play_movie(fname, bck_img=None):
 def plot_plst_data(p_lst):
     ''' makes a graph for the position, radius, angle, etc from the list of ellipse parameters'''
 
-    print 'hi'
+    print('hi')
     a, b, t0, x0, y0 = zip(*p_lst)
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -95,7 +96,7 @@ def plot_plst_data(p_lst):
     x0_0 = x0_0 / np.sqrt(np.sum(x0_0 ** 2))
     y0_0 = y0_0 / np.sqrt(np.sum(y0_0 ** 2))
 
-    print sum(x0_0 * y0_0)
+    print(sum(x0_0 * y0_0))
 
     fig = plt.figure()
     ax = fig.add_subplot(111)

@@ -9,6 +9,7 @@
 # Modified by Thomas A Caswell (tcaswell@uchicago.edu)
 ###############################################################################
 
+from __future__ import absolute_import
 import time
 import struct
 
@@ -16,7 +17,7 @@ from numpy import array, frombuffer
 
 from threading import Lock
 
-import packed
+from . import packed
 
 import datetime
 import hashlib

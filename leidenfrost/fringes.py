@@ -15,6 +15,7 @@
 #You should have received a copy of the GNU General Public License
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 from __future__ import division
+from __future__ import print_function
 import __builtin__
 from itertools import tee, izip, cycle
 from collections import namedtuple, defaultdict, deque
@@ -183,7 +184,7 @@ def latex_print_pairs():
 
         res_lst.append(res1 + res2 + res3)
         ft_fmt = '({0}, \quad{1},\quad {2})'.format(*ft)
-        print ft_fmt
+        print(ft_fmt)
         key = r'{{\color{{red}}{0}}}&{{\color{{DodgerBlue2}}{1} }}: &{2}'.format(
             j, ft_fmt, format_fringe(ft))
         key_lst.append(key)
@@ -255,7 +256,7 @@ class Fringe(object):
             try:
                 np.testing.assert_equal(getattr(self, k), getattr(other, k))
             except AssertionError:
-                print k
+                print(k)
                 return False
         return True
 
@@ -579,7 +580,7 @@ class Region_map(object):
         cal_val = backend.calibration_value * 1e-3
         for j in xrange(*f_slice.indices(len(backend))):
             if status_output and (j % 1000 == 0):
-                print j
+                print(j)
             mbe = backend.get_frame(j, get_img=True, raw=reclassify)
 
             fringe_rings.append(FringeRing.from_mbe(mbe,
@@ -1262,7 +1263,7 @@ class Region_map(object):
                                  bckgnd=True, alpha=.65,
                                  t_scale=1, t_units=''):
         height_img = self.resampled_height
-        print np.min(height_img), np.max(height_img)
+        print(np.min(height_img), np.max(height_img))
         if ax is None:
             # make this smarter
             ax = plt.gca()
@@ -1426,9 +1427,9 @@ class Region_map(object):
                     try:
                         h5file.attrs[key] = val
                     except TypeError:
-                        print 'key: ' + key + ' can not be gracefully'
-                        print 'shoved into an hdf object, please reconsider'
-                        print ' your life choices'
+                        print('key: ' + key + ' can not be gracefully')
+                        print('shoved into an hdf object, please reconsider')
+                        print(' your life choices')
 
             # save the parametrs
             param_grp = h5file.create_group('params')
@@ -1438,8 +1439,8 @@ class Region_map(object):
                 try:
                     param_grp.attrs[key] = val
                 except TypeError:
-                    print 'key: ' + key + ' can not be gracefully shoved into'
-                    print ' an hdf object, please reconsider your life choices'
+                    print('key: ' + key + ' can not be gracefully shoved into')
+                    print(' an hdf object, please reconsider your life choices')
 
             # the kymograph extracted from the image series
             h5file.create_dataset('working_img',
@@ -1504,7 +1505,7 @@ class Region_map(object):
 
     @classmethod
     def _from_hdf_0_2(cls, h5file):
-        print 'starting read'
+        print('starting read')
         # extract parameters
         #        md = dict(h5file.attrs)
         # get working image
@@ -1521,14 +1522,14 @@ class Region_map(object):
             circs = None
         # pull out the edges of the regions
         re_grp = h5file['region_edges']
-        print 'starting region edges'
+        print('starting region edges')
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
         region_edges = [Region_Edges(*(re_grp[k][:])) for k in re_grp]
         # extract the fringe properties
         fr_c_grp = h5file['fringe_classes']
         fr_l_grp = h5file['fringe_locs']
-        print 'starting fringe rings'
+        print('starting fringe rings')
         # this relies on the iterator in h5py returning things sorted
         # and the padding being sufficient to always sort correctly
         fringe_rings = [FringeRing(int(_cn.split('_')[-1]),
@@ -1540,7 +1541,7 @@ class Region_map(object):
         fringe_edges = [_segment_fringes(fringe_slice)
                              for fringe_slice in working_img.T]
 
-        print 'starting linking'
+        print('starting linking')
         # link the fringes.
         # This is simpler than storing the linking information
         for (FR, (region_starts,
@@ -1898,7 +1899,7 @@ def _connection_network(N, fringe_rings, dirc='f'):
     for FR in fringe_rings:
         for fr in FR:
             if fr is None:
-                print 'WTF mate'
+                print('WTF mate')
                 continue
             if fr.region == 0:
                 continue
@@ -1954,7 +1955,7 @@ def _connection_network_Nstep(N, fringe_rings, dirc='f'):
         for fr in FR:
             fr_region = fr.region
             if fr is None:
-                print 'WTF mate'
+                print('WTF mate')
                 continue
             if fr_region == 0:
                 continue
@@ -2046,9 +2047,9 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
             if dh is not None:
                 if dest_region in tmp_dict and tmp_dict[dest_region] != dh:
                     if status_output:
-                        print ("conflict from: {} to: {} " +
+                        print(("conflict from: {} to: {} " +
                                "old_dh: {} new_dh: {}").format(
-                                    i, dest_region, tmp_dict[dest_region], dh)
+                                    i, dest_region, tmp_dict[dest_region], dh))
                     # if we have inconsistent linking (between forward
                     # and backwards), throw everything out this
                     # happens
@@ -2060,7 +2061,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
 
     black_list = np.flatnonzero(conflict_flags > conflict_threshold)
     if status_output:
-        print "black list length: {}".format(len(black_list))
+        print("black list length: {}".format(len(black_list)))
     for bl in black_list:
         # we don't want to try any connections with the black-listed regions
         # nuke it's outward connections
@@ -2108,11 +2109,11 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
         else:
             if height_map[b] != prop_height:
                 if status_output:
-                    print ("from {}({}) to {}({}) proposed delta:" +
+                    print(("from {}({}) to {}({}) proposed delta:" +
                            " {} current delta: {}").format(
                         a, height_map[a], b, height_map[b],
                         valid_connections[a][b],
-                        height_map[b] - height_map[a])
+                        height_map[b] - height_map[a]))
                 fails.append((a, b))
 
     return height_map, set_by, fails
@@ -2152,7 +2153,7 @@ def _label_regions(mask, size_cut):
 
 
 def filter_fun(working_img, thresh, struct=None):
-    print 'threshold {}'.format(thresh)
+    print('threshold {}'.format(thresh))
     if struct is None:
         #        struct = ndi.morphology.generate_binary_structure(2, 1)
         struct = [[1, 1, 1]]
@@ -2252,9 +2253,9 @@ def texture_std_angle(RM, k_list, f_slice=None):
     """
     if f_slice is None:
         f_slice = slice(None, None, None)
-    print f_slice
+    print(f_slice)
     tmp_fft = np.fft.fft(RM.resampled_height[:, f_slice], axis=0)
-    print tmp_fft.shape
+    print(tmp_fft.shape)
     angles = np.angle(tmp_fft[k_list, :])
 
     return np.std(np.unwrap(angles, axis=1), axis=1)
@@ -2594,10 +2595,10 @@ def reconstruct_height(work_key, rm_dict, db, laser_lambda=.6328):
             # reset the back-checking, have a totally dead region
             prev_fr = None
             prev_h = None
-            print 'all nan'
+            print('all nan')
             continue
         if np.sum(np.diff(nan_mask)) > 2:
-            print 'two region'
+            print('two region')
             raise Exception("miracle has occured")
 
         h = h * (laser_lambda/4)  # convert to um

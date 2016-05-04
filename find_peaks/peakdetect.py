@@ -63,7 +63,7 @@ def _datacheck_peakdetect(x_axis, y_axis):
         x_axis = range(len(y_axis))
 
     if len(y_axis) != len(x_axis):
-        raise (ValueError,
+        raise ValueError(
                'Input vectors y_axis and x_axis must have same length')
 
     #needs to be a numpy array
@@ -431,6 +431,6 @@ def zero_crossings(y_axis):
 
     # check if any zero crossings were found
     if len(zero_crossings) < 1:
-        raise(ValueError, "No zero crossings found")
+        raise ValueError("No zero crossings found")
 
     return zero_crossings

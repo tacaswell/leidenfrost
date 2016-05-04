@@ -1,3 +1,4 @@
+from __future__ import print_function
 #Copyright 2013 Thomas A Caswell
 #tcaswell@uchicago.edu
 #http://jfi.uchicago.edu/~tcaswell
@@ -34,7 +35,7 @@ class directory_selector(QtGui.QWidget):
 
     def __init__(self, caption, path='', parent=None):
         QtGui.QWidget.__init__(self, parent)
-        print caption
+        print(caption)
         self.cap = caption
 
         layout = QtGui.QVBoxLayout()
@@ -281,7 +282,7 @@ class dict_display(QtGui.QGroupBox):
             The dictionary to display
         """
         # remove
-        print 'entered update'
+        print('entered update')
         for c in self._data_list:
             c.deleteLater()
 

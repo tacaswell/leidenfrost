@@ -16,6 +16,8 @@
 #along with this program; if not, see <http://www.gnu.org/licenses>.
 
 from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
 
 import os
 
@@ -37,7 +39,7 @@ import numpy as np
 import leidenfrost.infra as infra
 import leidenfrost.backends as backends
 
-from common import directory_selector, frame_range_selector, md_state
+from .common import directory_selector, frame_range_selector, md_state
 
 
 class LFReader(QtCore.QObject):
@@ -104,10 +106,10 @@ class LFReader(QtCore.QObject):
 
     @QtCore.Slot(backends.FilePath, str, dict)
     def set_fname(self, fname, cbp, kwargs):
-        print 'entered set_fname'
+        print('entered set_fname')
         self.clear()
 
-        print fname, cbp, kwargs
+        print(fname, cbp, kwargs)
         self.backend = backends.HdfBackend(fname,
                                            cine_base_path=cbp,
                                            **kwargs)
@@ -310,7 +312,7 @@ class LFReaderGui(QtGui.QMainWindow):
             return
 
         while not hdf_bp == fname[:len(hdf_bp)]:
-            print 'please set base_dir'
+            print('please set base_dir')
             self.directory_actions['hdf base path'].trigger()
             hdf_bp = self.paths_dict['hdf base path']
 
@@ -350,7 +352,7 @@ class LFReaderGui(QtGui.QMainWindow):
             for k, v in prams.iteritems():
                 if k in ignore_lst:
                     continue
-                print "| {key} | {val} |".format(key=k, val=v)
+                print("| {key} | {val} |".format(key=k, val=v))
 
         print_button = QtGui.QPushButton('Print')
         print_button.pressed.connect(print_parameters)
@@ -447,8 +449,8 @@ class LFReaderGui(QtGui.QMainWindow):
         in_out_select = frame_range_selector(self.frame_spinner)
         self._in_out_select = in_out_select
         def tmp(x, y):
-            print x, y
-            print "start: {} end: {}".format(x, y)
+            print(x, y)
+            print("start: {} end: {}".format(x, y))
         in_out_select.frame_range.connect(tmp)
         in_out_select.frame_range.connect(self.reader.set_inout_range)
 
@@ -503,7 +505,7 @@ class LFReaderGui(QtGui.QMainWindow):
                     self.graphs_window.update_axes(track_plot, trk)
 
             else:
-                print type(trk)
+                print(type(trk))
 
         self.picker = PickerHandler(self.canvas, picker_fun)
         # Since we have only one plot, we can use add_axes
@@ -550,7 +552,7 @@ class LFReaderGui(QtGui.QMainWindow):
     def create_actions(self):
 
         def set_dir(cap, d):
-            print cap
+            print(cap)
             base_dir = QtGui.QFileDialog.getExistingDirectory(self,
                                                               caption=cap,
                                                               dir=d[cap])
@@ -630,7 +632,7 @@ class PickerHandler(object):
         if payload is not None:
             self.fun(payload)
         else:
-            print 'fail type 2'
+            print('fail type 2')
 
 
 class GraphDialog(QtGui.QDialog):
