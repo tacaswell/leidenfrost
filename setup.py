@@ -15,5 +15,5 @@ setup(
     packages=["leidenfrost", "leidenfrost.gui", 'cine',
               'find_peaks'],
     requires=['numpy', 'six', 'scipy', 'pymongo', 'h5py',
-              'networkx', 'parse', 'ipython', 'pyzmq', 'pyside'],
+              'networkx', 'parse', 'ipython', 'pyzmq', 'pyside', 'future'],
     )
