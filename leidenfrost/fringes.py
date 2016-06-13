@@ -24,7 +24,7 @@ from builtins import zip
 from builtins import range
 from builtins import object
 import builtins
-from itertools import tee, cycle
+from itertools import tee, cycle, islice
 from collections import namedtuple, defaultdict, deque
 
 from contextlib import closing
@@ -67,7 +67,7 @@ fringe_type_list = [fringe_cls(1, 0, 1),
                     fringe_cls(-1, -1, 0)]
 
 fringe_type_dict = dict(enumerate(fringe_type_list))
-fringe_type_dict.update(reversed(i) for i in fringe_type_dict.items())
+fringe_type_dict.update(reversed(i) for i in list(fringe_type_dict.items()))
 
 valid_follow_dict = defaultdict(list)
 valid_follow_dict[fringe_type_dict[4]] = [fringe_type_dict[j]
@@ -1087,9 +1087,10 @@ class Region_map(object):
         # deal with middle region
         # note, 2s cancel
         _phi, _h = list(zip(*[(np.pi * (ir_s + ir_e) / (N_samples), _h)
-                       for (ir_s, ir_l, ir_e), _h in zip(zip(*image_edges),
-                                                         work_height_map)[1:-1]
-                        if ~np.isnan(_h)]))
+                              for (ir_s, ir_l, ir_e), _h in
+                              list(zip(zip(*image_edges),
+                                       work_height_map))[1:-1]
+                              if ~np.isnan(_h)]))
         phi.extend(_phi)
         h.extend(_h)
         if post_list is not None:
@@ -2088,7 +2089,7 @@ def _boot_strap(N, FRs, connection_threshold, conflict_threshold, status_output=
             G.add_edge(n, k)
 
     G.remove_nodes_from(networkx.isolates(G))
-    res = networkx.connected_component_subgraphs(G)
+    res = list(networkx.connected_component_subgraphs(G))
 
     # pick a node in the largest connected component
     start = list(res[0].node.keys())[0]

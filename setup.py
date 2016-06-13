@@ -14,6 +14,7 @@ setup(
     url='https://github.com/tacaswell/leidenfrost',
     packages=["leidenfrost", "leidenfrost.gui", 'cine',
               'find_peaks'],
-    requires=['numpy', 'six', 'scipy', 'pymongo', 'h5py',
-              'networkx', 'parse', 'ipython', 'pyzmq', 'pyside', 'future'],
+    install_requires=['numpy', 'six', 'scipy', 'pymongo', 'h5py',
+                      'networkx', 'parse', 'ipython', 'pyzmq', 'pyside',
+                      'future'],
     )

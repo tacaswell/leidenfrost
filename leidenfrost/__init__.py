@@ -54,6 +54,14 @@ class FilePath(collections.namedtuple('FilePath',
         base_path = disk_dict[in_dict.pop('disk')]
         return cls(base_path, **in_dict)
 
+    def __new__(self, *args, **kwargs):
+        args = tuple(a.decode('utf-8') if isinstance(a, bytes) else a
+                     for a in args)
+        for k, v in kwargs.items():
+            if isinstance(v, bytes):
+                kwargs[k] = v.decode('utf-8')
+        return super().__new__(self, *args, **kwargs)
+
 
 def convert_base_path(in_file_path, disk_dict):
     '''

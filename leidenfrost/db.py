@@ -129,7 +129,7 @@ class LFmongodb(LFDbWrapper):
                                                  #and/or results
                }
 
-    def __init__(self, host='10.8.0.1', port=27017, disk_dict=None,
+    def __init__(self, host='192.168.86.168', port=27017, disk_dict=None,
                  i_disk_dict=None,
                  *args, **kwargs):
         LFDbWrapper.__init__(self, *args, **kwargs)
@@ -220,7 +220,7 @@ class LFmongodb(LFDbWrapper):
         record = self.coll_dict['bck_img'].find_one({'cine': cine_hash})
         if record is None:
             return None
-        return pickle.loads(record['bck_img'])
+        return pickle.loads(record['bck_img'], encoding='bytes')
 
     def store_background_img(self, cine_hash, bck_img, overwrite=False):
         # test if it exists, add that logic

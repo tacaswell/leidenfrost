@@ -50,12 +50,26 @@ HdfBEPram = collections.namedtuple('HdfBEPram', ['raw', 'get_img'])
 
 
 def hdf_backend_factory(cine_hash,
-                        i_disk_dict=None,
+                        local_db,
                         cache_path='/mnt/cache'):
-    local_db = db.LFmongodb(i_disk_dict=i_disk_dict)
+    '''create an object to view multiple output files in unified way
+
+    Parameters
+    ----------
+    cine_hash : str
+        hash of the cine file to use as input
+
+    local_db : LFmongodb
+        The object which manages database lookup
+
+    cache_path : str, optional
+        Where to use as a fast cache.
+
+    '''
     h5_lst = local_db.get_h5_list(cine_hash)
     return MultiHdfBackend(h5_lst, h5_lst[0][0].base_path, cine_hash=cine_hash,
-                           i_disk_dict=i_disk_dict, cache_path=cache_path)
+                           i_disk_dict=local_db.i_disk_dict,
+                           cache_path=cache_path)
 
 
 class MultiHdfBackend(object):
@@ -257,7 +271,7 @@ class HdfBackend(object):
             if self.db is not None and self.bck_img is not None:
                 self.db.store_background_img(self.cine.hash, self.bck_img)
 
-        if 'ver' not in self.file.attrs or self.file.attrs['ver'] < '0.1.5':
+        if 'ver' not in self.file.attrs or self.file.attrs['ver'] < b'0.1.5':
             self._frame_str = 'frame_{:05d}'
         else:
             self._frame_str = 'frame_{:07d}'
@@ -394,7 +408,7 @@ class HdfBackend(object):
 
         res = _read_frame_tracks_from_file_res(g)
         next_curve = None
-        if self.file.attrs['ver'] < '1.1.5':
+        if self.file.attrs['ver'] < b'1.1.5':
             seed_curve = infra.SplineCurve.from_hdf(g)
         else:
             seed_curve = infra.SplineCurve.from_hdf(g['seed_curve'])
@@ -700,6 +714,9 @@ class MemBackendFrame(object):
             return self._next_curve
         else:
             self._params_cache = _params_cache
+
+        if self.trk_lst is None:
+            return None
 
         tim, tam = self.trk_lst
 
