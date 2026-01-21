@@ -26,12 +26,13 @@ import copy
 
 # do this to make me learn where stuff is and to make it easy to
 # switch to PyQt later
-import PySide.QtCore as QtCore
-import PySide.QtGui as QtGui
+import PySide6.QtCore as QtCore
+import PySide6.QtGui as QtGui
+import PySide6.QtWidgets as QtWidgets
 
 
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from .common import directory_selector, numbered_paths, base_path_path_selector
@@ -46,7 +47,7 @@ import leidenfrost.proc
 import leidenfrost.backends as backends
 import leidenfrost.db as ldb
 
-from IPython.parallel import Client
+from ipyparallel import Client
 
 
 class LFWorker(QtCore.QObject):
@@ -118,7 +119,7 @@ class LFWorker(QtCore.QObject):
     def get_frame(self, ind, *args, **kwargs):
         if self.process_backend is not None:
             tmp = self.process_backend.get_image(ind, *args, **kwargs)
-            return np.asarray(tmp, dtype=np.float)
+            return np.asarray(tmp, dtype=float)
         return None
 
     def clear(self):
@@ -157,7 +158,7 @@ class LFWorker(QtCore.QObject):
         print('fired: {}'.format(as_res.msg_id))
 
 
-class LFGui(QtGui.QMainWindow):
+class LFGui(QtWidgets.QMainWindow):
     proc = QtCore.Signal(int, infra.SplineCurve)
     open_file_sig = QtCore.Signal(backends.FilePath, dict)
     kill_thread = QtCore.Signal()
@@ -169,14 +170,14 @@ class LFGui(QtGui.QMainWindow):
          'max': 99,
          'step': .5,
          'prec': 1,
-         'type': np.float,
+         'type': float,
          'default': 10,
          'togglable': False},
         {'name': 's_num',
          'min': 1,
          'max': 9999,
          'step': 1,
-         'type': np.int,
+         'type': int,
          'default': 100,
          'togglable': False},
         {'name': 'search_range',
@@ -184,14 +185,14 @@ class LFGui(QtGui.QMainWindow):
          'max': 2 * np.pi,
          'step': .005,
          'prec': 3,
-         'type': np.float,
+         'type': float,
          'default': .01,
          'togglable': False},
         {'name': 'memory',
          'min': 0,
          'max': 999,
          'step': 1,
-         'type': np.int,
+         'type': int,
          'default': 0,
          'togglable': False},
         {'name': 'pix_err',
@@ -199,21 +200,21 @@ class LFGui(QtGui.QMainWindow):
          'max': 9,
          'step': .1,
          'prec': 1,
-         'type': np.float,
+         'type': float,
          'default': 0.5,
          'togglable': False},
         {'name': 'mix_in_count',
          'min': 0,
          'max': 100,
          'step': 1,
-         'type': np.int,
+         'type': int,
          'default': 0,
          'togglable': False},
         {'name': 'min_tlen',
          'min': 0,
          'max': 999999,
          'step': 1,
-         'type': np.int,
+         'type': int,
          'default': 15,
          'togglable': True,
          'default_state': True},
@@ -221,7 +222,7 @@ class LFGui(QtGui.QMainWindow):
          'min': 0,
          'max': 999,
          'step': 1,
-         'type': np.int,
+         'type': int,
          'default': 10,
          'togglable': True,
          'default_state': True},
@@ -229,7 +230,7 @@ class LFGui(QtGui.QMainWindow):
          'min': 0,
          'max': 999,
          'step': 1,
-         'type': np.int,
+         'type': int,
          'default': 10,
          'togglable': True,
          'default_state': False,
@@ -238,7 +239,7 @@ class LFGui(QtGui.QMainWindow):
          'min': 0,
          'max': np.pi,
          'step': np.pi / 100,
-         'type': np.float,
+         'type': float,
          'default': np.pi / 6,
          'prec': 3,
          'togglable': True,
@@ -250,7 +251,7 @@ class LFGui(QtGui.QMainWindow):
           'max': 1,
           'step': .0005,
           'prec': 4,
-          'type': np.float,
+          'type': float,
           'default': .002,
           'togglable': True,
           'default_state': True,
@@ -260,7 +261,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
           'min': -1,
           'max': 2**31 - 1,
           'step': 1,
-          'type': np.int,
+          'type': int,
           'default': -1,
           'togglable': True,
           'default_state': False,
@@ -285,7 +286,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         self.diag.setEnabled(True)
 
     def __init__(self, parent=None):
-        QtGui.QMainWindow.__init__(self, parent)
+        QtWidgets.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Finder')
 
         self.cine_fname = None
@@ -338,7 +339,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
 
         self.show()
         self.thread.start()
-        QtGui.qApp.exec_()
+
 
     def grab_sf_curve(self):
         try:
@@ -477,7 +478,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
 
     def open_file(self):
 
-        fname, _ = QtGui.QFileDialog.getOpenFileName(self,
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                     caption='Select cine',
                     dir=self.paths_dict['cine base path'],
                     filter="cine (*.cine)")
@@ -537,29 +538,29 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
 
     def create_diag(self):
         # make top level stuff
-        self.diag = QtGui.QDockWidget('controls', parent=self)
+        self.diag = QtWidgets.QDockWidget('controls', parent=self)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
-        diag_widget = QtGui.QWidget(self.diag)
+        diag_widget = QtWidgets.QWidget(self.diag)
         self.diag.setWidget(diag_widget)
-        diag_layout = QtGui.QVBoxLayout()
+        diag_layout = QtWidgets.QVBoxLayout()
         diag_widget.setLayout(diag_layout)
 
         # frame number lives on top
-        self.frame_spinner = QtGui.QSpinBox()
+        self.frame_spinner = QtWidgets.QSpinBox()
         self.frame_spinner.setRange(0, len(self.worker) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
 
-        frame_selector_group = QtGui.QVBoxLayout()
-        fs_form = QtGui.QHBoxLayout()
-        fs_form.addWidget(QtGui.QLabel('frame #'))
+        frame_selector_group = QtWidgets.QVBoxLayout()
+        fs_form = QtWidgets.QHBoxLayout()
+        fs_form.addWidget(QtWidgets.QLabel('frame #'))
         fs_form.addWidget(self.frame_spinner)
-        fs_form.addWidget(QtGui.QLabel(' of '))
-        self.max_cine_label = QtGui.QLabel(str(len(self.worker) - 1))
+        fs_form.addWidget(QtWidgets.QLabel(' of '))
+        self.max_cine_label = QtWidgets.QLabel(str(len(self.worker) - 1))
         fs_form.addWidget(self.max_cine_label)
-        fs_stepbox = QtGui.QGroupBox("Frame step")
-        fs_sb_rb = QtGui.QHBoxLayout()
+        fs_stepbox = QtWidgets.QGroupBox("Frame step")
+        fs_sb_rb = QtWidgets.QHBoxLayout()
         for j in [1, 10, 100, 1000, 10000]:
-            tmp_rdo = QtGui.QRadioButton(str(j))
+            tmp_rdo = QtWidgets.QRadioButton(str(j))
             tmp_rdo.toggled.connect(lambda x, j=j:
                                     self.frame_spinner.setSingleStep(j)
                                     if x else None)
@@ -573,20 +574,20 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         diag_layout.addLayout(frame_selector_group)
 
         # play button
-        play_button = QtGui.QPushButton('Play')
+        play_button = QtWidgets.QPushButton('Play')
         self.play_button = play_button
         play_button.setCheckable(True)
         play_button.setChecked(False)
         self.play_button.pressed.connect(self.frame_spinner.stepUp)
         diag_layout.addWidget(play_button)
 
-        meta_data_group = QtGui.QVBoxLayout()
+        meta_data_group = QtWidgets.QVBoxLayout()
 
-        useful_button = QtGui.QPushButton('useful')
+        useful_button = QtWidgets.QPushButton('useful')
         useful_button.clicked.connect(self.worker.set_useful)
-        useless_button = QtGui.QPushButton('useless')
+        useless_button = QtWidgets.QPushButton('useless')
         useless_button.clicked.connect(self.worker.set_useless)
-        use_level = QtGui.QHBoxLayout()
+        use_level = QtWidgets.QHBoxLayout()
         use_level.addWidget(useful_button)
         use_level.addWidget(useless_button)
         meta_data_group.addLayout(use_level)
@@ -598,15 +599,15 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         diag_layout.addLayout(meta_data_group)
 
         # tool box for all the controls
-        diag_tool_box = QtGui.QToolBox()
+        diag_tool_box = QtWidgets.QToolBox()
         diag_layout.addWidget(diag_tool_box)
 
         # section for dealing with fringe finding
 
         # the widget to shove into the toolbox
-        fringe_cntrls_w = QtGui.QWidget()
+        fringe_cntrls_w = QtWidgets.QWidget()
         # vbox layout for this panel
-        fc_vboxes = QtGui.QVBoxLayout()
+        fc_vboxes = QtWidgets.QVBoxLayout()
         # set the widget layout
 
         fringe_cntrls_w.setLayout(fc_vboxes)
@@ -614,7 +615,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         diag_tool_box.addItem(fringe_cntrls_w, "Fringe Finding Settings")
 
         # form layout to hold the spinners
-        fringe_cntrls_spins = QtGui.QFormLayout()
+        fringe_cntrls_spins = QtWidgets.QFormLayout()
         # add spinner layout
         fc_vboxes.addLayout(fringe_cntrls_spins)
 
@@ -624,9 +625,9 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
             s_type = np.dtype(spin_prams['type']).kind
 
             if s_type == 'i':
-                spin_box = QtGui.QSpinBox(parent=self)
+                spin_box = QtWidgets.QSpinBox(parent=self)
             elif s_type == 'f':
-                spin_box = QtGui.QDoubleSpinBox(parent=self)
+                spin_box = QtWidgets.QDoubleSpinBox(parent=self)
                 spin_box.setDecimals(spin_prams['prec'])
             else:
                 print(s_type)
@@ -642,17 +643,17 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
             # connect it to an action
             spin_box.valueChanged.connect(self.update_params_acc.trigger)
 
-            l_label = QtGui.QLabel(spin_prams['name'])
+            l_label = QtWidgets.QLabel(spin_prams['name'])
             if 'tooltip' in spin_prams:
                 l_label.setToolTip(spin_prams['tooltip'])
             # if it can be turned on or off
             if spin_prams['togglable']:
-                l_checkbox = QtGui.QCheckBox('enable')
+                l_checkbox = QtWidgets.QCheckBox('enable')
                 l_checkbox.stateChanged.connect(spin_box.setEnabled)
                 l_checkbox.setChecked(spin_prams['default_state'])
                 spin_box.setEnabled(spin_prams['default_state'])
                 l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
-                l_h_layout = QtGui.QHBoxLayout()
+                l_h_layout = QtWidgets.QHBoxLayout()
                 l_h_layout.addWidget(spin_box)
                 l_h_layout.addWidget(l_checkbox)
                 fringe_cntrls_spins.addRow(l_label, l_h_layout)
@@ -664,23 +665,23 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
             self.param_spin_dict[name] = spin_box
 
         for cb_param in self.toggle_lst:
-            l_label = QtGui.QLabel(cb_param['name'])
+            l_label = QtWidgets.QLabel(cb_param['name'])
             if 'tooltip' in cb_param:
                 l_label.setToolTip(cb_param['tooltip'])
 
-            l_checkbox = QtGui.QCheckBox('enable')
+            l_checkbox = QtWidgets.QCheckBox('enable')
             l_checkbox.setChecked(cb_param['default'])
             self.param_checkbox_dict[cb_param['name']] = l_checkbox
             l_checkbox.stateChanged.connect(self.update_params_acc.trigger)
             fringe_cntrls_spins.addRow(l_label, l_checkbox)
 
         # button to grab initial spline
-        grab_button = QtGui.QPushButton('Grab Spline')
+        grab_button = QtWidgets.QPushButton('Grab Spline')
         grab_button.clicked.connect(self.grab_sf_curve)
         fc_vboxes.addWidget(grab_button)
         # button to process this frame
 
-        ptf_button = QtGui.QPushButton('Process This Frame')
+        ptf_button = QtWidgets.QPushButton('Process This Frame')
         ptf_button.clicked.connect(self.proc_this_frame_acc.trigger)
         ptf_button.setEnabled(self.proc_this_frame_acc.isEnabled())
         self.proc_this_frame_acc.changed.connect(
@@ -690,7 +691,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         fc_vboxes.addWidget(ptf_button)
 
         # button to process next frame
-        pnf_button = QtGui.QPushButton('Process Next Frame')
+        pnf_button = QtWidgets.QPushButton('Process Next Frame')
         pnf_button.clicked.connect(self.proc_next_frame_acc.trigger)
         pnf_button.setEnabled(self.proc_next_frame_acc.isEnabled())
         self.proc_next_frame_acc.changed.connect(
@@ -700,11 +701,11 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         fc_vboxes.addWidget(pnf_button)
 
         # nuke tracking data
-        clear_mbe_button = QtGui.QPushButton('Clear fringes')
+        clear_mbe_button = QtWidgets.QPushButton('Clear fringes')
         clear_mbe_button.clicked.connect(self.clear_mbe)
         fc_vboxes.addWidget(clear_mbe_button)
 
-        self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
+        self.fringe_grp_bx = QtWidgets.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
         self.fringe_grp_bx.setChecked(False)
         self.fringe_grp_bx.toggled.connect(self.set_fringes_visible)
@@ -712,9 +713,9 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         #        self.proc_this_frame_acc.triggered.connect(
         #   lambda:self.fringe_grp_bx.setChecked(True))
 
-        all_fringe_rb = QtGui.QRadioButton('All Fringes')
-        valid_fringes_rb = QtGui.QRadioButton('Valid Fringes')
-        rb_vbox = QtGui.QVBoxLayout()
+        all_fringe_rb = QtWidgets.QRadioButton('All Fringes')
+        valid_fringes_rb = QtWidgets.QRadioButton('Valid Fringes')
+        rb_vbox = QtWidgets.QVBoxLayout()
         rb_vbox.addWidget(valid_fringes_rb)
         rb_vbox.addWidget(all_fringe_rb)
         self.fringe_grp_bx.setLayout(rb_vbox)
@@ -723,13 +724,13 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         valid_fringes_rb.setChecked(True)
         fc_vboxes.addWidget(self.fringe_grp_bx)
 
-        iterate_button = QtGui.QPushButton('Iterate fringes')
+        iterate_button = QtWidgets.QPushButton('Iterate fringes')
         iterate_button.clicked.connect(self.iterate_frame)
         iterate_button.setEnabled(False)
         fc_vboxes.addWidget(iterate_button)
         self.iterate_button = iterate_button
 
-        start_comp_bttn = QtGui.QPushButton('Start Computation')
+        start_comp_bttn = QtWidgets.QPushButton('Start Computation')
         start_comp_bttn.clicked.connect(self.start_comp_acc.trigger)
 
         start_comp_bttn.setEnabled(self.start_comp_acc.isEnabled())
@@ -741,19 +742,19 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         fc_vboxes.addStretch()
 
         # section for making spline fitting panel
-        spline_cntrls = QtGui.QVBoxLayout()
-        spline_cntrls_w = QtGui.QWidget()
+        spline_cntrls = QtWidgets.QVBoxLayout()
+        spline_cntrls_w = QtWidgets.QWidget()
         spline_cntrls_w.setLayout(spline_cntrls)
 
-        self.sf_check = QtGui.QCheckBox('enabled input')
+        self.sf_check = QtWidgets.QCheckBox('enabled input')
         self.sf_check.stateChanged.connect(self.set_spline_fitter)
         spline_cntrls.addWidget(self.sf_check)
 
-        self.sf_show = QtGui.QCheckBox('display fitter')
+        self.sf_show = QtWidgets.QCheckBox('display fitter')
         self.sf_show.stateChanged.connect(self.set_spline_fitter_visible)
         spline_cntrls.addWidget(self.sf_show)
 
-        clear_spline_button = QtGui.QPushButton('Clear Spline')
+        clear_spline_button = QtWidgets.QPushButton('Clear Spline')
         clear_spline_button.clicked.connect(self.clear_spline)
         spline_cntrls.addWidget(clear_spline_button)
 
@@ -762,8 +763,8 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         diag_tool_box.addItem(spline_cntrls_w, "Manual Spline Fitting")
 
         # section for making spline fitting panel
-        paths_layout = QtGui.QVBoxLayout()
-        path_w = QtGui.QWidget()
+        paths_layout = QtWidgets.QVBoxLayout()
+        path_w = QtWidgets.QWidget()
         path_w.setLayout(paths_layout)
 
         for c in self.cap_lst:
@@ -783,7 +784,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         diag_tool_box.addItem(path_w, "Paths")
 
     def create_main_frame(self):
-        self.main_frame = QtGui.QWidget()
+        self.main_frame = QtWidgets.QWidget()
         # create the mpl Figure and FigCanvas objects.
         # 5x4 inches, 100 dots-per-inch
         #
@@ -822,7 +823,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         #
         # lay out main panel
 
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         vbox.addWidget(self.mpl_toolbar)
         vbox.addWidget(self.canvas)
 
@@ -878,13 +879,13 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
         self.redraw_sig.emit(False, False)
 
     def create_status_bar(self):
-        self.status_text = QtGui.QLabel(str(self.cur_frame))
+        self.status_text = QtWidgets.QLabel(str(self.cur_frame))
 
-        self.fname_text = QtGui.QLabel('')
+        self.fname_text = QtWidgets.QLabel('')
         self.fname_text.setTextInteractionFlags(
             QtCore.Qt.TextSelectableByMouse)
         self.statusBar().addWidget(self.status_text)
-        self.prog_bar = QtGui.QProgressBar()
+        self.prog_bar = QtWidgets.QProgressBar()
         self.prog_bar.setRange(0, 0)
         self.prog_bar.hide()
         self.statusBar().addWidget(self.prog_bar, 1)
@@ -892,10 +893,10 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
 
     def closeEvent(self, ce):
         self.kill_thread.emit()
-        #        QtGui.qApp.quit()
+        #        QtWidgets.qApp.quit()
         #        self.thread.quit()
         self.diag.close()
-        QtGui.QMainWindow.closeEvent(self, ce)
+        QtWidgets.QMainWindow.closeEvent(self, ce)
 
     def create_actions(self):
         self.show_cntrl_acc = QtGui.QAction(u'show controls', self)
@@ -942,7 +943,8 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
 
     @QtCore.Slot()
     def _play(self):
-        QtGui.qApp.processEvents()        # make sure all pending
+        QtWidgets.QApplication.instance().processEvents()        # make sure all pending
+
                                           # events are cleaned up if we
                                           # don't do this, this gets
                                           # hit before the button is

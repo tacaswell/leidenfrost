@@ -39,8 +39,7 @@ import scipy.interpolate as si
 import os
 
 import cine
-from trackpy.tracking import Point
-from trackpy.tracking import Track
+from trackpy.linking.legacy import Point, Track
 import find_peaks.peakdetect as pd
 import trackpy.tracking as pt
 

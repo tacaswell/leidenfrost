@@ -20,15 +20,16 @@ from builtins import range
 
 # do this to make me learn where stuff is and to make it easy to
 # switch to PyQt later
-import PySide.QtCore as QtCore
-import PySide.QtGui as QtGui
+import PySide6.QtCore as QtCore
+import PySide6.QtGui as QtGui
+import PySide6.QtWidgets as QtWidgets
 import os.path
 
 
 from leidenfrost import FilePath
 
 
-class directory_selector(QtGui.QWidget):
+class directory_selector(QtWidgets.QWidget):
     '''
     A widget class deal with selecting and displaying path names
     '''
@@ -36,22 +37,22 @@ class directory_selector(QtGui.QWidget):
     selected = QtCore.Signal(str)
 
     def __init__(self, caption, path='', parent=None):
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         print(caption)
         self.cap = caption
 
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
-        layout.addWidget(QtGui.QLabel(caption))
+        layout.addWidget(QtWidgets.QLabel(caption))
 
-        hlayout = QtGui.QHBoxLayout()
+        hlayout = QtWidgets.QHBoxLayout()
         layout.addLayout(hlayout)
 
-        self.label = QtGui.QLabel(path)
+        self.label = QtWidgets.QLabel(path)
         hlayout.addWidget(self.label)
         hlayout.addStretch()
-        button = QtGui.QPushButton('')
+        button = QtWidgets.QPushButton('')
         button.setIcon(QtGui.QIcon.fromTheme('folder'))
         button.clicked.connect(self.select_path)
         hlayout.addWidget(button)
@@ -69,7 +70,7 @@ class directory_selector(QtGui.QWidget):
         cur_path = self.path
         if len(cur_path) == 0:
             cur_path = None
-        path = QtGui.QFileDialog.getExistingDirectory(self,
+        path = QtWidgets.QFileDialog.getExistingDirectory(self,
                                                       caption=self.cap,
                                                       dir=cur_path)
 
@@ -89,7 +90,7 @@ class directory_selector(QtGui.QWidget):
         self.set_path(in_path)
 
 
-class numbered_paths(QtGui.QWidget):
+class numbered_paths(QtWidgets.QWidget):
     def __init__(self, N, parent=None):
         """
         Parameters
@@ -97,9 +98,9 @@ class numbered_paths(QtGui.QWidget):
         N : int
            Initial number of path to keep track of
         """
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         self.path_widgets = []
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         for j in range(N):
             tmp = directory_selector('Disk {}'.format(j))
@@ -111,7 +112,7 @@ class numbered_paths(QtGui.QWidget):
         return {j: path for j, path in enumerate(fs.path for fs in self.path_widgets)}
 
 
-class base_path_path_selector(QtGui.QWidget):
+class base_path_path_selector(QtWidgets.QWidget):
     def __init__(self, caption, parent=None):
         """
         Parameters
@@ -119,12 +120,12 @@ class base_path_path_selector(QtGui.QWidget):
         N : int
            Initial number of path to keep track of
         """
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         self.base_widget = directory_selector('{} base path'.format(caption))
         self.path_widget = directory_selector('{} path'.format(caption))
         self.path_widget.selected.connect(self.validate_path)
 
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addWidget(self.base_widget)
         layout.addWidget(self.path_widget)
@@ -149,38 +150,38 @@ class base_path_path_selector(QtGui.QWidget):
             self.path_widget.path = bp
 
 
-class frame_range_selector(QtGui.QWidget):
+class frame_range_selector(QtWidgets.QWidget):
     frame_range = QtCore.Signal(int, int)
     updated = QtCore.Signal()
 
     def __init__(self, spinner, parent=None):
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         self._spinner = spinner
         self._start = 0
         self._end = 1
         # global layout
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         # top layer of labels
-        top_layer = QtGui.QHBoxLayout()
-        self._end_lab = QtGui.QLabel('-')
-        self._start_lab = QtGui.QLabel('-')
+        top_layer = QtWidgets.QHBoxLayout()
+        self._end_lab = QtWidgets.QLabel('-')
+        self._start_lab = QtWidgets.QLabel('-')
         top_layer.addWidget(self._start_lab)
         top_layer.addWidget(self._end_lab)
 
         # in/out buttons
-        mid_layer = QtGui.QHBoxLayout()
+        mid_layer = QtWidgets.QHBoxLayout()
 
-        start_button = QtGui.QPushButton('in')
+        start_button = QtWidgets.QPushButton('in')
         start_button.clicked.connect(self._set_start)
         mid_layer.addWidget(start_button)
 
-        end_button = QtGui.QPushButton('out')
+        end_button = QtWidgets.QPushButton('out')
         end_button.clicked.connect(self._set_end)
         mid_layer.addWidget(end_button)
 
         # submit button
-        submit = QtGui.QPushButton('submit')
+        submit = QtWidgets.QPushButton('submit')
         submit.clicked.connect(
             lambda: self.frame_range.emit(self._start, self._end))
         layout.addLayout(top_layer)
@@ -218,28 +219,28 @@ class frame_range_selector(QtGui.QWidget):
                 lab.setNum(val)
 
 
-class md_state(QtGui.QWidget):
+class md_state(QtWidgets.QWidget):
     """
     a class for displaying meta-data, eats dicts returned by the db
     """
     def __init__(self, parent=None):
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
 
-        top_row = QtGui.QHBoxLayout()
-        top_row.addWidget(QtGui.QLabel("in: "))
-        self._in_label = QtGui.QLabel('-')
+        top_row = QtWidgets.QHBoxLayout()
+        top_row.addWidget(QtWidgets.QLabel("in: "))
+        self._in_label = QtWidgets.QLabel('-')
         top_row.addWidget(self._in_label)
         top_row.addStretch()
-        self._out_label = QtGui.QLabel('-')
+        self._out_label = QtWidgets.QLabel('-')
         top_row.addWidget(self._out_label)
 
-        bottom_row = QtGui.QHBoxLayout()
-        bottom_row.addWidget(QtGui.QLabel("useful: "))
-        self._useful_lab = QtGui.QLabel('-')
+        bottom_row = QtWidgets.QHBoxLayout()
+        bottom_row.addWidget(QtWidgets.QLabel("useful: "))
+        self._useful_lab = QtWidgets.QLabel('-')
         bottom_row.addWidget(self._useful_lab)
 
         # top level layout
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addLayout(top_row)
         layout.addLayout(bottom_row)
@@ -259,14 +260,14 @@ class md_state(QtGui.QWidget):
                 lab.setText(str(v))
 
 
-class dict_display(QtGui.QGroupBox):
+class dict_display(QtWidgets.QGroupBox):
     """
     A generic widget for displaying dictionaries
     """
     def __init__(self, title, ignore_list=None, parent=None):
-        QtGui.QGroupBox.__init__(self, title, parent=parent)
+        QtWidgets.QGroupBox.__init__(self, title, parent=parent)
 
-        self.full_layout = QtGui.QVBoxLayout()
+        self.full_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.full_layout)
         self._ignore = set(['_id', 'fpath'])
         self._data_list = []
@@ -292,11 +293,11 @@ class dict_display(QtGui.QGroupBox):
 
         for k, v in sorted(list(in_dict.items())):
             if k not in self._ignore:
-                tmp = QtGui.QWidget(self)
-                tmp_l = QtGui.QHBoxLayout()
+                tmp = QtWidgets.QWidget(self)
+                tmp_l = QtWidgets.QHBoxLayout()
                 tmp.setLayout(tmp_l)
-                tmp_l.addWidget(QtGui.QLabel(k + ':'))
+                tmp_l.addWidget(QtWidgets.QLabel(k + ':'))
                 tmp_l.addStretch()
-                tmp_l.addWidget(QtGui.QLabel(str(v)))
+                tmp_l.addWidget(QtWidgets.QLabel(str(v)))
                 self.full_layout.addWidget(tmp)
                 self._data_list.append(tmp)
