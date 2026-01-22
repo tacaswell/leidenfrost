@@ -419,7 +419,7 @@ successive rims.  If exceeded, the previous seed-curve is re-used"""},
                     )
                     self.fringe_lines.extend(
                         mbe.ax_draw_center_curves(self.axes))
-
+                self.axes.legend()
         self.canvas.draw()
         self.status_text.setNum(self.cur_frame)
         self.draw_done_sig.emit()

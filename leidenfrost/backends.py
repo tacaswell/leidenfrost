@@ -835,8 +835,8 @@ class MemBackendFrame(object):
     def ax_draw_center_curves(self, ax,
                               prev_c=True, next_c=True,
                               seed_dict=None, cur_dict=None):
-        _seed_dict = {'color': 'g', 'lw': 2, 'linestyle': '--'}
-        _cur_dict = {'color': 'm', 'lw': 1, 'linestyle': '--'}
+        _seed_dict = {'color': 'g', 'lw': 2, 'linestyle': '--', 'label': 'seed'}
+        _cur_dict = {'color': 'm', 'lw': 1, 'linestyle': '--', 'label': 'current'}
         if seed_dict is not None:
             _seed_dict.update(seed_dict)
         if cur_dict is not None:
