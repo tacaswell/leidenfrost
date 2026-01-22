@@ -930,7 +930,7 @@ def _read_frame_tracks_from_file_raw(parent_group):
     Reads out all of the raw data
 
     '''
-
+    infra.Point1D_circ.reset_counter()
     # names
     raw_data_name = 'raw_data_'
     raw_track_md_name = 'raw_track_md_'

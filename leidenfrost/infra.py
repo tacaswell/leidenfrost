@@ -41,7 +41,7 @@ import os
 import cine
 from trackpy.linking.legacy import Point, Track
 import find_peaks.peakdetect as pd
-import trackpy.tracking as pt
+import trackpy.linking.legacy as pt
 
 import weakref
 
@@ -74,6 +74,7 @@ class hash_line_angular(object):
                       in range(0, int(np.ceil(full_width / bin_width)))]
         self.bin_width = bin_width
         self.bin_count = len(self.boxes)
+        self.points = []
 
     def add_point(self, point):
         '''
@@ -84,6 +85,7 @@ class hash_line_angular(object):
         Assumes that the point have been properly rationalized 0<`point.phi`< max
         '''
         self.boxes[int(np.floor(point.phi / self.bin_width))].append(point)
+        self.points.append(point)
 
     def get_region(self, point, bbuffer):
         '''
@@ -834,7 +836,7 @@ def find_rim_fringes(curve, lfimg, s_width, s_num,
 
 def proc_frame(curve, img, s_width, s_num, search_range, min_tlen=5, **kwargs):
     '''new version with different returns'''
-
+    Point1D_circ.reset_counter()
     _t0 = time.time()
 
     miv, mav = find_rim_fringes(curve,
@@ -862,17 +864,16 @@ def link_ridges(vec, search_range, memory=0, **kwargs):
 
     levels = [[Point1D_circ(q, phi, v) for phi, v in pks] for q, pks in vec]
 
-    trks = pt.link_full(levels,
-                        2 * np.pi,
-                        search_range,
-                        hash_cls=hash_line_angular,
-                        memory=memory,
-                        track_cls=lf_Track)
+    trks = list(pt.link(levels,
+                   [search_range],
+                   hash_generator=lambda: hash_line_angular(2*np.pi, search_range),
+                   memory=memory,
+                   track_cls=lf_Track))
     for t in trks:
         t.classify2(**kwargs)
 
-    trks.sort(key=lambda x: x.phi)
-    return trks
+    return sorted(trks, key=lambda x: x.phi if x.phi is not None else 6*np.pi)
+
 
 
 def resample_track(data, pt_num=250, interp_type='linear'):
