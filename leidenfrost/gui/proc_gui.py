@@ -20,6 +20,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from builtins import zip
 from builtins import str
+import traceback
 
 import os
 import copy
@@ -79,6 +80,7 @@ class LFWorker(QtCore.QObject):
                     ind, curve)
                 self.frame_proced.emit(True, True)
             except Exception as e:
+                traceback.print_tb(e.__traceback__)
                 print(e)
                 print('something is borked')
                 self.frame_proced.emit(False, False)
