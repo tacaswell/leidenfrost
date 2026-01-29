@@ -835,8 +835,8 @@ class MemBackendFrame(object):
     def ax_draw_center_curves(self, ax,
                               prev_c=True, next_c=True,
                               seed_dict=None, cur_dict=None):
-        _seed_dict = {'color': 'g', 'lw': 2, 'linestyle': '--'}
-        _cur_dict = {'color': 'm', 'lw': 1, 'linestyle': '--'}
+        _seed_dict = {'color': 'g', 'lw': 2, 'linestyle': '--', 'label': 'seed'}
+        _cur_dict = {'color': 'm', 'lw': 1, 'linestyle': '--', 'label': 'current'}
         if seed_dict is not None:
             _seed_dict.update(seed_dict)
         if cur_dict is not None:
@@ -930,7 +930,7 @@ def _read_frame_tracks_from_file_raw(parent_group):
     Reads out all of the raw data
 
     '''
-
+    infra.Point1D_circ.reset_counter()
     # names
     raw_data_name = 'raw_data_'
     raw_track_md_name = 'raw_track_md_'

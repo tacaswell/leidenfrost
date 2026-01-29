@@ -26,12 +26,13 @@ import os
 
 # do this to make me learn where stuff is and to make it easy to
 # switch to PyQt later
-import PySide.QtCore as QtCore
-import PySide.QtGui as QtGui
+import PySide6.QtCore as QtCore
+import PySide6.QtGui as QtGui
+import PySide6.QtWidgets as QtWidgets
 
 import matplotlib
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.gridspec as gridspec
 
@@ -138,7 +139,7 @@ class LFReader(QtCore.QObject):
         return -1
 
 
-class LFReaderGui(QtGui.QMainWindow):
+class LFReaderGui(QtWidgets.QMainWindow):
     read_request_sig = QtCore.Signal(int)
     open_file_sig = QtCore.Signal(backends.FilePath, str, dict)
     kill_thread = QtCore.Signal()
@@ -150,7 +151,7 @@ class LFReaderGui(QtGui.QMainWindow):
                'hdf cache path']
 
     def __init__(self, parent=None):
-        QtGui.QMainWindow.__init__(self, parent)
+        QtWidgets.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Fringe Display')
 
         self.draw_fringes = False
@@ -187,7 +188,7 @@ class LFReaderGui(QtGui.QMainWindow):
 
         self.label_block = None
 
-        QtGui.qApp.exec_()
+        QtWidgets.qApp.exec_()
 
     def set_fringes_visible(self, i):
         self.draw_fringes = bool(i)
@@ -308,7 +309,7 @@ class LFReaderGui(QtGui.QMainWindow):
         else:
             cine_bp = hdf_bp
 
-        fname, _ = QtGui.QFileDialog.getOpenFileName(self,
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                      caption='Select File',
                                                      filter='hdf (*.h5 *.hdf)')
         if len(fname) == 0:
@@ -336,14 +337,14 @@ class LFReaderGui(QtGui.QMainWindow):
             diag_layout.removeWidget(self.label_block)
             self.label_block.setVisible(False)
 
-        param_form_layout = QtGui.QFormLayout()
+        param_form_layout = QtWidgets.QFormLayout()
         ignore_lst = ['tck0', 'tck1', 'tck2', 'center',
                       'cine_path', 'cine_fname', 'cine_hash']
         for k, v in prams.items():
             if k in ignore_lst:
                 continue
-            param_form_layout.addRow(QtGui.QLabel(k + ':'),
-                                     QtGui.QLabel(str(v)))
+            param_form_layout.addRow(QtWidgets.QLabel(k + ':'),
+                                     QtWidgets.QLabel(str(v)))
 
         def print_parameters():
             '''
@@ -357,11 +358,11 @@ class LFReaderGui(QtGui.QMainWindow):
                     continue
                 print("| {key} | {val} |".format(key=k, val=v))
 
-        print_button = QtGui.QPushButton('Print')
+        print_button = QtWidgets.QPushButton('Print')
         print_button.pressed.connect(print_parameters)
 
-        self.label_block = QtGui.QGroupBox("Parameters")
-        lb_layout = QtGui.QVBoxLayout()
+        self.label_block = QtWidgets.QGroupBox("Parameters")
+        lb_layout = QtWidgets.QVBoxLayout()
         lb_layout.addLayout(param_form_layout)
         lb_layout.addWidget(print_button)
         self.label_block.setLayout(lb_layout)
@@ -370,24 +371,24 @@ class LFReaderGui(QtGui.QMainWindow):
     def create_diag(self):
 
         # frame number lives on top
-        self.frame_spinner = QtGui.QSpinBox()
+        self.frame_spinner = QtWidgets.QSpinBox()
         self.frame_spinner.setRange(0, len(self.reader) - 1)
         self.frame_spinner.valueChanged.connect(self.set_cur_frame)
         self.frame_spinner.setWrapping(True)
-        frame_selector_group = QtGui.QVBoxLayout()
-        fs_form = QtGui.QHBoxLayout()
-        fs_form.addWidget(QtGui.QLabel('frame #'))
+        frame_selector_group = QtWidgets.QVBoxLayout()
+        fs_form = QtWidgets.QHBoxLayout()
+        fs_form.addWidget(QtWidgets.QLabel('frame #'))
         fs_form.addWidget(self.frame_spinner)
-        fs_form.addWidget(QtGui.QLabel(' of '))
-        self.max_frame_label = QtGui.QLabel(str(self.reader.last_frame))
+        fs_form.addWidget(QtWidgets.QLabel(' of '))
+        self.max_frame_label = QtWidgets.QLabel(str(self.reader.last_frame))
         fs_form.addWidget(self.max_frame_label)
-        fs_form.addWidget(QtGui.QLabel(' cine '))
-        self.max_cine_label = QtGui.QLabel(str(self.reader.cine_len() - 1))
+        fs_form.addWidget(QtWidgets.QLabel(' cine '))
+        self.max_cine_label = QtWidgets.QLabel(str(self.reader.cine_len() - 1))
         fs_form.addWidget(self.max_cine_label)
-        fs_stepbox = QtGui.QGroupBox("Frame step")
-        fs_sb_rb = QtGui.QHBoxLayout()
+        fs_stepbox = QtWidgets.QGroupBox("Frame step")
+        fs_sb_rb = QtWidgets.QHBoxLayout()
         for j in [1, 10, 100, 1000, 10000]:
-            tmp_rdo = QtGui.QRadioButton(str(j))
+            tmp_rdo = QtWidgets.QRadioButton(str(j))
             tmp_rdo.toggled.connect(lambda x, j=j:
                                     self.frame_spinner.setSingleStep(j)
                                     if x else None)
@@ -400,14 +401,14 @@ class LFReaderGui(QtGui.QMainWindow):
         frame_selector_group.addWidget(fs_stepbox)
 
         # box for setting if the fringes should be drawn
-        self.fringe_grp_bx = QtGui.QGroupBox("Draw Fringes")
+        self.fringe_grp_bx = QtWidgets.QGroupBox("Draw Fringes")
         self.fringe_grp_bx.setCheckable(True)
         self.fringe_grp_bx.setChecked(self.draw_fringes)
         self.fringe_grp_bx.toggled.connect(self.set_fringes_acc.setChecked)
         self.set_fringes_acc.toggled.connect(self.fringe_grp_bx.setChecked)
-        all_fringe_rb = QtGui.QRadioButton('All Fringes')
-        valid_fringes_rb = QtGui.QRadioButton('Valid Fringes')
-        rb_vbox = QtGui.QVBoxLayout()
+        all_fringe_rb = QtWidgets.QRadioButton('All Fringes')
+        valid_fringes_rb = QtWidgets.QRadioButton('Valid Fringes')
+        rb_vbox = QtWidgets.QVBoxLayout()
         rb_vbox.addWidget(valid_fringes_rb)
         rb_vbox.addWidget(all_fringe_rb)
         self.fringe_grp_bx.setLayout(rb_vbox)
@@ -423,8 +424,8 @@ class LFReaderGui(QtGui.QMainWindow):
         self.set_all_fringes_acc.toggled.connect(rb_sync)
 
         # box for path information
-        path_box = QtGui.QGroupBox("paths")
-        pb_layout = QtGui.QVBoxLayout()
+        path_box = QtWidgets.QGroupBox("paths")
+        pb_layout = QtWidgets.QVBoxLayout()
         path_box.setLayout(pb_layout)
         for c in self.cap_lst:
             ds = directory_selector(caption=c)
@@ -433,15 +434,15 @@ class LFReaderGui(QtGui.QMainWindow):
             ds.selected.connect(lambda x, c=c: self.paths_dict.__setitem__(c, x))
 
         # set up over-all layout
-        self.diag = QtGui.QDockWidget('controls', parent=self)
+        self.diag = QtWidgets.QDockWidget('controls', parent=self)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.diag)
-        diag_widget = QtGui.QWidget(self.diag)
+        diag_widget = QtWidgets.QWidget(self.diag)
         self.diag.setWidget(diag_widget)
-        diag_layout = QtGui.QVBoxLayout()
+        diag_layout = QtWidgets.QVBoxLayout()
         diag_widget.setLayout(diag_layout)
 
         # play button
-        play_button = QtGui.QPushButton('Play')
+        play_button = QtWidgets.QPushButton('Play')
         self.play_button = play_button
         play_button.setCheckable(True)
         self.play_button.pressed.connect(self.frame_spinner.stepUp)
@@ -457,11 +458,11 @@ class LFReaderGui(QtGui.QMainWindow):
         in_out_select.frame_range.connect(tmp)
         in_out_select.frame_range.connect(self.reader.set_inout_range)
 
-        useful_button = QtGui.QPushButton('useful')
+        useful_button = QtWidgets.QPushButton('useful')
         useful_button.clicked.connect(self.reader.set_useful)
-        useless_button = QtGui.QPushButton('useless')
+        useless_button = QtWidgets.QPushButton('useless')
         useless_button.clicked.connect(self.reader.set_useless)
-        use_level = QtGui.QHBoxLayout()
+        use_level = QtWidgets.QHBoxLayout()
         use_level.addWidget(useful_button)
         use_level.addWidget(useless_button)
 
@@ -484,7 +485,7 @@ class LFReaderGui(QtGui.QMainWindow):
             QtCore.QTimer.singleShot(30, self.frame_spinner.stepUp)
 
     def create_main_frame(self):
-        self.main_frame = QtGui.QWidget()
+        self.main_frame = QtWidgets.QWidget()
         # create the mpl Figure and FigCanvas objects.
         # 5x4 inches, 100 dots-per-inch
         #
@@ -528,7 +529,7 @@ class LFReaderGui(QtGui.QMainWindow):
         # Other GUI controls
         #
         # lay out main panel
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         vbox.addWidget(self.mpl_toolbar)
         vbox.addWidget(self.canvas)
 
@@ -536,11 +537,11 @@ class LFReaderGui(QtGui.QMainWindow):
         self.setCentralWidget(self.main_frame)
 
     def create_status_bar(self):
-        self.status_text = QtGui.QLabel('')
-        self.fname_text = QtGui.QLabel('')
+        self.status_text = QtWidgets.QLabel('')
+        self.fname_text = QtWidgets.QLabel('')
         self.fname_text.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.statusBar().addWidget(self.status_text)
-        self.prog_bar = QtGui.QProgressBar()
+        self.prog_bar = QtWidgets.QProgressBar()
         self.prog_bar.setRange(0, 0)
         self.prog_bar.hide()
         self.statusBar().addWidget(self.prog_bar, 1)
@@ -550,13 +551,13 @@ class LFReaderGui(QtGui.QMainWindow):
         self.kill_thread.emit()
 
         self.diag.close()
-        QtGui.QMainWindow.closeEvent(self, ce)
+        QtWidgets.QMainWindow.closeEvent(self, ce)
 
     def create_actions(self):
 
         def set_dir(cap, d):
             print(cap)
-            base_dir = QtGui.QFileDialog.getExistingDirectory(self,
+            base_dir = QtWidgets.QFileDialog.getExistingDirectory(self,
                                                               caption=cap,
                                                               dir=d[cap])
             if len(base_dir) > 0:
@@ -638,15 +639,15 @@ class PickerHandler(object):
             print('fail type 2')
 
 
-class GraphDialog(QtGui.QDialog):
+class GraphDialog(QtWidgets.QDialog):
     def __init__(self, grid_size=(1, 1), parent=None):
-        QtGui.QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
 
         self.fig = Figure((10, 10))
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self)
-        self.canvas.setSizePolicy(QtGui.QSizePolicy.Expanding,
-                                  QtGui. QSizePolicy.Expanding)
+        self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                  QtWidgets. QSizePolicy.Expanding)
         self.gs = gridspec.GridSpec(*grid_size)
         self.axes_list = [self.fig.add_subplot(s) for s in self.gs]
         self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1])
@@ -657,45 +658,45 @@ class GraphDialog(QtGui.QDialog):
         self.canvas.draw()
 
     def resizeEvent(self, re):
-        QtGui.QDialog.resizeEvent(self, re)
+        QtWidgets.QDialog.resizeEvent(self, re)
         self.canvas.resize(re.size().width(), re.size().height())
         self.gs.tight_layout(self.fig, rect=[0, 0, 1, 1], pad=0)
 
 
-class BinaryFrameSearch(QtGui.QDialog):
+class BinaryFrameSearch(QtWidgets.QDialog):
     change_frame = QtCore.Signal(int)
 
     def __init__(self, max_number, min_number=0, parent=None):
-        QtGui.QDialog.__init__(self, parent)
-        main_layout = QtGui.QVBoxLayout()
+        QtWidgets.QDialog.__init__(self, parent)
+        main_layout = QtWidgets.QVBoxLayout()
 
-        info_layout = QtGui.QHBoxLayout()
+        info_layout = QtWidgets.QHBoxLayout()
 
-        info_layout.addWidget(QtGui.QLabel('cur frame: '))
-        self.cur_frame_label = QtGui.QLabel('')
+        info_layout.addWidget(QtWidgets.QLabel('cur frame: '))
+        self.cur_frame_label = QtWidgets.QLabel('')
         info_layout.addWidget(self.cur_frame_label)
         info_layout.addStretch()
 
-        info_layout.addWidget(QtGui.QLabel('bottom: '))
-        self.bottom_label = QtGui.QLabel(str(min_number))
+        info_layout.addWidget(QtWidgets.QLabel('bottom: '))
+        self.bottom_label = QtWidgets.QLabel(str(min_number))
         info_layout.addWidget(self.bottom_label)
         info_layout.addStretch()
 
-        info_layout.addWidget(QtGui.QLabel('top: '))
-        self.top_label = QtGui.QLabel(str(max_number))
+        info_layout.addWidget(QtWidgets.QLabel('top: '))
+        self.top_label = QtWidgets.QLabel(str(max_number))
         info_layout.addWidget(self.top_label)
 
-        button_layout = QtGui.QHBoxLayout()
+        button_layout = QtWidgets.QHBoxLayout()
 
-        self.good_button = QtGui.QPushButton('good')
+        self.good_button = QtWidgets.QPushButton('good')
         self.good_button.clicked.connect(self.good_jump)
         button_layout.addWidget(self.good_button)
 
-        self.bad_button = QtGui.QPushButton('bad')
+        self.bad_button = QtWidgets.QPushButton('bad')
         self.bad_button.clicked.connect(self.bad_jump)
         button_layout.addWidget(self.bad_button)
 
-        self.reset_button = QtGui.QPushButton('reset')
+        self.reset_button = QtWidgets.QPushButton('reset')
         self.reset_button.clicked.connect(self.reset)
         button_layout.addWidget(self.reset_button)
 

@@ -1,8 +1,9 @@
 import sys
 import leidenfrost.gui as lfg
-import PySide.QtGui as QtGui
+import PySide6.QtWidgets as QtWidgets
 
 
-app = QtGui.QApplication(sys.argv)
+app = QtWidgets.QApplication(sys.argv)
 lfg.LFGui()
+app.exec_()
 sys.exit()
